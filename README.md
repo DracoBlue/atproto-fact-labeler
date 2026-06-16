@@ -1,0 +1,271 @@
+# atproto-fact-labeler
+
+A self-hostable [atproto](https://atproto.com) labeler that surfaces
+**existing fact-check verdicts** (CORRECTIV, dpa, AFP, Snopes, PolitiFact, …)
+on Bluesky posts.
+
+**This labeler does not decide what is true.** It routes the verdicts that
+third-party fact-checkers have already published. Every emitted label points
+back to its source. The vocabulary on the wire is descriptive
+(`fact-supported`, `fact-refuted`, `fact-disputed`, `fact-unknown`,
+`fact-outdated`, `fact-mixed`).
+
+For the longer-form design rationale, see [`docs/`](./docs):
+
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — runtime topology
+- [EPISTEMICS.md](./docs/EPISTEMICS.md) — who verifies what, on what basis
+- [SOURCES.md](./docs/SOURCES.md) — fact-check feed licensing
+- [COMPONENTS.md](./docs/COMPONENTS.md) — extraction & verification components
+- [PRIOR_ART.md](./docs/PRIOR_ART.md) — what we borrowed from
+- [RESEARCH.md](./docs/RESEARCH.md) — atproto labeler ecosystem survey
+
+License: MIT (see [LICENSE](./LICENSE)).
+
+---
+
+## How it works (in 60 seconds)
+
+```
+Bluesky / Jetstream
+        │
+        ▼
+   ingest worker
+        │
+        ▼
+ LLM extraction (LM Studio @ 127.0.0.1:1234)
+        │
+        ▼
+ ClaimReview lookup (local SQLite index, built from Google Data Commons feed)
+        │
+        ▼
+ publisher-rating normaliser → internal verdict {true,false,mixed,unknown,disputed,outdated}
+        │
+        ▼
+ HITL (stdin · Telegram · auto)
+        │ on accept
+        ▼
+ @skyware/labeler  →  signed label on subscribeLabels  +  detail HTML page
+```
+
+The pipeline is **lookup-first**: most claims are answered by an existing
+fact-check entry. Running our own retrieval-augmented LLM verification is a
+fallback for novel claims and is stubbed in this v0 (see
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §3).
+
+---
+
+## Requirements
+
+- **Node ≥ 22** and **pnpm ≥ 9**.
+- **LM Studio** running an OpenAI-compatible API at
+  `http://127.0.0.1:1234/v1`. A small model like `google/gemma-4-e2b`
+  works for extraction.
+- A copy of the **Google Data Commons Fact Check feed**:
+  ```bash
+  curl -L \
+    https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json \
+    -o data.json
+  ```
+  (Compilation is CC BY 4.0; per-entry text remains under each publisher's
+  copyright. We store URLs + metadata + a normalised rating only.)
+
+---
+
+## Install
+
+```bash
+git clone <this-repo>
+cd atproto-fact-labeler
+pnpm install
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```
+# REQUIRED — your LM Studio key
+OPENAI_API_KEY=sk-lm-...
+
+# Bluesky labeler identity (placeholder fine for local dev)
+LABELER_DID=did:plc:placeholder-replace-after-setup
+LABELER_SIGNING_KEY=         # auto-generated on first run
+
+# HITL surface (stdin | telegram | auto)
+HITL_MODE=stdin
+```
+
+---
+
+## Ingest fact-checks
+
+Build the local SQLite index from the Data Commons feed:
+
+```bash
+pnpm run ingest                    # uses CLAIMREVIEW_FEED_PATH from .env
+# or
+pnpm run ingest path/to/data.json
+```
+
+Progress is logged every 5 000 entries. The full Data Commons dump
+(~200 MB JSON, ~200 k entries) takes a couple of minutes.
+
+---
+
+## Run the service
+
+```bash
+pnpm run start
+```
+
+You'll see something like:
+
+```
+labeler server listening on http://127.0.0.1:14831
+detail HTTP server listening on http://127.0.0.1:14832
+starting Jetstream ingest
+```
+
+The service is now:
+
+- consuming `app.bsky.feed.post` events from the Bluesky Jetstream,
+- extracting atomic claims via LM Studio,
+- matching them against the local fact-check index,
+- proposing labels via your HITL surface.
+
+When you press `a`/`y`, the label is signed by `@skyware/labeler` and
+served on `subscribeLabels`. Without a real Bluesky service account
+registered in PLC, the label won't be honoured by the public AppView yet —
+see [Going Live](#going-live) below.
+
+---
+
+## Local development without internet
+
+To run the pipeline offline against local fixture posts:
+
+```bash
+echo 'JETSTREAM_FIXTURE=fixtures/posts.jsonl' >> .env
+pnpm run start
+```
+
+There is also a deterministic offline smoke test that bypasses LM Studio
+entirely (stubs the extraction with a known claim) and proves the rest of
+the pipeline end-to-end:
+
+```bash
+pnpm tsx src/cli/smoke-test.ts
+```
+
+The fixture file has one JSON post per line. `fixtures/posts.jsonl` ships
+with five sample posts (German + English).
+
+---
+
+## HITL modes
+
+- **`stdin`** (default) — Each proposal prints in your terminal. Press
+  `a`/`y` to accept, `r`/`n` to reject, `d` to defer, `q` to quit.
+- **`telegram`** — Set `TG_BOT_TOKEN` and `TG_REVIEWER_CHAT_ID` in `.env`,
+  then `HITL_MODE=telegram`. The bot DMs you each proposal with inline
+  `✅/❌/↻` buttons.
+- **`auto`** — Decide automatically without a human. Used for smoke
+  tests; accept iff aggregated confidence ≥ 0.8 and votes ≥ 1.
+
+---
+
+## Detail HTTP page
+
+For any post the service has touched:
+
+```
+http://localhost:14832/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx
+http://localhost:14832/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx&format=json
+```
+
+HTML for humans, JSON via `format=json` or `Accept: application/json`.
+
+---
+
+## Tests
+
+```bash
+pnpm test              # one shot
+pnpm run test:watch    # watch mode
+pnpm run typecheck     # tsc --noEmit
+```
+
+Unit tests cover the pure-function paths: rating normalisation, lookup
+tokenisation, extraction-response parsing, attribution shape, label-value
+regex compliance.
+
+---
+
+## Going live
+
+To make the labels visible to real Bluesky users you need three things we
+don't do here:
+
+1. A dedicated Bluesky **service account**, created at `bsky.app`.
+2. `pnpm dlx @skyware/labeler setup` — registers the labeler endpoint and
+   signing key in the account's DID document.
+3. `pnpm dlx @skyware/labeler label add` — declares each value in
+   `app.bsky.labeler.service`.
+
+See [HOSTING guide](https://github.com/skyware-js/labeler) and
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §11 for the full Lite-stack
+deployment path.
+
+---
+
+## Layout
+
+```
+src/
+├── config/                env + zod validation
+├── store/                 SQLite + schema migrations
+├── ingest/
+│   ├── claimreview-feed.ts  Google Data Commons → SQLite
+│   ├── jetstream.ts         live atproto firehose (JSON)
+│   └── fixture.ts           local JSONL replay for tests/dev
+├── pipeline/
+│   ├── extract.ts           S1  LM Studio extraction
+│   ├── lookup.ts            S2  FTS5 over ClaimReview index
+│   ├── normalise-rating.ts  S3  publisher rating → internal verdict
+│   └── orchestrator.ts      glue S0 → S5
+├── hitl/
+│   ├── stdin.ts             terminal HITL
+│   ├── telegram.ts          grammy bot
+│   ├── auto.ts              policy-only HITL
+│   └── format.ts            proposal renderers
+├── labels/
+│   ├── server.ts            @skyware/labeler wrapper + key gen
+│   └── vocabulary.ts        verdict → fact-* label value
+├── detail/
+│   └── server.ts            per-post HTTP "why?" page
+└── index.ts                 main entrypoint
+test/                        vitest unit tests
+fixtures/posts.jsonl         sample posts for offline dev
+docs/                        design docs
+```
+
+---
+
+## Licensing of the data you ingest
+
+- **Google Data Commons Fact Check feed** compilation: CC BY 4.0
+  (attribution required, redistribution permitted).
+- **Individual ClaimReview entries**: the *text* (claim, verdict, rationale)
+  remains under each publisher's own copyright. We store only the URL,
+  metadata, normalised rating, and a verbatim attribution string. We do not
+  mirror publisher text into our PDS records. See
+  [`docs/SOURCES.md`](./docs/SOURCES.md) §12 for the per-publisher posture.
+- Our own normalised verdict + matching work + labels are MIT-licensed and
+  redistributable.
+
+---
+
+## Acknowledgements
+
+Built on top of [`@skyware/labeler`](https://github.com/skyware-js/labeler),
+the lightweight atproto labeler SDK that lets you skip Ozone for solo / lean
+deployments.

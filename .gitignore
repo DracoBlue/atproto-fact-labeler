@@ -1,0 +1,27 @@
+node_modules
+dist
+.DS_Store
+
+# Design / research docs were preparation, not part of the shipped repo.
+docs/
+
+# Local environment + secrets
+.env
+.env.*
+!.env.example
+
+# Large local fact-check feed dump (download separately)
+data.json
+
+# Runtime state
+*.sqlite
+*.sqlite-*
+data/
+.cursor
+
+# Editor
+.idea
+.vscode
+
+# Logs
+*.log

@@ -1,0 +1,44 @@
+{
+  "name": "atproto-fact-labeler",
+  "version": "0.1.0",
+  "description": "An atproto labeler that routes existing fact-check verdicts (CORRECTIV, dpa, AFP, Snopes, ...) onto Bluesky posts — it does not decide what is true; it surfaces who already verified what.",
+  "type": "module",
+  "license": "MIT",
+  "author": "DracoBlue",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "ingest": "tsx src/cli/ingest-claimreview.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Setup)'"
+  },
+  "dependencies": {
+    "@skyware/labeler": "^0.2.0",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.0",
+    "grammy": "^1.32.0",
+    "openai": "^4.79.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "stream-json": "^1.9.1",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "@types/stream-json": "^1.7.8",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
