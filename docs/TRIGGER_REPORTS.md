@@ -192,14 +192,13 @@ sqlite3 data/labeler.sqlite \
   pack): the AppView call returns nothing, the dispatcher logs a warning
   and drops. We only handle `app.bsky.feed.post`.
 - **Reports against a deleted post**: AppView returns empty, drop.
-- **Bulk-report flooding**: there is no rate limit on the HTTP endpoint
-  yet. A bad actor can still hammer it. For self-reports against the
-  labeler's own posts the impact is dampened because the `feedback`
-  table has a UNIQUE constraint on `(subject_uri, reason_type, reason)`
-  — duplicates bump the `count` column instead of creating new rows.
-  For reports against third-party posts, consider adding a per-IP /
-  per-DID rate limit at the Fastify level before going to production
-  scale.
+- **Bulk-report flooding**: when `REQUIRE_REPORT_AUTH=true` (the
+  default), every request must carry a valid atproto service JWT, so a
+  random caller can't spam the endpoint. For self-reports against the
+  labeler's own posts the `feedback` table also dedupes on
+  `(subject_uri, reason_type, reason)` and bumps a `count` column
+  instead of creating new rows. Further per-DID rate limiting is left
+  to a Fastify plugin if traffic justifies it.
 
 ## See also
 

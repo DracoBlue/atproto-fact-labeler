@@ -166,6 +166,8 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post |
 | `TRIGGER_WATCHLIST` | _(empty)_ | Comma-separated DIDs **or handles** whose posts are always checked. Handles are resolved to DIDs at startup; failure to resolve aborts startup |
 | `APPVIEW_URL` | `https://public.api.bsky.app` | Bluesky read-only AppView; used to fetch post text by URI (mention parents, report subjects). Unauthenticated. |
+| `REQUIRE_REPORT_AUTH` | `true` | Validate an atproto service JWT on `createReport`. Real Bluesky clients always sign; flip to `false` only for local curl-based testing. |
+| `PLC_DIRECTORY_URL` | `https://plc.directory` | DID directory used to resolve report-issuer signing keys. |
 | `HITL_MODE` | `stdin` | `stdin` · `telegram` · `auto` |
 | `TG_BOT_TOKEN`, `TG_REVIEWER_CHAT_ID` | — | Required when `HITL_MODE=telegram` |
 | `SQLITE_PATH` | `data/labeler.sqlite` | Index + labeler state DB |

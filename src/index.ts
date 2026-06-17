@@ -535,7 +535,9 @@ async function main(): Promise<void> {
 
   // --- Reports trigger (variant 3) -----------------------------------------
   if (cfg.TRIGGER_REPORTS) {
-    registerReportRoutes(labelerServer.app, async (report) => {
+    registerReportRoutes(
+      labelerServer.app,
+      async (report) => {
       // A user reporting one of our own posts is signalling "you got something
       // wrong" — record it as operator feedback instead of running the pipeline
       // on our own work.
@@ -552,10 +554,22 @@ async function main(): Promise<void> {
         );
         return;
       }
-      logger.info({ uri: report.subjectUri, reasonType: report.reasonType }, 'report received');
+      logger.info(
+        { uri: report.subjectUri, reasonType: report.reasonType, reportedBy: report.reportedBy },
+        'report received',
+      );
       await dispatchByUri(report.subjectUri, { reason: 'report' });
-    });
-    logger.info('TRIGGER_REPORTS enabled — /xrpc/com.atproto.moderation.createReport mounted');
+    },
+      {
+        requireAuth: cfg.REQUIRE_REPORT_AUTH,
+        labelerDid: cfg.LABELER_DID,
+        plcUrl: cfg.PLC_DIRECTORY_URL,
+      },
+    );
+    logger.info(
+      { authRequired: cfg.REQUIRE_REPORT_AUTH },
+      'TRIGGER_REPORTS enabled — /xrpc/com.atproto.moderation.createReport mounted',
+    );
   }
 
   await labelerServer.start();

@@ -74,6 +74,14 @@ const Schema = z.object({
   // path that gives us a Bluesky session). The fallback reuses the labeler's
   // access JWT to pass authorisation.
   APPVIEW_AUTHED_URL: z.string().default('https://api.bsky.app'),
+  // Require a valid atproto service JWT on POST /xrpc/com.atproto.moderation.createReport.
+  // ON by default — a real Bluesky client always signs the call via its PDS.
+  // Turn off only for local development / curl-based testing.
+  REQUIRE_REPORT_AUTH: z
+    .preprocess((v) => v === undefined || v === '1' || v === 'true' || v === true, z.boolean())
+    .default(true),
+  // PLC directory used to resolve report-issuer DIDs to signing keys.
+  PLC_DIRECTORY_URL: z.string().default('https://plc.directory'),
 
   // --- Reply to @mention author ----------------------------------------
   // When true, the labeler posts a Bluesky reply to the mention post after a
