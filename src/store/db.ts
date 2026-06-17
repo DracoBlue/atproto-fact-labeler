@@ -268,6 +268,13 @@ function migrate(db: DbLike): void {
   ensureMentionReplyAcceptsNoTarget(db);
   addColumnIfMissing(db, 'feedback', 'count', 'INTEGER NOT NULL DEFAULT 1');
   addColumnIfMissing(db, 'feedback', 'first_reported_at', "TEXT NOT NULL DEFAULT (datetime('now'))");
+
+  // Dense-retrieval embeddings (Stage 1). float32 LE little-endian BLOB.
+  // Dim is recorded so the cli:embed-rebuild can detect a model change and
+  // refuse to mix dimensions in the same index.
+  addColumnIfMissing(db, 'claim_review', 'embedding', 'BLOB');
+  addColumnIfMissing(db, 'claim_review', 'embedding_dim', 'INTEGER');
+  addColumnIfMissing(db, 'claim_review', 'embedding_model', 'TEXT');
 }
 
 /**

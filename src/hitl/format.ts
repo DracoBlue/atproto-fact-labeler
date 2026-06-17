@@ -15,9 +15,13 @@ export function renderProposalText(p: Proposal): string {
   lines.push('');
   lines.push('Evidence:');
   p.evidence.slice(0, 5).forEach((e, i) => {
+    const flip = e.publisherVerdict !== e.effectiveVerdict
+      ? ` → flipped to ${e.effectiveVerdict}`
+      : '';
     lines.push(
-      `  ${i + 1}. ${e.publisher} — "${truncate(e.ratingNative ?? '?', 40)}"  ${truncate(e.claimReviewed, 100)}`,
+      `  ${i + 1}. [${e.nliLabel} ${e.nliConfidence.toFixed(2)}, cos=${e.cosine.toFixed(2)}] ${e.publisher} — "${truncate(e.ratingNative ?? '?', 40)}"${flip}`,
     );
+    lines.push(`     P: ${truncate(e.claimReviewed, 120)}`);
     lines.push(`     ${e.sourceUrl}`);
   });
   lines.push('');

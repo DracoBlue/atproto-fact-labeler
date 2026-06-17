@@ -3,23 +3,21 @@
  *
  *   S0 ingest    → already done by caller
  *   S1 extract   → LLM atomic claim list
- *   S2 lookup    → FTS over ClaimReview index
- *   S3 normalise → publisher rating → internal verdict
+ *   S2 retrieve  → dense embedding cosine top-K (see retrieve.ts)
+ *   S3 entail    → NLI polarity judge per candidate (see entail.ts)
+ *   S4 match     → drop neutral, flip on contradiction, aggregate
  *   S5 propose   → write a proposal to the HITL queue
  *
- * Each proposal carries enough context for a human or auto-accept policy to decide.
+ * The retrieve→entail→match chain is implemented in matching.ts.
+ * See docs/PIPELINE.md for the architecture rationale.
  */
 import { getDb } from '../store/db.ts';
 import type { DbLike } from '../store/runtime-sqlite.ts';
 import { logger } from '../util/logger.ts';
 import type { IngestedPost } from '../ingest/types.ts';
 import { extractClaims } from './extract.ts';
-import { lookupCandidates, type LookupCandidate } from './lookup.ts';
-import {
-  aggregateVerdicts,
-  normaliseRating,
-  type Aggregated,
-} from './normalise-rating.ts';
+import { matchClaim, type MatchedCandidate } from './matching.ts';
+import type { Aggregated } from './normalise-rating.ts';
 
 export interface Proposal {
   proposalId: number;
@@ -32,7 +30,7 @@ export interface Proposal {
   decontextualized: string;
   verdict: string;
   aggregated: Aggregated | null;
-  evidence: LookupCandidate[];
+  evidence: MatchedCandidate[];
 }
 
 export interface PipelineEnv {
@@ -146,27 +144,32 @@ export async function processPost(
     if ((c.confidence ?? 0) < 0.45) continue;
     falsifiableClaims++;
 
-    // S2 — lookup.
-    const lookup = lookupCandidates(c.decontextualized_text || c.atomic_text, {
-      lang: c.lang ?? post.lang,
-      topK: 5,
-    }, db);
+    // S2 + S3 — retrieve + NLI polarity gate + aggregate. See
+    // docs/PIPELINE.md for the three-stage architecture.
+    const match = await matchClaim(
+      c.decontextualized_text || c.atomic_text,
+      { topK: 10, lang: c.lang ?? post.lang },
+      db,
+    );
 
-    if (!lookup.candidates.length) {
-      logger.debug({ claim: c.atomic_text }, 'no claim-review match, skipping');
+    if (!match.candidates.length) {
+      logger.debug({ claim: c.atomic_text }, 'no candidates retrieved, skipping');
       continue;
     }
     claimsWithMatches++;
 
-    // S3 — normalise + aggregate.
-    const normalised = lookup.candidates
-      .map((cand) => normaliseRating(cand.publisher, cand.ratingNative))
-      .filter(<T,>(v: T | null): v is T => v !== null);
-
-    if (!normalised.length) continue;
-
-    const agg = aggregateVerdicts(normalised);
-    if (!agg) continue;
+    const agg = match.aggregated;
+    if (!agg) {
+      logger.debug(
+        {
+          claim: c.atomic_text,
+          retrieved: match.retrieved,
+          neutral: match.neutral,
+        },
+        'all candidates judged neutral, skipping (uncovered)',
+      );
+      continue;
+    }
 
     // S5 — persist claim, verdict, evidence, proposal.
     const claimResult = db.prepare(INSERT_CLAIM).run(
@@ -183,27 +186,29 @@ export async function processPost(
     );
     const claimId = Number(claimResult.lastInsertRowid);
 
+    const survivingCandidates = match.candidates.filter((m) => m.nliLabel !== 'neutral');
     const verdictResult = db.prepare(INSERT_VERDICT).run(
       claimId,
       post.uri,
       agg.verdict,
-      lookup.candidates[0]?.reviewDate ?? null,
+      survivingCandidates[0]?.reviewDate ?? null,
       'feed',
-      lookup.candidates.map((cand) => cand.publisher).join(','),
+      survivingCandidates.map((cand) => cand.publisher).join(','),
       agg.confidence,
-      `Aggregated from ${agg.votes} fact-check(s); agreement=${agg.agreement}.`,
+      `Aggregated from ${agg.votes} fact-check(s); agreement=${agg.agreement}. ` +
+        `NLI: ${match.entailed} entail, ${match.contradicted} contradict, ${match.neutral} neutral (dropped).`,
     );
     const verdictId = Number(verdictResult.lastInsertRowid);
 
     const evidenceStmt = db.prepare(INSERT_EVIDENCE);
-    for (const cand of lookup.candidates) {
+    for (const cand of survivingCandidates) {
       evidenceStmt.run(
         verdictId,
         cand.sourceUrl,
         cand.publisher,
         cand.ratingNative,
         cand.reviewDate,
-        'claim_review_fts',
+        `dense+nli:${cand.nliLabel}`,
         'see sd_license',
         cand.attribution,
         cand.id,
@@ -234,7 +239,7 @@ export async function processPost(
       decontextualized: c.decontextualized_text,
       verdict: agg.verdict,
       aggregated: agg,
-      evidence: lookup.candidates,
+      evidence: survivingCandidates,
     });
   }
 

@@ -25,8 +25,11 @@ const sample: Proposal = {
       reviewDate: '2018-04-01',
       lang: 'de',
       attribution: 'Fact-checked by CORRECTIV.',
-      bm25Score: -2.4,
-      quality: 0.6,
+      cosine: 0.82,
+      nliLabel: 'entailment',
+      nliConfidence: 0.95,
+      publisherVerdict: 'false',
+      effectiveVerdict: 'false',
     },
   ],
 };

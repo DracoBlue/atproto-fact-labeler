@@ -24,6 +24,7 @@
     "lifecycle:status": "tsx src/cli/lifecycle-status.ts",
     "feedback:list": "tsx src/cli/feedback-list.ts",
     "cli:label": "tsx src/cli/label-post.ts",
+    "cli:embed-rebuild": "tsx src/cli/embed-rebuild.ts",
     "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Going live)'"
   },
   "dependencies": {
@@ -50,5 +51,8 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
+  },
+  "volta": {
+    "node": "24.16.0"
   }
 }

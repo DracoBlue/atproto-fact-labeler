@@ -149,6 +149,7 @@ export async function extractClaims(input: ExtractInput): Promise<ExtractResult>
   const completion = await client().chat.completions.create({
     model: cfg.OPENAI_MODEL,
     temperature: 0,
+    ...(cfg.OPENAI_MAX_TOKENS > 0 ? { max_tokens: cfg.OPENAI_MAX_TOKENS } : {}),
     messages: [
       { role: 'system', content: EXTRACTION_PROMPT },
       { role: 'user', content: userContent },
@@ -156,8 +157,33 @@ export async function extractClaims(input: ExtractInput): Promise<ExtractResult>
     response_format: RESPONSE_FORMAT,
   });
 
-  const raw = completion.choices[0]?.message?.content ?? '';
+  const choice = completion.choices[0];
+  // Reasoning models (qwen3, deepseek-r1, ...) sometimes emit the JSON via
+  // `reasoning_content` instead of `content` when `response_format` is set —
+  // LM Studio in particular does this. Fall back to it if `content` is empty.
+  const message = choice?.message as
+    | { content?: string | null; reasoning_content?: string | null }
+    | undefined;
+  const raw = (message?.content && message.content.trim().length > 0
+    ? message.content
+    : (message?.reasoning_content ?? '')) || '';
+
+  if (!raw && choice?.finish_reason === 'length') {
+    logger.warn(
+      { model: cfg.OPENAI_MODEL, maxTokens: cfg.OPENAI_MAX_TOKENS },
+      'LLM hit max_tokens before producing content — increase OPENAI_MAX_TOKENS (likely a reasoning model)',
+    );
+  } else if (!message?.content && message?.reasoning_content) {
+    logger.debug(
+      { model: cfg.OPENAI_MODEL },
+      'reasoning model emitted JSON via reasoning_content; used as fallback',
+    );
+  }
+
   const claims = parseExtractionResponse(raw);
-  logger.debug({ count: claims.length, model: cfg.OPENAI_MODEL }, 'extraction done');
+  logger.debug(
+    { count: claims.length, model: cfg.OPENAI_MODEL, finishReason: choice?.finish_reason },
+    'extraction done',
+  );
   return { claims, extractorVersion: cfg.OPENAI_MODEL, raw };
 }

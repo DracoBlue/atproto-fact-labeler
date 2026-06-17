@@ -23,10 +23,6 @@ data/
 # Logs
 *.log
 
-# Preparation / research docs — kept locally only.
-docs/ARCHITECTURE.md
-docs/COMPONENTS.md
-docs/EPISTEMICS.md
-docs/PRIOR_ART.md
-docs/RESEARCH.md
-docs/SOURCES.md
+# Local Claude Code state
+.claude/
+

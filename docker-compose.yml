@@ -13,17 +13,61 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-google/gemma-4-e2b}
+      # Reasoning models (qwen3, deepseek-r1) need headroom or finish_reason=length
+      # swallows the answer. Set 0 to let the server pick its default.
+      - OPENAI_MAX_TOKENS=${OPENAI_MAX_TOKENS:-4096}
+
+      # --- Embedding (Stage 1: dense retrieval) ---
+      # Falls back to the OPENAI_* slot when unset, so a single LM Studio
+      # instance can serve both. Override when embeddings live on a different server.
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-granite-embedding-278m-multilingual}
+
+      # --- NLI (Stage 3: polarity gate) ---
+      # llm-judge: prompt OPENAI_MODEL as a 3-class entailment judge (default).
+      # dedicated: reserved for a separate NLI server (not yet implemented).
+      - NLI_MODE=${NLI_MODE:-llm-judge}
+
       # --- Labeler identity ---
       - LABELER_DID=${LABELER_DID:-did:plc:placeholder-replace-after-setup}
+      - LABELER_HANDLE=${LABELER_HANDLE:-}
       - LABELER_SIGNING_KEY=${LABELER_SIGNING_KEY:-}
       - LABELER_HOSTNAME=${LABELER_HOSTNAME:-http://localhost:14831}
       - LABELER_PORT=14831
+
       # --- Ingest ---
       - JETSTREAM_URL=${JETSTREAM_URL:-wss://jetstream2.us-east.bsky.network/subscribe}
+
+      # --- Triggers (mentions + reports on by default; firehose is opt-in) ---
+      - TRIGGER_FIREHOSE=${TRIGGER_FIREHOSE:-false}
+      - TRIGGER_MENTIONS=${TRIGGER_MENTIONS:-true}
+      - TRIGGER_REPORTS=${TRIGGER_REPORTS:-true}
+      - TRIGGER_WATCHLIST=${TRIGGER_WATCHLIST:-}
+
+      # --- AppView (used to fetch parent posts on mentions / report subjects) ---
+      - APPVIEW_URL=${APPVIEW_URL:-https://public.api.bsky.app}
+      - APPVIEW_AUTHED_URL=${APPVIEW_AUTHED_URL:-https://api.bsky.app}
+
+      # --- Report intake ---
+      # JWT verification of createReport requests. ON by default — real Bluesky
+      # clients always sign. Set false only for local curl-based testing.
+      - REQUIRE_REPORT_AUTH=${REQUIRE_REPORT_AUTH:-true}
+      - PLC_DIRECTORY_URL=${PLC_DIRECTORY_URL:-https://plc.directory}
+
+      # --- Mention replies (opt-in; needs a Bluesky service account) ---
+      - REPLY_TO_MENTIONS=${REPLY_TO_MENTIONS:-false}
+      - LABELER_BSKY_SERVICE=${LABELER_BSKY_SERVICE:-https://bsky.social}
+      - LABELER_BSKY_IDENTIFIER=${LABELER_BSKY_IDENTIFIER:-}
+      - LABELER_BSKY_APP_PASSWORD=${LABELER_BSKY_APP_PASSWORD:-}
+      - LABELER_DETAIL_BASE_URL=${LABELER_DETAIL_BASE_URL:-}
+      - LABELER_REPLY_DEFAULT_LANG=${LABELER_REPLY_DEFAULT_LANG:-en}
+
       # --- HITL ---
       - HITL_MODE=${HITL_MODE:-auto}
       - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
       - TG_REVIEWER_CHAT_ID=${TG_REVIEWER_CHAT_ID:-}
+
       # --- Storage ---
       - SQLITE_PATH=/data/labeler.sqlite
       - CLAIMREVIEW_FEED_PATH=/feed/data.json

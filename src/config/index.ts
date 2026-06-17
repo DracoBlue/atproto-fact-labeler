@@ -10,6 +10,31 @@ const Schema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY must be set (API key for the OpenAI-compatible endpoint)'),
   OPENAI_BASE_URL: z.string().url().default('http://127.0.0.1:1234/v1'),
   OPENAI_MODEL: z.string().default('google/gemma-4-e2b'),
+  /**
+   * max_tokens sent on each chat-completions request. Reasoning models
+   * (qwen3 family, deepseek-r1, etc.) burn tokens on internal "thinking" before
+   * producing the actual answer — give them generous head-room or you'll get
+   * empty content with finish_reason=length. Set to 0 to let the server choose.
+   */
+  OPENAI_MAX_TOKENS: z.coerce.number().int().nonnegative().default(4096),
+
+  // --- Embedding (Stage 1: dense retrieval) -----------------------------
+  // OpenAI-compatible `/v1/embeddings` endpoint. Optional base_url/key fall
+  // back to OPENAI_* so a single LM Studio instance can serve both. Set
+  // explicitly when embeddings live on a different server.
+  EMBEDDING_API_KEY: z.string().optional(),
+  EMBEDDING_BASE_URL: z.string().url().optional(),
+  /**
+   * Embedding model name. Default = granite-278m-multilingual: ships with
+   * LM Studio, 768 dims, genuine multilingual (EN↔DE crosslingual cosine 0.81
+   * measured on our test set). See docs/PIPELINE.md.
+   */
+  EMBEDDING_MODEL: z.string().default('text-embedding-granite-embedding-278m-multilingual'),
+
+  // --- NLI (Stage 3: polarity gate) -------------------------------------
+  // `llm-judge` reuses the LLM (OPENAI_*) with a 3-class entailment prompt.
+  // `dedicated` would call a separate NLI server (not implemented yet).
+  NLI_MODE: z.enum(['llm-judge', 'dedicated']).default('llm-judge'),
 
   // Labeler identity
   LABELER_DID: z.string().default('did:plc:placeholder-replace-after-setup'),
