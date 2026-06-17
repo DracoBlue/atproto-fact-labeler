@@ -376,37 +376,53 @@ node-process RSS vs. one fewer service to run.
 
 ## Test-set / CI gate
 
-A labelled test set lives at `test/fixtures/matching/`. Each entry is a
-post text, an expected matching outcome, and a verdict expectation:
+The labelled test set lives at
+[`test/fixtures/matching-cases.json`](../test/fixtures/matching-cases.json).
+13 cases at the time of writing, grouped into six categories:
 
-```jsonc
-[
-  { "text": "the earth is round.",                       "outcome": "match",     "verdict": "supported"  },
-  { "text": "the earth is not flat.",                    "outcome": "match",     "verdict": "supported"  },
-  { "text": "the earth is flat.",                        "outcome": "match",     "verdict": "refuted"    },
-  { "text": "vaccines do not contain microchips.",       "outcome": "match",     "verdict": "supported"  },
-  { "text": "5G towers cause COVID-19.",                 "outcome": "match",     "verdict": "refuted"    },
-  { "text": "my dog is brown.",                          "outcome": "uncovered" },
-  { "text": "Trump claims there is no inflation.",       "outcome": "match",     "verdict": "refuted"    },
-  // German pairs
-  { "text": "Die Erde ist eine Scheibe.",                "outcome": "match",     "verdict": "refuted"    },
-  { "text": "Die Erde ist keine Scheibe.",               "outcome": "match",     "verdict": "supported"  },
-  { "text": "5G-Masten verursachen Krebs.",              "outcome": "match",     "verdict": "refuted"    },
-]
+- **`polarity-matrix`** — earth round/flat × is/isn't (4 cases). Property:
+  *true claims and their negations get opposite verdicts*. This is the
+  property the FTS pipeline failed and the whole rewrite exists to fix.
+- **`classic-conspiracy`** — Vaccines+microchips, 5G+COVID. Property:
+  publishers' false ratings pass through via entailment.
+- **`true-supported`** — "COVID vaccines are safe and effective".
+  Property: contradiction-flip recovers true from false-rated
+  anti-vax reviews.
+- **`temporal-entity`** — Trump-vs-Biden 2020. Property: Stage 3 NLI
+  correctly disambiguates same-topic claims with different truth values.
+- **`publisher-uncertainty`** — Bill Gates microchip implants.
+  Property: when publishers themselves are uncertain, the system does
+  not over-commit (verdict = `unknown`).
+- **`uncovered`** / **`uncovered-entity-disambiguation`** /
+  **`uncovered-number-disambiguation`** — my dog, Mick Jagger (vs Mugabe
+  / Jackie Chan death hoaxes), German unemployment (vs Italian
+  unemployment). Property: high-cosine topical neighbours with
+  *different* entities or numbers must drop as `neutral`, not flow
+  through as `entailment`.
+
+Runner: `pnpm test:matching`. Exit code is non-zero on regression.
+**Not** part of `pnpm test` — needs LM Studio running, a populated index,
+and ~15 min wall clock for the full set on M3 Max. Treat a regression
+here as a release blocker.
+
+```bash
+pnpm test:matching                       # full set
+pnpm test:matching --filter polarity     # by category
+pnpm test:matching --filter uncovered    # by category
+pnpm test:matching --json > report.json  # machine-readable
 ```
 
-A CI test runs the full pipeline against each fixture and verifies:
+Each case asserts:
 
-- Posts marked `uncovered` produce no proposal.
-- Posts marked `match` produce a proposal whose `verdict` equals the
-  expectation.
-- **A "polarity matrix" pair** (e.g. "earth is round" / "earth is flat")
-  must produce *opposite* verdicts. We will not merge a pipeline change
-  that breaks the matrix.
+- `expected_verdict` — one of `true | false | mixed | unknown |
+  disputed | outdated | uncovered`.
+- optional `min_confidence` — pipeline confidence floor on hits.
 
-This becomes the gating fact for "is this ready to ship publicly?" — not
-test count, not module coverage. **No live deployment until this set is
-green and the matrix property holds.**
+Add a case whenever a new failure mode is identified in production.
+The fixture is small and curated, not random — adding noise weakens the
+gate. If a real-world post produces a wrong label, the fix lands in two
+parts: (a) the pipeline change, (b) the case that proves it stays
+fixed.
 
 ## Open questions (from the research pass)
 

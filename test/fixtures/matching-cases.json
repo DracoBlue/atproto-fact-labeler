@@ -1,0 +1,89 @@
+[
+  {
+    "claim": "the earth is round",
+    "expected_verdict": "true",
+    "min_confidence": 0.3,
+    "category": "polarity-matrix",
+    "notes": "true claim refuted by flat-earth fact-checks via contradiction-flip"
+  },
+  {
+    "claim": "the earth is not flat",
+    "expected_verdict": "true",
+    "min_confidence": 0.7,
+    "category": "polarity-matrix",
+    "notes": "negation of false claim; contradiction-flip recovers truth"
+  },
+  {
+    "claim": "the earth is flat",
+    "expected_verdict": "false",
+    "min_confidence": 0.6,
+    "category": "polarity-matrix",
+    "notes": "direct false claim; entailment passes through publisher false"
+  },
+  {
+    "claim": "the earth is not round",
+    "expected_verdict": "false",
+    "min_confidence": 0.5,
+    "category": "polarity-matrix",
+    "notes": "negation of true claim; entailment to flat-earth false ratings"
+  },
+  {
+    "claim": "Vaccines contain microchips",
+    "expected_verdict": "false",
+    "min_confidence": 0.6,
+    "category": "classic-conspiracy",
+    "notes": "direct topical hit, publishers all rated false"
+  },
+  {
+    "claim": "5G towers cause COVID-19",
+    "expected_verdict": "false",
+    "min_confidence": 0.8,
+    "category": "classic-conspiracy",
+    "notes": "strong entailment across multiple publishers and languages"
+  },
+  {
+    "claim": "COVID vaccines are safe and effective",
+    "expected_verdict": "true",
+    "min_confidence": 0.7,
+    "category": "true-supported",
+    "notes": "true claim contradicted by false anti-vax fact-checks → flip to true"
+  },
+  {
+    "claim": "Bill Gates wants to inject everyone with microchips",
+    "expected_verdict": "unknown",
+    "category": "publisher-uncertainty",
+    "notes": "BBC reviewed this with verdict unknown; system should mirror, not over-commit"
+  },
+  {
+    "claim": "Donald Trump won the 2020 US presidential election",
+    "expected_verdict": "false",
+    "min_confidence": 0.7,
+    "category": "temporal-entity",
+    "notes": "publishers reviewed this exact false claim with verdict false"
+  },
+  {
+    "claim": "Joe Biden won the 2020 US presidential election",
+    "expected_verdict": "true",
+    "min_confidence": 0.7,
+    "category": "temporal-entity",
+    "notes": "publishers reviewed the negation; contradiction flips false → true"
+  },
+  {
+    "claim": "My dog is brown",
+    "expected_verdict": "uncovered",
+    "category": "uncovered",
+    "notes": "topically uncovered; Stage 3 should mark all candidates neutral"
+  },
+  {
+    "claim": "Mick Jagger is dead",
+    "expected_verdict": "uncovered",
+    "category": "uncovered-entity-disambiguation",
+    "notes": "topically near death-hoax claims (Jackie Chan, Mugabe) — NLI must say neutral because the entity differs"
+  },
+  {
+    "claim": "Germany unemployment rate is at 15 percent",
+    "expected_verdict": "uncovered",
+    "category": "uncovered-number-disambiguation",
+    "notes": "topically near Philippines/Italy unemployment claims — NLI must say neutral because country + figure differ"
+  }
+]

@@ -4,6 +4,26 @@ For the matching architecture itself see [PIPELINE.md](./PIPELINE.md) and
 its companion [RESEARCH-MATCHING.md](./RESEARCH-MATCHING.md). This file
 covers the dev workflow only.
 
+## Matching fixtures — `pnpm test:matching`
+
+The polarity-matrix + regression test set referenced in
+[PIPELINE.md § Test-set / CI gate](./PIPELINE.md#test-set--ci-gate)
+lives at `test/fixtures/matching-cases.json`. Run it against your
+locally-configured LLM + embedding endpoint:
+
+```bash
+pnpm test:matching
+pnpm test:matching --filter earth        # only earth-shape cases
+pnpm test:matching --filter polarity     # filter by category
+pnpm test:matching --json > report.json  # machine-readable
+```
+
+Each case asserts `expected_verdict` and an optional `min_confidence`.
+Exit code is non-zero on any failure. Wall-clock is ~13 cases × ~1 min on
+M3 Max with qwen3.6-27b as NLI judge — **not** part of the default
+`pnpm test` suite. Re-run before any change to retrieval thresholds, NLI
+prompts, or the flip table. Treat a regression here as a release blocker.
+
 ## Embedding index rebuild
 
 The dense-retrieval stage needs every ClaimReview row in `data/labeler.sqlite`
