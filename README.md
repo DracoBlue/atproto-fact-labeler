@@ -21,7 +21,7 @@ Bluesky / Jetstream
    ingest worker
         │
         ▼
- LLM extraction (LM Studio @ 127.0.0.1:1234)
+ LLM extraction (any OpenAI-compatible API — local or hosted)
         │
         ▼
  ClaimReview lookup (local SQLite index, built from Google Data Commons feed)
@@ -44,9 +44,13 @@ fallback for novel claims and is stubbed in this v0 — see the `S4` notes in
 ## Requirements
 
 - **Node ≥ 22** and **pnpm ≥ 9** (or Docker, see below).
-- **LM Studio** running an OpenAI-compatible API at
-  `http://127.0.0.1:1234/v1`. A small model like `google/gemma-4-e2b`
-  works for extraction.
+- An **OpenAI-compatible chat-completions endpoint**. Anything that speaks
+  the OpenAI API works — OpenAI itself, [LM Studio](https://lmstudio.ai/),
+  [Ollama](https://ollama.com/blog/openai-compatibility),
+  [vLLM](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html),
+  llama.cpp's server, Together, Groq, Mistral, etc. Configure it via
+  `OPENAI_BASE_URL` + `OPENAI_API_KEY` + `OPENAI_MODEL`. A small model is
+  enough for extraction (e.g. `google/gemma-4-e2b` on LM Studio).
 - A copy of the **Google Data Commons Fact Check feed**:
   ```bash
   curl -L \
@@ -84,7 +88,8 @@ starting Jetstream ingest
 ```
 
 The service is now consuming `app.bsky.feed.post` events from the Bluesky
-Jetstream, extracting atomic claims via LM Studio, matching them against
+Jetstream, extracting atomic claims via the configured OpenAI-compatible
+endpoint, matching them against
 the local fact-check index, and proposing labels via your HITL surface.
 
 When you press `a`/`y`, the label is signed by `@skyware/labeler` and
@@ -128,9 +133,9 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | — (required) | LM Studio API key |
-| `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible endpoint |
-| `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model |
+| `OPENAI_API_KEY` | — (required) | API key for the OpenAI-compatible endpoint (any non-empty value if the server doesn't check) |
+| `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL |
+| `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model name (must be one the endpoint serves) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
 | `LABELER_SIGNING_KEY` | _(auto-generated on first run)_ | Persist after first start |
 | `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` **and** the detail HTTP page |

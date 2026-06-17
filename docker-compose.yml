@@ -9,7 +9,7 @@ services:
       # Mount your Data Commons feed read-only and point CLAIMREVIEW_FEED_PATH at it:
       - ./data.json:/feed/data.json:ro
     environment:
-      # --- LLM (LM Studio or any OpenAI-compatible endpoint) ---
+      # --- LLM (any OpenAI-compatible endpoint: OpenAI, LM Studio, Ollama, vLLM, ...) ---
       - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-google/gemma-4-e2b}
@@ -30,7 +30,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
     extra_hosts:
-      # so containers can reach LM Studio running on the Docker host
+      # so containers can reach a local LLM server (LM Studio / Ollama / ...) on the Docker host
       - "host.docker.internal:host-gateway"
 
 volumes:

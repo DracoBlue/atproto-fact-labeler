@@ -1,5 +1,5 @@
 /**
- * Local smoke test of the full pipeline without LM Studio.
+ * Local smoke test of the full pipeline without an LLM endpoint.
  *
  * - Stubs out the LLM extraction with hard-coded atomic claims.
  * - Feeds the orchestrator with a fixture post.

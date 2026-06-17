@@ -1,7 +1,8 @@
 /**
  * Stage S1 — extract atomic, falsifiable claims from a post.
  *
- * Calls LM Studio via the OpenAI-compatible API. Output is constrained by a JSON
+ * Calls an OpenAI-compatible chat-completions endpoint (OpenAI, LM Studio,
+ * Ollama, vLLM, ...). Output is constrained by a JSON
  * Schema so the model returns parseable structured data. We split each post into
  * one *atomic* claim per assertion, then produce a *decontextualised* standalone
  * version of each so downstream lookup can match against fact-check databases

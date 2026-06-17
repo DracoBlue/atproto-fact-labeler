@@ -9,9 +9,9 @@ echo 'JETSTREAM_FIXTURE=fixtures/posts.jsonl' >> .env
 pnpm run start
 ```
 
-There is also a deterministic offline smoke test that bypasses LM Studio
-entirely (stubs the extraction with a known claim) and proves the rest of
-the pipeline end-to-end:
+There is also a deterministic offline smoke test that bypasses the LLM
+endpoint entirely (stubs the extraction with a known claim) and proves the
+rest of the pipeline end-to-end:
 
 ```bash
 pnpm tsx src/cli/smoke-test.ts
@@ -58,7 +58,7 @@ src/
 │   ├── jetstream.ts         live atproto firehose (JSON)
 │   └── fixture.ts           local JSONL replay for tests/dev
 ├── pipeline/
-│   ├── extract.ts           S1  LM Studio extraction
+│   ├── extract.ts           S1  OpenAI-compatible LLM extraction
 │   ├── lookup.ts            S2  FTS5 over ClaimReview index
 │   ├── normalise-rating.ts  S3  publisher rating → internal verdict
 │   └── orchestrator.ts      glue S0 → S5

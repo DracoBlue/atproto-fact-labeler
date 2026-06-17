@@ -7,7 +7,7 @@ loadEnv();
 
 const Schema = z.object({
   // LLM
-  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY must be set (LM Studio API key from .env)'),
+  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY must be set (API key for the OpenAI-compatible endpoint)'),
   OPENAI_BASE_URL: z.string().url().default('http://127.0.0.1:1234/v1'),
   OPENAI_MODEL: z.string().default('google/gemma-4-e2b'),
 
