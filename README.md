@@ -15,10 +15,13 @@ License: MIT (see [LICENSE](./LICENSE)).
 ## How it works
 
 ```
-Bluesky / Jetstream
-        │
-        ▼
-   ingest worker
+Bluesky / Jetstream                    com.atproto.moderation.createReport
+        │                                      │
+        ▼                                      │
+   ingest worker                               │
+        │                                      │
+        ▼                                      ▼
+ trigger filter (firehose · mentions · watchlist · reports)
         │
         ▼
  LLM extraction (any OpenAI-compatible API — local or hosted)
@@ -40,6 +43,12 @@ The pipeline is **lookup-first**: a claim is only labeled when there's a
 matching fact-check entry from a third-party publisher in the local index.
 Claims without a match are dropped — this labeler does not generate
 verdicts of its own.
+
+**Triggers are user-initiated by default.** Running an LLM extraction on
+every Bluesky post (~30 M/day) is impractical for any single-LLM setup, so
+the default trigger set is **mentions + reports**. Firehose mode (every
+post) and watchlist (named accounts) are opt-in. See
+[Triggers](#triggers).
 
 ## Requirements
 
@@ -137,11 +146,17 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL |
 | `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model name (must be one the endpoint serves) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
+| `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`); enables plain-text mention fallback when post `facets` are missing |
 | `LABELER_SIGNING_KEY` | _(auto-generated on first run)_ | Persist after first start |
 | `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` **and** the detail HTTP page |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public hostname for the labeler |
 | `JETSTREAM_URL` | `wss://jetstream2.us-east.bsky.network/subscribe` | Live firehose |
 | `JETSTREAM_FIXTURE` | _(unset)_ | Path to JSONL fixture (offline replay) |
+| `TRIGGER_FIREHOSE` | `false` | Fact-check **every** post — opt-in, LLM-heavy |
+| `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply) |
+| `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post |
+| `TRIGGER_WATCHLIST` | _(empty)_ | Comma-separated DIDs whose posts are always checked |
+| `APPVIEW_URL` | `https://api.bsky.app` | Used to fetch post text by URI (mention parents, report subjects) |
 | `HITL_MODE` | `stdin` | `stdin` · `telegram` · `auto` |
 | `TG_BOT_TOKEN`, `TG_REVIEWER_CHAT_ID` | — | Required when `HITL_MODE=telegram` |
 | `SQLITE_PATH` | `data/labeler.sqlite` | Index + labeler state DB |
@@ -149,6 +164,54 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `LOG_LEVEL` | `info` | pino log level |
 
 ## Usage
+
+### Triggers
+
+Which posts trigger an LLM extraction? Four mechanisms, freely combined.
+**Defaults are conservative** so a single local LLM endpoint is not
+overwhelmed.
+
+| Trigger | Env | Default | Source | Volume |
+| --- | --- | --- | --- | --- |
+| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. | low |
+| **Reports** | `TRIGGER_REPORTS=true` | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. The reported post is fact-checked. | low–medium |
+| **Watchlist** | `TRIGGER_WATCHLIST=did:plc:a,did:plc:b` | empty | The post's author DID is in the list. Useful for proactively monitoring politicians, news outlets, known repeat spreaders. | controllable |
+| **Firehose** | `TRIGGER_FIREHOSE=true` | off | Every post. Volume is realistically ~hundreds per second after pre-filtering. Only enable with a high-throughput LLM endpoint. | very high |
+
+Jetstream stays connected as long as any of `TRIGGER_FIREHOSE`,
+`TRIGGER_MENTIONS`, or `TRIGGER_WATCHLIST` is set, because mentions /
+watchlist need to scan the stream. With all three off, the service runs
+**report-only** — the labeler endpoint stays up to answer
+`subscribeLabels` and `createReport`, but no Jetstream connection is held.
+
+#### How a mention is detected
+
+1. Authoritative path — structured facet: a feature inside
+   `record.facets[*].features[*]` with `$type = app.bsky.richtext.facet#mention`
+   and `did = LABELER_DID`. Bluesky clients always emit facets for
+   mentions, so this is the normal case.
+2. Fallback path — plain-text substring: only used when no facets are
+   present. Requires `LABELER_HANDLE`. Matches `@<handle>`,
+   case-insensitive.
+
+#### How a report is dispatched
+
+`POST /xrpc/com.atproto.moderation.createReport` is mounted on the
+labeler's HTTP port (`LABELER_PORT`). Body shape:
+
+```jsonc
+{
+  "reasonType": "com.atproto.moderation.defs#reasonOther",
+  "reason":     "please fact-check",
+  "subject":    { "$type": "com.atproto.repo.strongRef",
+                  "uri":   "at://did:plc:.../app.bsky.feed.post/3kx",
+                  "cid":   "bafy..." }
+}
+```
+
+The handler fetches the post via the AppView (`APPVIEW_URL`), persists it,
+and runs the pipeline. The HTTP response follows
+`com.atproto.moderation.defs#createReportOutput`.
 
 ### HITL modes
 

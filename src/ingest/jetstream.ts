@@ -28,15 +28,24 @@ interface JetstreamCommitEvent {
     collection: string;
     rkey: string;
     cid?: string;
-    record?: {
-      $type?: string;
-      text?: string;
-      langs?: string[];
-      createdAt?: string;
-      reply?: unknown;
-      embed?: { $type?: string };
-    };
+    record?: JetstreamPostRecord;
   };
+}
+
+interface JetstreamPostRecord {
+  $type?: string;
+  text?: string;
+  langs?: string[];
+  createdAt?: string;
+  reply?: {
+    parent?: { uri: string; cid?: string };
+    root?: { uri: string; cid?: string };
+  };
+  facets?: Array<{
+    index?: { byteStart: number; byteEnd: number };
+    features?: Array<{ $type?: string; did?: string }>;
+  }>;
+  embed?: { $type?: string };
 }
 
 export interface JetstreamOptions {
@@ -141,7 +150,18 @@ function toIngestedPost(evt: JetstreamCommitEvent): IngestedPost | null {
   const rec = evt.commit.record;
   if (!rec || rec.$type !== COLLECTION) return null;
   if (typeof rec.text !== 'string') return null;
-  if (rec.reply) return null; // skip replies for now — keep top-level posts
+  // Replies are preserved — mention-in-reply triggers need them. The trigger
+  // layer is responsible for deciding whether to fact-check the reply itself
+  // or its parent.
+
+  const facets = (rec.facets ?? []).map((f) => ({
+    index: f.index,
+    features: (f.features ?? []).map((feat) => ({
+      $type: feat.$type,
+      did: typeof feat.did === 'string' ? feat.did : '',
+    })),
+  }));
+
   return {
     uri: `at://${evt.did}/${evt.commit.collection}/${evt.commit.rkey}`,
     cid: evt.commit.cid ?? '',
@@ -150,6 +170,13 @@ function toIngestedPost(evt: JetstreamCommitEvent): IngestedPost | null {
     lang: rec.langs?.[0],
     indexedAt: rec.createdAt ?? new Date(evt.time_us / 1000).toISOString(),
     kind: 'post',
+    facets: facets.length ? facets : undefined,
+    replyParent: rec.reply?.parent
+      ? { uri: rec.reply.parent.uri, cid: rec.reply.parent.cid }
+      : undefined,
+    replyRoot: rec.reply?.root
+      ? { uri: rec.reply.root.uri, cid: rec.reply.root.cid }
+      : undefined,
   };
 }
 

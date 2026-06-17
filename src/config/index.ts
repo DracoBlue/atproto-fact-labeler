@@ -13,6 +13,8 @@ const Schema = z.object({
 
   // Labeler identity
   LABELER_DID: z.string().default('did:plc:placeholder-replace-after-setup'),
+  // Optional handle for mention-text fallback when post.facets is empty.
+  LABELER_HANDLE: z.string().optional(),
   LABELER_SIGNING_KEY: z.string().default(''),
   LABELER_PORT: z.coerce.number().int().positive().default(14831),
   LABELER_HOSTNAME: z.string().default('http://localhost:14831'),
@@ -22,6 +24,29 @@ const Schema = z.object({
     .string()
     .default('wss://jetstream2.us-east.bsky.network/subscribe'),
   JETSTREAM_FIXTURE: z.string().optional(),
+
+  // Triggers — control which posts hit the LLM. Default: mentions + reports.
+  // Firehose mode (every post) is opt-in because it will overwhelm a single
+  // local LLM. Mentions + reports are user-initiated and low-volume.
+  TRIGGER_FIREHOSE: z
+    .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
+    .default(false),
+  TRIGGER_MENTIONS: z
+    .preprocess((v) => v === undefined || v === '1' || v === 'true' || v === true, z.boolean())
+    .default(true),
+  TRIGGER_REPORTS: z
+    .preprocess((v) => v === undefined || v === '1' || v === 'true' || v === true, z.boolean())
+    .default(true),
+  /** Comma-separated DIDs whose top-level posts are always checked. */
+  TRIGGER_WATCHLIST: z
+    .preprocess(
+      (v) => (typeof v === 'string' && v.length ? v.split(',').map((s) => s.trim()).filter(Boolean) : []),
+      z.array(z.string()),
+    )
+    .default([]),
+
+  // AppView used by report ingest to fetch post text by URI.
+  APPVIEW_URL: z.string().default('https://api.bsky.app'),
 
   // HITL
   HITL_MODE: z.enum(['stdin', 'telegram', 'auto']).default('stdin'),
