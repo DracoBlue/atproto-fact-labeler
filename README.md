@@ -146,7 +146,7 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL |
 | `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model name (must be one the endpoint serves) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
-| `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`); enables plain-text mention fallback when post `facets` are missing |
+| `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. Word-boundary matched — `email@<handle>` and `<handle>.suffix` do **not** false-match. |
 | `REPLY_TO_MENTIONS` | `false` | Post a Bluesky reply to the mention author after a mention-triggered label is accepted. See [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) § Reply-to-mention |
 | `LABELER_BSKY_SERVICE` | `https://bsky.social` | PDS URL the labeler account lives on |
 | `LABELER_BSKY_IDENTIFIER` | — | Required when `REPLY_TO_MENTIONS=true`. Handle or DID of the labeler account |
@@ -161,7 +161,7 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `TRIGGER_FIREHOSE` | `false` | Fact-check **every** post — opt-in, LLM-heavy |
 | `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply) |
 | `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post |
-| `TRIGGER_WATCHLIST` | _(empty)_ | Comma-separated DIDs whose posts are always checked |
+| `TRIGGER_WATCHLIST` | _(empty)_ | Comma-separated DIDs **or handles** whose posts are always checked. Handles are resolved to DIDs at startup; failure to resolve aborts startup |
 | `APPVIEW_URL` | `https://public.api.bsky.app` | Bluesky read-only AppView; used to fetch post text by URI (mention parents, report subjects). Unauthenticated. |
 | `HITL_MODE` | `stdin` | `stdin` · `telegram` · `auto` |
 | `TG_BOT_TOKEN`, `TG_REVIEWER_CHAT_ID` | — | Required when `HITL_MODE=telegram` |

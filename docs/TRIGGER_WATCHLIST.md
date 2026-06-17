@@ -29,17 +29,23 @@ publicly when you operate this at scale.
 
 ```bash
 LABELER_DID=did:plc:fact-labeler-abcdef
-TRIGGER_WATCHLIST=did:plc:bob-abcdef,did:plc:carol-abcdef
+# Mix DIDs and bare handles freely — handles are resolved at startup.
+TRIGGER_WATCHLIST=did:plc:bob-abcdef,carol.example.org,@dave.bsky.social
 ```
 
-The value is a comma-separated list of DIDs. Whitespace is trimmed; empty
-entries are dropped. There is no soft-match — you must list each DID
-explicitly. Resolve handles to DIDs once via the AppView:
+The value is a comma-separated list. Each entry is either:
 
-```bash
-curl -s 'https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=bob.example.org' | jq .did
-# "did:plc:bob-abcdef"
-```
+- An atproto DID (`did:plc:…` or `did:web:…`) — used as-is.
+- A bare Bluesky handle (`alice.example.org`) — resolved to a DID at
+  startup via `com.atproto.identity.resolveHandle` against `APPVIEW_URL`.
+- A handle with a leading `@` — the `@` is stripped before resolution.
+
+If **any** entry fails to resolve, the service refuses to start with an
+error listing every failure. A half-resolved watchlist silently misses
+posts, so failing fast is safer than working around the bad config.
+
+Whitespace is trimmed; empty entries are dropped. `did:plc:` entries are
+lowercased for the method-specific id.
 
 ## Example event
 

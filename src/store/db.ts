@@ -177,7 +177,7 @@ function migrate(db: DbLike): void {
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       proposal_id         INTEGER REFERENCES proposal(id),
       reply_kind          TEXT    NOT NULL DEFAULT 'verdict'
-                                    CHECK (reply_kind IN ('verdict','no-claim','no-match')),
+                                    CHECK (reply_kind IN ('verdict','no-claim','no-match','no-target')),
       reply_uri           TEXT    NOT NULL,
       reply_cid           TEXT    NOT NULL,
       replied_to_uri      TEXT    NOT NULL,
@@ -235,6 +235,45 @@ function migrate(db: DbLike): void {
   addColumnIfMissing(db, 'proposal', 'trigger_root_cid', 'TEXT');
   addColumnIfMissing(db, 'proposal', 'trigger_source_lang', 'TEXT');
   addColumnIfMissing(db, 'mention_reply', 'reply_kind', "TEXT NOT NULL DEFAULT 'verdict'");
+  ensureMentionReplyAcceptsNoTarget(db);
+}
+
+/**
+ * Existing databases were created with a CHECK constraint that excludes the
+ * new 'no-target' reply kind. SQLite has no ALTER for CHECK constraints, so
+ * rebuild the table if needed. The rebuild is a no-op when the constraint
+ * already accepts 'no-target'.
+ */
+function ensureMentionReplyAcceptsNoTarget(db: DbLike): void {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='mention_reply'`)
+    .get() as { sql: string } | undefined;
+  if (!row?.sql || row.sql.includes("'no-target'")) return;
+
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+
+    CREATE TABLE mention_reply_new (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      proposal_id         INTEGER REFERENCES proposal(id),
+      reply_kind          TEXT    NOT NULL DEFAULT 'verdict'
+                                    CHECK (reply_kind IN ('verdict','no-claim','no-match','no-target')),
+      reply_uri           TEXT    NOT NULL,
+      reply_cid           TEXT    NOT NULL,
+      replied_to_uri      TEXT    NOT NULL,
+      replied_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO mention_reply_new
+      (id, proposal_id, reply_kind, reply_uri, reply_cid, replied_to_uri, replied_at)
+      SELECT id, proposal_id, reply_kind, reply_uri, reply_cid, replied_to_uri, replied_at
+        FROM mention_reply;
+    DROP TABLE mention_reply;
+    ALTER TABLE mention_reply_new RENAME TO mention_reply;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mention_reply_to_uri
+      ON mention_reply(replied_to_uri);
+
+    PRAGMA foreign_keys = ON;
+  `);
 }
 
 function addColumnIfMissing(db: DbLike, table: string, col: string, type: string): void {

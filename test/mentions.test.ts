@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectMention } from '../src/ingest/mentions.ts';
+import { detectMention, textMatchesHandle } from '../src/ingest/mentions.ts';
 
 const DID = 'did:plc:fact-labeler';
 
@@ -79,5 +79,46 @@ describe('detectMention', () => {
       ],
     };
     expect(detectMention(post, { did: DID })).toEqual({ matched: false, via: null });
+  });
+});
+
+describe('textMatchesHandle word-boundary', () => {
+  const handle = 'facts.example.org';
+
+  it('matches at start-of-string', () => {
+    expect(textMatchesHandle('@facts.example.org check this', handle)).toBe(true);
+  });
+
+  it('matches after whitespace', () => {
+    expect(textMatchesHandle('Hello @facts.example.org', handle)).toBe(true);
+  });
+
+  it('matches after a paren', () => {
+    expect(textMatchesHandle('(@facts.example.org)', handle)).toBe(true);
+  });
+
+  it('matches at end-of-string', () => {
+    expect(textMatchesHandle('Hello @facts.example.org', handle)).toBe(true);
+  });
+
+  it('does NOT match inside an email address', () => {
+    expect(textMatchesHandle('Contact me: email@facts.example.org', handle)).toBe(false);
+  });
+
+  it('does NOT match a handle-suffix trick', () => {
+    expect(textMatchesHandle('@facts.example.org.evil-site', handle)).toBe(false);
+  });
+
+  it('does NOT match when concatenated with letters before @', () => {
+    expect(textMatchesHandle('not.an.email@facts.example.org', handle)).toBe(false);
+  });
+
+  it('matches case-insensitively', () => {
+    expect(textMatchesHandle('Hello @FaCtS.example.ORG', handle)).toBe(true);
+  });
+
+  it('escapes regex metachars in the handle', () => {
+    expect(textMatchesHandle('Hi @user.+plus.test', 'user.+plus.test')).toBe(true);
+    expect(textMatchesHandle('Hi @user-other.test', 'user.+plus.test')).toBe(false);
   });
 });

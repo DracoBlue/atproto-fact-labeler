@@ -49,6 +49,11 @@ describe('t', () => {
   it('uses fallback when lang is unsupported', () => {
     expect(t('fr', 'verdict_label', 'de')).toBe('Einschätzung');
   });
+
+  it('returns the no_target string in both languages', () => {
+    expect(t('en', 'no_target')).toContain("couldn't load");
+    expect(t('de', 'no_target')).toContain('verlinkten Beitrag');
+  });
 });
 
 describe('translateVerdict', () => {

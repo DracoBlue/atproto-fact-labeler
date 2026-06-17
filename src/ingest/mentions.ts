@@ -35,11 +35,32 @@ export function detectMention(
   if (facetHit) return { matched: true, via: 'facet' };
 
   if (opts.handle && post.text) {
-    const needle = `@${opts.handle.toLowerCase()}`;
-    if (post.text.toLowerCase().includes(needle)) {
+    if (textMatchesHandle(post.text, opts.handle)) {
       return { matched: true, via: 'text' };
     }
   }
 
   return { matched: false, via: null };
+}
+
+/**
+ * Word-bounded match for an `@<handle>` mention in plain text. Pure / exported
+ * for testability.
+ *
+ * Required conditions:
+ *  - the `@` is preceded by start-of-string or a non-identifier character —
+ *    so `email@facts.example.org` does **not** match;
+ *  - the handle is **not** followed by an identifier character — so
+ *    `@facts.example.org.evil-site` does **not** match.
+ *
+ * Identifier chars considered: lowercase ASCII letters, digits, `.`, `-`, `_`.
+ * Match is case-insensitive.
+ */
+export function textMatchesHandle(text: string, handle: string): boolean {
+  const escaped = handle.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  const re = new RegExp(
+    `(?:^|[^a-z0-9._-])@${escaped}(?![a-z0-9._-])`,
+    'i',
+  );
+  return re.test(text);
 }

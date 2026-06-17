@@ -342,6 +342,9 @@ de  "Ich konnte in dem Beitrag keine prüfbare Tatsachenbehauptung finden — ni
 
 en  "I checked, but no fact-check publisher I know of has covered that claim yet."
 de  "Ich habe geprüft, aber bislang hat keine mir bekannte Faktencheck-Quelle diese Aussage abgedeckt."
+
+en  "I couldn't load the post you asked about — maybe it was deleted or unavailable."
+de  "Ich konnte den verlinkten Beitrag nicht laden — möglicherweise gelöscht oder nicht erreichbar."
 ```
 
 Verdict replies translate the head as well:

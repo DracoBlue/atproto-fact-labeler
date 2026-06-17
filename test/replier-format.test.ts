@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildNoClaimReply, buildNoMatchReply, buildReplyText } from '../src/replier/format.ts';
+import {
+  buildNoClaimReply,
+  buildNoMatchReply,
+  buildNoTargetReply,
+  buildReplyText,
+} from '../src/replier/format.ts';
 
 describe('buildReplyText', () => {
   it('formats a refuted verdict with sources and link', () => {
@@ -149,5 +154,23 @@ describe('buildNoMatchReply', () => {
   it('localises into German', () => {
     const text = buildNoMatchReply({ lang: 'de' });
     expect(text).toContain('Faktencheck-Quelle');
+  });
+});
+
+describe('buildNoTargetReply', () => {
+  it('produces an English diagnostic by default', () => {
+    const text = buildNoTargetReply();
+    expect(text).toContain("couldn't load");
+  });
+
+  it('localises into German', () => {
+    const text = buildNoTargetReply({ lang: 'de' });
+    expect(text).toContain('verlinkten Beitrag');
+    expect(text).toContain('nicht laden');
+  });
+
+  it('falls back to defaultLang when source lang unsupported', () => {
+    const text = buildNoTargetReply({ lang: 'jp', defaultLang: 'de' });
+    expect(text).toContain('verlinkten Beitrag');
   });
 });

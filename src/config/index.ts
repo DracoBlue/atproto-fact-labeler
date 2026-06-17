@@ -14,7 +14,27 @@ const Schema = z.object({
   // Labeler identity
   LABELER_DID: z.string().default('did:plc:placeholder-replace-after-setup'),
   // Optional handle for mention-text fallback when post.facets is empty.
-  LABELER_HANDLE: z.string().optional(),
+  // Must be a bare handle without the leading "@" and look roughly
+  // like a domain (contain a dot, no whitespace, ASCII only).
+  LABELER_HANDLE: z
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (!val) return;
+      if (val.startsWith('@')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `LABELER_HANDLE must not include the leading "@" (got "${val}" — use "${val.slice(1)}")`,
+        });
+        return;
+      }
+      if (!/^[a-z0-9._-]+\.[a-z0-9.-]+$/i.test(val)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `LABELER_HANDLE must be a domain-style handle like "facts.example.org" (got "${val}")`,
+        });
+      }
+    }),
   LABELER_SIGNING_KEY: z.string().default(''),
   LABELER_PORT: z.coerce.number().int().positive().default(14831),
   LABELER_HOSTNAME: z.string().default('http://localhost:14831'),

@@ -16,6 +16,7 @@ import { registerDetailRoutes } from './detail/server.ts';
 import { registerReportRoutes } from './ingest/reports.ts';
 import { AppViewClient } from './ingest/appview.ts';
 import { evaluateTrigger, type TriggerConfig, type TriggerHit } from './ingest/triggers.ts';
+import { resolveWatchlistToDids } from './config/resolve-watchlist.ts';
 import type { IngestedPost } from './ingest/types.ts';
 import { AutoHitl } from './hitl/auto.ts';
 import { StdinHitl } from './hitl/stdin.ts';
@@ -23,7 +24,12 @@ import { TelegramHitl } from './hitl/telegram.ts';
 import type { HitlSurface } from './hitl/types.ts';
 import type { Proposal, TriggerContext } from './pipeline/orchestrator.ts';
 import { BskyClient } from './replier/bsky.ts';
-import { buildNoClaimReply, buildNoMatchReply, buildReplyText } from './replier/format.ts';
+import {
+  buildNoClaimReply,
+  buildNoMatchReply,
+  buildNoTargetReply,
+  buildReplyText,
+} from './replier/format.ts';
 import { isLabelerOwnUri, recordFeedback } from './feedback/store.ts';
 
 async function main(): Promise<void> {
@@ -202,7 +208,7 @@ async function main(): Promise<void> {
     parentCid: string;
     rootUri: string;
     rootCid: string;
-    replyKind: 'verdict' | 'no-claim' | 'no-match';
+    replyKind: 'verdict' | 'no-claim' | 'no-match' | 'no-target';
     proposalId?: number;
   }): Promise<void> => {
     if (!bsky) return;
@@ -418,6 +424,28 @@ async function main(): Promise<void> {
     const fetched = await appview.getPost(uri);
     if (!fetched) {
       logger.warn({ uri }, 'could not resolve target post via AppView');
+      // Tell the mention author we tried. Verdict reply path can't run because
+      // we have no post to extract claims from; instead we send a `no-target`
+      // diagnostic so the user isn't left hanging.
+      if (
+        (trigger.reason === 'mention-reply' || trigger.reason === 'mention-quote') &&
+        trigger.sourceUri &&
+        trigger.sourceCid &&
+        bsky &&
+        !hasReplied(trigger.sourceUri)
+      ) {
+        await sendReply({
+          text: buildNoTargetReply({
+            lang: trigger.sourceLang,
+            defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
+          }),
+          parentUri: trigger.sourceUri,
+          parentCid: trigger.sourceCid,
+          rootUri: trigger.rootUri ?? trigger.sourceUri,
+          rootCid: trigger.rootCid ?? trigger.sourceCid,
+          replyKind: 'no-target',
+        });
+      }
       return;
     }
     // Belt-and-braces self-guard: the trigger layer already drops posts
@@ -459,10 +487,23 @@ async function main(): Promise<void> {
   await labelerServer.start();
 
   // --- Jetstream-driven triggers (variants 1, 2, 4) ------------------------
+  // Watchlist entries may be handles or DIDs in env config; resolve them all
+  // to DIDs at startup. If any resolution fails, we abort — a half-resolved
+  // watchlist silently misses posts.
+  const resolvedWatchlist = await resolveWatchlistToDids(cfg.TRIGGER_WATCHLIST, {
+    appviewUrl: cfg.APPVIEW_URL,
+  });
+  if (resolvedWatchlist.length !== cfg.TRIGGER_WATCHLIST.length) {
+    logger.info(
+      { configured: cfg.TRIGGER_WATCHLIST.length, resolved: resolvedWatchlist.length },
+      'watchlist deduped after handle resolution',
+    );
+  }
+
   const triggerCfg: TriggerConfig = {
     firehose: cfg.TRIGGER_FIREHOSE,
     mentions: cfg.TRIGGER_MENTIONS,
-    watchlist: cfg.TRIGGER_WATCHLIST,
+    watchlist: resolvedWatchlist,
     labelerDid: cfg.LABELER_DID,
     labelerHandle: cfg.LABELER_HANDLE,
   };
@@ -506,7 +547,7 @@ async function main(): Promise<void> {
   // need it for TRIGGER_MENTIONS and TRIGGER_WATCHLIST. If none of the three
   // is enabled and there's no fixture, the service runs report-only.
   const needsJetstream =
-    cfg.TRIGGER_FIREHOSE || cfg.TRIGGER_MENTIONS || cfg.TRIGGER_WATCHLIST.length > 0;
+    cfg.TRIGGER_FIREHOSE || cfg.TRIGGER_MENTIONS || resolvedWatchlist.length > 0;
 
   if (cfg.JETSTREAM_FIXTURE) {
     logger.info({ path: cfg.JETSTREAM_FIXTURE }, 'using fixture ingest');
@@ -519,7 +560,7 @@ async function main(): Promise<void> {
         url: cfg.JETSTREAM_URL,
         firehose: cfg.TRIGGER_FIREHOSE,
         mentions: cfg.TRIGGER_MENTIONS,
-        watchlist: cfg.TRIGGER_WATCHLIST.length,
+        watchlist: resolvedWatchlist.length,
       },
       'starting Jetstream ingest',
     );

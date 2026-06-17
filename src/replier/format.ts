@@ -87,6 +87,12 @@ export function buildNoMatchReply(input: DiagnosticReplyInput = {}): string {
   return clamp(body);
 }
 
+export function buildNoTargetReply(input: DiagnosticReplyInput = {}): string {
+  const fallback = input.defaultLang ?? 'en';
+  const body = t(input.lang, 'no_target', fallback);
+  return clamp(body);
+}
+
 function clamp(s: string): string {
   return s.length <= MAX_LEN ? s : s.slice(0, MAX_LEN - 1) + '…';
 }

@@ -22,6 +22,7 @@ export interface Strings {
   details_label: string;
   no_claim: string;
   no_match: string;
+  no_target: string;
 }
 
 const TRANSLATIONS: Record<Lang, Strings> = {
@@ -39,6 +40,8 @@ const TRANSLATIONS: Record<Lang, Strings> = {
       "I couldn't find a falsifiable factual claim in that post — nothing to fact-check.",
     no_match:
       "I checked, but no fact-check publisher I know of has covered that claim yet.",
+    no_target:
+      "I couldn't load the post you asked about — maybe it was deleted or unavailable.",
   },
   de: {
     verdict_supported: 'bestätigt',
@@ -54,6 +57,8 @@ const TRANSLATIONS: Record<Lang, Strings> = {
       'Ich konnte in dem Beitrag keine prüfbare Tatsachenbehauptung finden — nichts zu prüfen.',
     no_match:
       'Ich habe geprüft, aber bislang hat keine mir bekannte Faktencheck-Quelle diese Aussage abgedeckt.',
+    no_target:
+      'Ich konnte den verlinkten Beitrag nicht laden — möglicherweise gelöscht oder nicht erreichbar.',
   },
 };
 
