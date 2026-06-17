@@ -169,9 +169,13 @@ is missed.
 
 ## Edge cases
 
-- **Self-mention** (the labeler account mentions itself): not
-  special-cased — `evaluateTrigger` fires normally. Avoid posting from
-  the labeler account if you don't want recursion.
+- **Self-mention** (the labeler account is the post's author):
+  **always dropped**, regardless of which triggers are enabled.
+  `evaluateTrigger` short-circuits at the top when `post.did` equals
+  `LABELER_DID`. This prevents the recursion that
+  `REPLY_TO_MENTIONS=true` would otherwise trigger when our own reply is
+  carried back through Jetstream, and it also stops the labeler from
+  fact-checking its own posts on a watchlist or firehose match.
 - **Multiple mentions in one post** (`@facts.example.org @other-bot`):
   the first matching facet wins; other-bot is irrelevant to us.
 - **Mention with no claim**: extraction returns zero falsifiable claims;

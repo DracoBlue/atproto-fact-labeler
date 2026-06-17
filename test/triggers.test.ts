@@ -112,4 +112,41 @@ describe('evaluateTrigger', () => {
     });
     expect(hit?.reason).toBe('mention');
   });
+
+  describe('self-mention protection', () => {
+    it('drops a post authored by the labeler even on firehose', () => {
+      const ours = basePost({ did: LABELER_DID, uri: 'at://did:plc:fact-labeler/x' });
+      expect(evaluateTrigger(ours, { ...ALL_OFF, firehose: true })).toBeNull();
+    });
+
+    it('drops a post authored by the labeler even when watchlisted', () => {
+      const ours = basePost({ did: LABELER_DID });
+      const hit = evaluateTrigger(ours, { ...ALL_OFF, watchlist: [LABELER_DID] });
+      expect(hit).toBeNull();
+    });
+
+    it('drops a labeler-authored post that mentions the labeler', () => {
+      const ours = basePost({
+        did: LABELER_DID,
+        facets: [
+          {
+            features: [{ $type: 'app.bsky.richtext.facet#mention', did: LABELER_DID }],
+          },
+        ],
+      });
+      expect(evaluateTrigger(ours, { ...ALL_OFF, mentions: true })).toBeNull();
+    });
+
+    it('still triggers when the labeler is mentioned by a different author', () => {
+      const them = basePost({
+        did: 'did:plc:alice', // not the labeler
+        facets: [
+          {
+            features: [{ $type: 'app.bsky.richtext.facet#mention', did: LABELER_DID }],
+          },
+        ],
+      });
+      expect(evaluateTrigger(them, { ...ALL_OFF, mentions: true })?.reason).toBe('mention');
+    });
+  });
 });

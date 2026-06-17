@@ -34,8 +34,17 @@ export interface TriggerHit {
 
 /**
  * Returns the trigger hit, or `null` to drop the post. Pure / synchronous.
+ *
+ * **Self-mention protection.** A post authored by the labeler itself is always
+ * dropped, regardless of which triggers are configured. This prevents the
+ * obvious recursion when `REPLY_TO_MENTIONS=true` and a reply happens to be
+ * mistaken for a new claim, and it also stops the labeler from labelling its
+ * own posts on a watchlist or firehose match.
  */
 export function evaluateTrigger(post: IngestedPost, cfg: TriggerConfig): TriggerHit | null {
+  // Hard guard — never act on our own posts.
+  if (post.did === cfg.labelerDid) return null;
+
   // Firehose always wins (most permissive).
   if (cfg.firehose) {
     return { reason: 'firehose', targetUri: post.uri, targetIsSourcePost: true };
