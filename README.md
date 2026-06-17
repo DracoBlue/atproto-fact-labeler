@@ -246,6 +246,25 @@ http://localhost:14831/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx&format=
 HTML for humans, JSON via `format=json` or `Accept: application/json`.
 Liveness: `GET /healthz`.
 
+### One-shot labeling — `cli:label`
+
+Label a single Bluesky post manually, without standing up the Jetstream
+worker or the HTTP server:
+
+```bash
+pnpm cli:label at://did:plc:alice/app.bsky.feed.post/3kxabc
+pnpm cli:label at://did:plc:alice/app.bsky.feed.post/3kxabc --dry-run
+pnpm cli:label at://did:plc:alice/app.bsky.feed.post/3kxabc --reply
+```
+
+The command fetches the post via the AppView, runs the pipeline,
+auto-accepts the top proposal (the operator is the human reviewer when
+the command runs), emits the signed label, and prints the verdict +
+sources. `--dry-run` prints without emitting. `--reply` additionally
+posts a Bluesky reply on the target post (requires `REPLY_TO_MENTIONS`
+configured with credentials). The self-guard still applies — posts
+authored by the labeler itself are refused.
+
 ### Lifecycle status
 
 ```bash

@@ -27,10 +27,45 @@ uses when a user picks "Report → atproto-fact-labeler" from a post's menu.
 ```bash
 TRIGGER_REPORTS=true
 APPVIEW_URL=https://public.api.bsky.app
+REQUIRE_REPORT_AUTH=true                # ON by default
+PLC_DIRECTORY_URL=https://plc.directory # used to resolve report-issuer DIDs
 ```
 
 Bluesky's AppView is used to fetch the reported post's content by URI.
 This works for any public post, no auth required.
+
+### Authentication
+
+`REQUIRE_REPORT_AUTH=true` is the default. Every request must carry a
+valid atproto service JWT in `Authorization: Bearer <jwt>`. The labeler:
+
+1. Splits + decodes the JWT.
+2. Checks `alg` is `ES256K` or `ES256`, `aud` is `LABELER_DID`,
+   `lxm` is `com.atproto.moderation.createReport`, `exp` is in the
+   future (5 s clock-skew tolerance), `iss` looks like a DID.
+3. Resolves `iss` via PLC (`did:plc:…`) or `/.well-known/did.json`
+   (`did:web:…`) and parses the atproto signing key.
+4. Verifies the signature against `SHA-256(header.payload)`.
+5. On success, records the issuer DID as `reportedBy` in the feedback
+   row and the HTTP response.
+
+Failure paths:
+- Missing / malformed `Authorization` header → **401 AuthRequired**.
+- JWT validation failed → **401 BadJwt** with a precise reason in the
+  response body (`signature invalid`, `expired`, `wrong audience`, …).
+
+Real Bluesky clients always sign these requests via their PDS, so this
+"just works" in production.
+
+**For local curl-based testing**, flip the env:
+
+```bash
+REQUIRE_REPORT_AUTH=false pnpm run start
+```
+
+…then anyone can `curl -d '{...}'` the endpoint and `reportedBy` is
+recorded as `"unknown"`. Never run with `REQUIRE_REPORT_AUTH=false` in
+a public deployment.
 
 The HTTP handler is mounted on the same port as `subscribeLabels` (the
 default is `LABELER_PORT=14831`), so a single ingress route serves both.

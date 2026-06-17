@@ -23,6 +23,7 @@
     "retire:check": "tsx src/cli/retire.ts --dry-run",
     "lifecycle:status": "tsx src/cli/lifecycle-status.ts",
     "feedback:list": "tsx src/cli/feedback-list.ts",
+    "cli:label": "tsx src/cli/label-post.ts",
     "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Going live)'"
   },
   "dependencies": {
