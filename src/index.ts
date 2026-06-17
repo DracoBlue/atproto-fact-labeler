@@ -15,13 +15,15 @@ import { verdictToLabel } from './labels/vocabulary.ts';
 import { registerDetailRoutes } from './detail/server.ts';
 import { registerReportRoutes } from './ingest/reports.ts';
 import { AppViewClient } from './ingest/appview.ts';
-import { evaluateTrigger, type TriggerConfig } from './ingest/triggers.ts';
+import { evaluateTrigger, type TriggerConfig, type TriggerHit } from './ingest/triggers.ts';
 import type { IngestedPost } from './ingest/types.ts';
 import { AutoHitl } from './hitl/auto.ts';
 import { StdinHitl } from './hitl/stdin.ts';
 import { TelegramHitl } from './hitl/telegram.ts';
 import type { HitlSurface } from './hitl/types.ts';
-import type { Proposal } from './pipeline/orchestrator.ts';
+import type { Proposal, TriggerContext } from './pipeline/orchestrator.ts';
+import { BskyClient } from './replier/bsky.ts';
+import { buildReplyText } from './replier/format.ts';
 
 async function main(): Promise<void> {
   const cfg = getConfig();
@@ -33,6 +35,25 @@ async function main(): Promise<void> {
   registerDetailRoutes(labelerServer.app);
 
   const appview = new AppViewClient({ baseUrl: cfg.APPVIEW_URL });
+
+  /** Authenticated Bluesky client for posting mention-replies. Optional. */
+  const bsky = cfg.REPLY_TO_MENTIONS
+    ? new BskyClient({
+        serviceUrl: cfg.LABELER_BSKY_SERVICE,
+        identifier: cfg.LABELER_BSKY_IDENTIFIER!,
+        password: cfg.LABELER_BSKY_APP_PASSWORD!,
+      })
+    : null;
+  if (bsky) {
+    try {
+      await bsky.login();
+    } catch (err) {
+      logger.error(
+        { err },
+        'failed to log in to Bluesky for mention-replies — REPLY_TO_MENTIONS will be a no-op',
+      );
+    }
+  }
 
   /** Decision handler: write back to DB and emit a label if accepted. */
   const onDecision = async ({
@@ -96,6 +117,92 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err, proposalId }, 'failed to emit label');
     }
+
+    // Optional: reply to the mention post on Bluesky.
+    await maybeReplyToMention(proposalId);
+  };
+
+  /** Post a Bluesky reply to the mention author when conditions are met. */
+  const maybeReplyToMention = async (proposalId: number): Promise<void> => {
+    if (!bsky) return;
+    const ctx = db
+      .prepare(
+        `SELECT p.trigger_reason     AS reason,
+                p.trigger_source_uri AS source_uri,
+                p.trigger_source_cid AS source_cid,
+                p.trigger_root_uri   AS root_uri,
+                p.trigger_root_cid   AS root_cid,
+                v.label              AS verdict,
+                p.id                 AS proposal_id
+           FROM proposal p
+           JOIN verdict v ON v.id = p.verdict_id
+          WHERE p.id = ?`,
+      )
+      .get(proposalId) as
+      | {
+          reason: string | null;
+          source_uri: string | null;
+          source_cid: string | null;
+          root_uri: string | null;
+          root_cid: string | null;
+          verdict: string;
+          proposal_id: number;
+        }
+      | undefined;
+    if (!ctx) return;
+    if (ctx.reason !== 'mention' && ctx.reason !== 'mention-reply') return;
+    if (!ctx.source_uri || !ctx.source_cid) return;
+
+    const already = db
+      .prepare(`SELECT 1 FROM mention_reply WHERE proposal_id = ?`)
+      .get(proposalId);
+    if (already) return;
+
+    // Top publishers — at most 3, deduped.
+    const publishers = (
+      db
+        .prepare(
+          `SELECT DISTINCT publisher FROM evidence
+             WHERE verdict_id = (SELECT verdict_id FROM proposal WHERE id = ?)
+             ORDER BY id LIMIT 5`,
+        )
+        .all(proposalId) as Array<{ publisher: string | null }>
+    )
+      .map((r) => r.publisher ?? '')
+      .filter(Boolean);
+
+    const detailUrl =
+      (cfg.LABELER_DETAIL_BASE_URL ?? cfg.LABELER_HOSTNAME).replace(/\/$/, '') +
+      `/posts?uri=${encodeURIComponent(
+        (
+          db
+            .prepare(`SELECT post_uri FROM proposal WHERE id = ?`)
+            .get(proposalId) as { post_uri: string }
+        ).post_uri,
+      )}`;
+    const text = buildReplyText({ verdict: ctx.verdict, publishers, detailUrl });
+
+    const root = ctx.root_uri && ctx.root_cid
+      ? { uri: ctx.root_uri, cid: ctx.root_cid }
+      : { uri: ctx.source_uri, cid: ctx.source_cid };
+
+    try {
+      const result = await bsky.postReply({
+        text,
+        parent: { uri: ctx.source_uri, cid: ctx.source_cid },
+        root,
+      });
+      db.prepare(
+        `INSERT INTO mention_reply (proposal_id, reply_uri, reply_cid, replied_to_uri)
+         VALUES (?, ?, ?, ?)`,
+      ).run(proposalId, result.uri, result.cid, ctx.source_uri);
+      logger.info(
+        { proposalId, replyUri: result.uri, repliedTo: ctx.source_uri },
+        'mention-reply posted',
+      );
+    } catch (err) {
+      logger.error({ err, proposalId }, 'mention-reply post failed');
+    }
   };
 
   const surface: HitlSurface =
@@ -108,11 +215,11 @@ async function main(): Promise<void> {
   await surface.start?.(abort.signal);
 
   /** Common dispatcher: take a fully-formed post and run it through the pipeline. */
-  const dispatchPost = async (post: IngestedPost, reason: string): Promise<void> => {
-    logger.info({ uri: post.uri, reason }, 'dispatch');
+  const dispatchPost = async (post: IngestedPost, trigger: TriggerContext): Promise<void> => {
+    logger.info({ uri: post.uri, reason: trigger.reason }, 'dispatch');
     let proposals: Proposal[];
     try {
-      proposals = await processPost(post);
+      proposals = await processPost(post, {}, trigger);
     } catch (err) {
       logger.error({ err, uri: post.uri }, 'pipeline error');
       return;
@@ -127,7 +234,7 @@ async function main(): Promise<void> {
   };
 
   /** Resolve a URI to a post (cache lookup or AppView fetch) and dispatch. */
-  const dispatchByUri = async (uri: string, reason: string): Promise<void> => {
+  const dispatchByUri = async (uri: string, trigger: TriggerContext): Promise<void> => {
     const cached = db
       .prepare(
         `SELECT uri, cid, did, text, lang, indexed_at AS indexedAt
@@ -147,7 +254,7 @@ async function main(): Promise<void> {
           indexedAt: cached.indexedAt,
           kind: 'post',
         },
-        reason,
+        trigger,
       );
       return;
     }
@@ -156,14 +263,14 @@ async function main(): Promise<void> {
       logger.warn({ uri }, 'could not resolve target post via AppView');
       return;
     }
-    await dispatchPost(fetched, reason);
+    await dispatchPost(fetched, trigger);
   };
 
   // --- Reports trigger (variant 3) -----------------------------------------
   if (cfg.TRIGGER_REPORTS) {
     registerReportRoutes(labelerServer.app, async (report) => {
       logger.info({ uri: report.subjectUri, reasonType: report.reasonType }, 'report received');
-      await dispatchByUri(report.subjectUri, 'report');
+      await dispatchByUri(report.subjectUri, { reason: 'report' });
     });
     logger.info('TRIGGER_REPORTS enabled — /xrpc/com.atproto.moderation.createReport mounted');
   }
@@ -182,10 +289,11 @@ async function main(): Promise<void> {
   const handlePost = async (post: IngestedPost): Promise<void> => {
     const hit = evaluateTrigger(post, triggerCfg);
     if (!hit) return;
+    const trigger = buildTriggerContext(post, hit);
     if (hit.targetIsSourcePost) {
-      await dispatchPost(post, hit.reason);
+      await dispatchPost(post, trigger);
     } else {
-      await dispatchByUri(hit.targetUri, hit.reason);
+      await dispatchByUri(hit.targetUri, trigger);
     }
   };
 
@@ -245,6 +353,25 @@ async function main(): Promise<void> {
     logger.info('all Jetstream triggers disabled — service is report-only. Press Ctrl+C to exit.');
     await new Promise<void>((resolveFn) => abort.signal.addEventListener('abort', () => resolveFn()));
   }
+}
+
+/**
+ * Build the per-proposal trigger context from the originating post + trigger hit.
+ * The mention reply path needs to know the mentioning post's URI, CID, and
+ * thread root so it can construct a syntactically correct Bluesky reply.
+ */
+function buildTriggerContext(post: IngestedPost, hit: TriggerHit): TriggerContext {
+  if (hit.reason === 'mention' || hit.reason === 'mention-reply') {
+    const root = post.replyRoot ?? { uri: post.uri, cid: post.cid };
+    return {
+      reason: hit.reason,
+      sourceUri: post.uri,
+      sourceCid: post.cid,
+      rootUri: root.uri,
+      rootCid: root.cid,
+    };
+  }
+  return { reason: hit.reason };
 }
 
 main().catch((err: unknown) => {

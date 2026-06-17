@@ -45,8 +45,26 @@ const Schema = z.object({
     )
     .default([]),
 
-  // AppView used by report ingest to fetch post text by URI.
-  APPVIEW_URL: z.string().default('https://api.bsky.app'),
+  // Public Bluesky AppView used to fetch post text by URI. Unauthenticated
+  // reads — `public.api.bsky.app` is the dedicated read-only endpoint and the
+  // right choice for our use case (no session, no rate-limit-tier promotion).
+  APPVIEW_URL: z.string().default('https://public.api.bsky.app'),
+
+  // --- Reply to @mention author ----------------------------------------
+  // When true, the labeler posts a Bluesky reply to the mention post after a
+  // mention-triggered label is accepted. Requires authenticated credentials
+  // for the labeler service account (an app password from bsky.app).
+  REPLY_TO_MENTIONS: z
+    .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
+    .default(false),
+  /** PDS URL the labeler account lives on (bsky.social or self-hosted). */
+  LABELER_BSKY_SERVICE: z.string().default('https://bsky.social'),
+  /** Handle or DID of the labeler service account (writes posts as this account). */
+  LABELER_BSKY_IDENTIFIER: z.string().optional(),
+  /** App password from bsky.app (NOT the main account password). */
+  LABELER_BSKY_APP_PASSWORD: z.string().optional(),
+  /** Public detail-page base URL — embedded in mention replies as a deep-link. */
+  LABELER_DETAIL_BASE_URL: z.string().optional(),
 
   // HITL
   HITL_MODE: z.enum(['stdin', 'telegram', 'auto']).default('stdin'),
@@ -77,6 +95,18 @@ export function getConfig(): AppConfig {
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
   _config = parsed.data;
+
+  // Cross-field invariant: REPLY_TO_MENTIONS requires Bluesky credentials.
+  if (_config.REPLY_TO_MENTIONS) {
+    const missing: string[] = [];
+    if (!_config.LABELER_BSKY_IDENTIFIER) missing.push('LABELER_BSKY_IDENTIFIER');
+    if (!_config.LABELER_BSKY_APP_PASSWORD) missing.push('LABELER_BSKY_APP_PASSWORD');
+    if (missing.length) {
+      throw new Error(
+        `REPLY_TO_MENTIONS=true requires ${missing.join(' and ')} to be set.`,
+      );
+    }
+  }
 
   // Ensure the SQLite directory exists.
   const dbPath = resolve(_config.SQLITE_PATH);

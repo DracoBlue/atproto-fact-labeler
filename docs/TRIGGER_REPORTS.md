@@ -26,7 +26,7 @@ uses when a user picks "Report → atproto-fact-labeler" from a post's menu.
 
 ```bash
 TRIGGER_REPORTS=true
-APPVIEW_URL=https://api.bsky.app
+APPVIEW_URL=https://public.api.bsky.app
 ```
 
 Bluesky's AppView is used to fetch the reported post's content by URI.
@@ -96,7 +96,7 @@ the same JSON directly with `curl` or `httpie`.)
    ```
 3. **Target resolution.** `dispatchByUri("at://did:plc:bob…/3kxbob", "report")`
    checks `post_cache` first; on miss, calls
-   `GET https://api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at://did:plc:bob…/3kxbob`,
+   `GET https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at://did:plc:bob…/3kxbob`,
    converts the response to an `IngestedPost`, and persists it.
 4. **Pipeline.**
    - **S1 extract** — `"Vaccines contain tracking microchips."`

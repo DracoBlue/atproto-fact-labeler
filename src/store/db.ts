@@ -150,18 +150,37 @@ function migrate(db: DbLike): void {
     CREATE INDEX IF NOT EXISTS idx_evidence_verdict_id ON evidence(verdict_id);
 
     CREATE TABLE IF NOT EXISTS proposal (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      post_uri     TEXT    NOT NULL,
-      claim_id     INTEGER NOT NULL REFERENCES claim(id),
-      verdict_id   INTEGER NOT NULL REFERENCES verdict(id),
-      created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-      decided_at   TEXT,
-      decision     TEXT    CHECK (decision IN ('accept','reject','defer')),
-      decided_by   TEXT,
-      hitl_ref     TEXT  -- e.g. telegram message id, terminal session id
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_uri            TEXT    NOT NULL,
+      claim_id            INTEGER NOT NULL REFERENCES claim(id),
+      verdict_id          INTEGER NOT NULL REFERENCES verdict(id),
+      created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+      decided_at          TEXT,
+      decision            TEXT    CHECK (decision IN ('accept','reject','defer')),
+      decided_by          TEXT,
+      hitl_ref            TEXT,        -- e.g. telegram message id, terminal session id
+      -- Trigger source: where did this proposal originate from? Used by the
+      -- mention-reply feature so we know whose post to reply to after accept.
+      trigger_reason      TEXT,        -- 'mention' | 'mention-reply' | 'watchlist' | 'firehose' | 'report'
+      trigger_source_uri  TEXT,        -- e.g. Alice's mention post URI
+      trigger_source_cid  TEXT,
+      trigger_root_uri    TEXT,        -- thread root for the reply target
+      trigger_root_cid    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_proposal_decision ON proposal(decision);
+
+    -- Append-only log: which (proposal × label) pairs have we already
+    -- replied to with an authenticated PDS write?
+    CREATE TABLE IF NOT EXISTS mention_reply (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      proposal_id         INTEGER NOT NULL REFERENCES proposal(id),
+      reply_uri           TEXT    NOT NULL,
+      reply_cid           TEXT    NOT NULL,
+      replied_to_uri      TEXT    NOT NULL,
+      replied_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(proposal_id)
+    );
 
     CREATE TABLE IF NOT EXISTS label_emit (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,4 +201,19 @@ function migrate(db: DbLike): void {
       v TEXT NOT NULL
     );
   `);
+
+  // Idempotent post-create migrations for databases created by earlier
+  // versions of this schema. Each ALTER fails silently if the column
+  // already exists.
+  addColumnIfMissing(db, 'proposal', 'trigger_reason', 'TEXT');
+  addColumnIfMissing(db, 'proposal', 'trigger_source_uri', 'TEXT');
+  addColumnIfMissing(db, 'proposal', 'trigger_source_cid', 'TEXT');
+  addColumnIfMissing(db, 'proposal', 'trigger_root_uri', 'TEXT');
+  addColumnIfMissing(db, 'proposal', 'trigger_root_cid', 'TEXT');
+}
+
+function addColumnIfMissing(db: DbLike, table: string, col: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (cols.some((c) => c.name === col)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
 }

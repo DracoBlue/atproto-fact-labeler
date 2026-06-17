@@ -41,6 +41,21 @@ export interface PipelineEnv {
   extractStub?: (post: IngestedPost) => ReturnType<typeof extractClaims>;
 }
 
+/**
+ * Trigger context — passed through from the dispatcher when known. Persisted on
+ * each proposal so post-decision hooks (e.g. the mention-reply feature) know
+ * where the request originated.
+ */
+export interface TriggerContext {
+  reason: string;
+  /** When the trigger was a mention, this is the mentioning post's URI. */
+  sourceUri?: string;
+  sourceCid?: string;
+  /** Thread root for the reply, when known. */
+  rootUri?: string;
+  rootCid?: string;
+}
+
 const INSERT_POST_CACHE = `
   INSERT OR REPLACE INTO post_cache (uri, cid, did, text, lang, indexed_at, seen_at)
   VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -67,13 +82,17 @@ const INSERT_EVIDENCE = `
 `;
 
 const INSERT_PROPOSAL = `
-  INSERT INTO proposal (post_uri, claim_id, verdict_id)
-  VALUES (?, ?, ?)
+  INSERT INTO proposal
+    (post_uri, claim_id, verdict_id,
+     trigger_reason, trigger_source_uri, trigger_source_cid,
+     trigger_root_uri, trigger_root_cid)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 export async function processPost(
   post: IngestedPost,
   env: PipelineEnv = {},
+  trigger: TriggerContext = { reason: 'unknown' },
 ): Promise<Proposal[]> {
   const db = env.db ?? getDb();
 
@@ -166,7 +185,16 @@ export async function processPost(
       );
     }
 
-    const proposalResult = db.prepare(INSERT_PROPOSAL).run(post.uri, claimId, verdictId);
+    const proposalResult = db.prepare(INSERT_PROPOSAL).run(
+      post.uri,
+      claimId,
+      verdictId,
+      trigger.reason,
+      trigger.sourceUri ?? null,
+      trigger.sourceCid ?? null,
+      trigger.rootUri ?? null,
+      trigger.rootCid ?? null,
+    );
     const proposalId = Number(proposalResult.lastInsertRowid);
 
     proposals.push({

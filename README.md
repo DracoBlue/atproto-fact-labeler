@@ -147,6 +147,11 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model name (must be one the endpoint serves) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
 | `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`); enables plain-text mention fallback when post `facets` are missing |
+| `REPLY_TO_MENTIONS` | `false` | Post a Bluesky reply to the mention author after a mention-triggered label is accepted. See [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) § Reply-to-mention |
+| `LABELER_BSKY_SERVICE` | `https://bsky.social` | PDS URL the labeler account lives on |
+| `LABELER_BSKY_IDENTIFIER` | — | Required when `REPLY_TO_MENTIONS=true`. Handle or DID of the labeler account |
+| `LABELER_BSKY_APP_PASSWORD` | — | Required when `REPLY_TO_MENTIONS=true`. App password from bsky.app (never the main password) |
+| `LABELER_DETAIL_BASE_URL` | _(unset → `LABELER_HOSTNAME`)_ | Public URL of the labeler's detail page, used as deep-link in mention replies |
 | `LABELER_SIGNING_KEY` | _(auto-generated on first run)_ | Persist after first start |
 | `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` **and** the detail HTTP page |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public hostname for the labeler |
@@ -156,7 +161,7 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply) |
 | `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post |
 | `TRIGGER_WATCHLIST` | _(empty)_ | Comma-separated DIDs whose posts are always checked |
-| `APPVIEW_URL` | `https://api.bsky.app` | Used to fetch post text by URI (mention parents, report subjects) |
+| `APPVIEW_URL` | `https://public.api.bsky.app` | Bluesky read-only AppView; used to fetch post text by URI (mention parents, report subjects). Unauthenticated. |
 | `HITL_MODE` | `stdin` | `stdin` · `telegram` · `auto` |
 | `TG_BOT_TOKEN`, `TG_REVIEWER_CHAT_ID` | — | Required when `HITL_MODE=telegram` |
 | `SQLITE_PATH` | `data/labeler.sqlite` | Index + labeler state DB |
@@ -173,7 +178,7 @@ overwhelmed.
 
 | Trigger | Env | Default | Source | Volume | Per-trigger doc |
 | --- | --- | --- | --- | --- | --- |
-| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. | low | [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) |
+| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. Optional: post a Bluesky reply to the mention author with `REPLY_TO_MENTIONS=true`. | low | [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) |
 | **Reports** | `TRIGGER_REPORTS=true` | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. The reported post is fact-checked. | low–medium | [docs/TRIGGER_REPORTS.md](./docs/TRIGGER_REPORTS.md) |
 | **Watchlist** | `TRIGGER_WATCHLIST=did:plc:a,did:plc:b` | empty | The post's author DID is in the list. Useful for proactively monitoring politicians, news outlets, known repeat spreaders. | controllable | [docs/TRIGGER_WATCHLIST.md](./docs/TRIGGER_WATCHLIST.md) |
 | **Firehose** | `TRIGGER_FIREHOSE=true` | off | Every post. Volume is realistically ~hundreds per second after pre-filtering. Only enable with a high-throughput LLM endpoint. | very high | [docs/TRIGGER_FIREHOSE.md](./docs/TRIGGER_FIREHOSE.md) |

@@ -105,7 +105,7 @@ Alice's PDS broadcasts the create event onto the Jetstream relay.
 3. **Target resolution.** The trigger target is **Bob's post**, not
    Alice's reply. The dispatcher calls `dispatchByUri()`. Since Bob's
    post is not yet in `post_cache`, the AppView is queried at
-   `GET https://api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob`.
+   `GET https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob`.
    The response is converted to an `IngestedPost` and persisted.
 4. **Pipeline.**
    - **S1 extract** — LLM extracts one atomic claim:
@@ -178,6 +178,102 @@ is missed.
   the pipeline drops the post silently.
 - **Mention of a deleted parent**: AppView fetch returns no post; the
   dispatcher logs a warning and drops.
+
+## Reply to the mention author (opt-in)
+
+By default the labeler stays silent on Bluesky — it only signs labels.
+With `REPLY_TO_MENTIONS=true` the labeler also **replies** to Alice's
+mention post after a successful label emit, so the user who asked sees
+the verdict inline in the thread.
+
+### Setup
+
+This trigger needs the labeler service account to authenticate as a real
+Bluesky user (so it can post). Generate an **app password** in the
+account's settings (`bsky.app` → Settings → Privacy and Security → App
+Passwords). Never use the main account password.
+
+```bash
+REPLY_TO_MENTIONS=true
+LABELER_BSKY_SERVICE=https://bsky.social
+LABELER_BSKY_IDENTIFIER=facts.example.org      # or did:plc:fact-labeler-abcdef
+LABELER_BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+LABELER_DETAIL_BASE_URL=https://facts.example.org   # for the deep-link in the reply
+```
+
+Config validation fails fast at startup if `REPLY_TO_MENTIONS=true` but
+the identifier or app password is missing.
+
+### Conditions
+
+The reply fires only when **all** of:
+
+1. `REPLY_TO_MENTIONS=true`,
+2. trigger reason is `mention` or `mention-reply` (never for watchlist /
+   firehose / report),
+3. a label was actually emitted — i.e. HITL accepted the proposal
+   (rejections and defers produce no reply),
+4. we haven't already replied to this proposal (one reply per proposal,
+   tracked in the `mention_reply` table).
+
+### Example reply payload
+
+After Alice's mention from the example above is accepted by the HITL,
+the labeler posts a reply on Alice's PDS:
+
+```jsonc
+// at://did:plc:fact-labeler-abcdef/app.bsky.feed.post/<rkey>
+{
+  "$type":     "app.bsky.feed.post",
+  "text":      "Verdict: refuted. Sources: CORRECTIV, AFP Fact Check, Snopes. Details: https://facts.example.org/posts?uri=at%3A%2F%2Fdid%3Aplc%3Abob-abcdef%2Fapp.bsky.feed.post%2F3kxbob",
+  "createdAt": "2026-06-17T10:01:42.000Z",
+  "reply": {
+    "parent": {
+      "uri": "at://did:plc:alice-abcdef/app.bsky.feed.post/3kxalice",
+      "cid": "bafy-alice"
+    },
+    "root": {
+      "uri": "at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob",
+      "cid": "bafy-bob"
+    }
+  }
+}
+```
+
+- `parent` points at **Alice's mention** — that's who we're answering.
+- `root` is the original thread root, taken from Alice's own
+  `replyRoot` if set (Bob's post here) or her post URI otherwise.
+- The post body fits inside 280 characters; longer source lists are
+  trimmed and the URL preserved.
+
+### What HITL rejection / no-match means
+
+| HITL outcome | Mention reply behaviour |
+| --- | --- |
+| accept → label emitted | reply is posted |
+| reject | no reply (we don't want to amplify proposals a moderator rejected) |
+| defer | no reply yet — if a later accept fires for the same proposal, the reply goes out then |
+| extraction returned no falsifiable claim | no proposal, no reply |
+| ClaimReview lookup returned no match | no proposal, no reply |
+
+If you want a "we looked but found nothing" reply, that's not built —
+open an issue if you need it.
+
+### Operational notes
+
+- App passwords can be revoked from `bsky.app` settings at any time.
+  Revoking a password while the labeler is running will surface as a
+  401 on the next post; the client tries a refresh once and then logs
+  the error.
+- Bluesky's API has per-account rate limits. A high mention volume will
+  eventually hit them; failed posts are logged but do not block the
+  pipeline.
+- The reply uses an authenticated `com.atproto.repo.createRecord` call.
+  The labels themselves are still signed with the labeler's secp256k1
+  key — the two paths are independent.
+- The detail link uses `LABELER_DETAIL_BASE_URL` if set, otherwise
+  falls back to `LABELER_HOSTNAME`. For a production deploy, set
+  `LABELER_DETAIL_BASE_URL` to the public reverse-proxy URL.
 
 ## See also
 
