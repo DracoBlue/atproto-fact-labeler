@@ -49,6 +49,11 @@ const Schema = z.object({
   // reads — `public.api.bsky.app` is the dedicated read-only endpoint and the
   // right choice for our use case (no session, no rate-limit-tier promotion).
   APPVIEW_URL: z.string().default('https://public.api.bsky.app'),
+  // Authed AppView used as a fallback when the public one is rate-limited or
+  // transiently unavailable. Only used when REPLY_TO_MENTIONS=true (the only
+  // path that gives us a Bluesky session). The fallback reuses the labeler's
+  // access JWT to pass authorisation.
+  APPVIEW_AUTHED_URL: z.string().default('https://api.bsky.app'),
 
   // --- Reply to @mention author ----------------------------------------
   // When true, the labeler posts a Bluesky reply to the mention post after a

@@ -35,8 +35,6 @@ async function main(): Promise<void> {
   const labelerServer = createLabelerServer();
   registerDetailRoutes(labelerServer.app);
 
-  const appview = new AppViewClient({ baseUrl: cfg.APPVIEW_URL });
-
   /** Authenticated Bluesky client for posting mention-replies. Optional. */
   const bsky = cfg.REPLY_TO_MENTIONS
     ? new BskyClient({
@@ -55,6 +53,15 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  // Once the optional BskyClient is wired we can give the AppViewClient an
+  // authed fallback — same access JWT, called only when public reads fail.
+  const appview = new AppViewClient({
+    baseUrl: cfg.APPVIEW_URL,
+    authedFallback: bsky
+      ? { baseUrl: cfg.APPVIEW_AUTHED_URL, getJwt: () => bsky.accessJwt }
+      : undefined,
+  });
 
   /** Decision handler: write back to DB and emit a label if accepted. */
   const onDecision = async ({

@@ -69,6 +69,11 @@ export class BskyClient {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
+  /** The current access JWT, or `null` if not logged in / session lost. */
+  get accessJwt(): string | null {
+    return this.session?.accessJwt ?? null;
+  }
+
   async login(): Promise<void> {
     const res = await this.fetchImpl(`${this.serviceUrl}/xrpc/com.atproto.server.createSession`, {
       method: 'POST',
