@@ -171,12 +171,12 @@ Which posts trigger an LLM extraction? Four mechanisms, freely combined.
 **Defaults are conservative** so a single local LLM endpoint is not
 overwhelmed.
 
-| Trigger | Env | Default | Source | Volume |
-| --- | --- | --- | --- | --- |
-| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. | low |
-| **Reports** | `TRIGGER_REPORTS=true` | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. The reported post is fact-checked. | low–medium |
-| **Watchlist** | `TRIGGER_WATCHLIST=did:plc:a,did:plc:b` | empty | The post's author DID is in the list. Useful for proactively monitoring politicians, news outlets, known repeat spreaders. | controllable |
-| **Firehose** | `TRIGGER_FIREHOSE=true` | off | Every post. Volume is realistically ~hundreds per second after pre-filtering. Only enable with a high-throughput LLM endpoint. | very high |
+| Trigger | Env | Default | Source | Volume | Per-trigger doc |
+| --- | --- | --- | --- | --- | --- |
+| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. | low | [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) |
+| **Reports** | `TRIGGER_REPORTS=true` | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. The reported post is fact-checked. | low–medium | [docs/TRIGGER_REPORTS.md](./docs/TRIGGER_REPORTS.md) |
+| **Watchlist** | `TRIGGER_WATCHLIST=did:plc:a,did:plc:b` | empty | The post's author DID is in the list. Useful for proactively monitoring politicians, news outlets, known repeat spreaders. | controllable | [docs/TRIGGER_WATCHLIST.md](./docs/TRIGGER_WATCHLIST.md) |
+| **Firehose** | `TRIGGER_FIREHOSE=true` | off | Every post. Volume is realistically ~hundreds per second after pre-filtering. Only enable with a high-throughput LLM endpoint. | very high | [docs/TRIGGER_FIREHOSE.md](./docs/TRIGGER_FIREHOSE.md) |
 
 Jetstream stays connected as long as any of `TRIGGER_FIREHOSE`,
 `TRIGGER_MENTIONS`, or `TRIGGER_WATCHLIST` is set, because mentions /
