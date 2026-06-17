@@ -33,7 +33,12 @@ export async function resolveWatchlistToDids(
     const entry = raw.trim();
     if (!entry) continue;
     if (entry.startsWith(DID_PREFIX)) {
-      resolved.push(normaliseDid(entry));
+      const issue = validateDidCase(entry);
+      if (issue) {
+        failures.push({ handle: entry, reason: issue });
+        continue;
+      }
+      resolved.push(entry);
       continue;
     }
     const handle = entry.replace(/^@/, '');
@@ -43,8 +48,13 @@ export async function resolveWatchlistToDids(
         failures.push({ handle, reason: 'resolveHandle returned no did' });
         continue;
       }
+      const issue = validateDidCase(did);
+      if (issue) {
+        failures.push({ handle, reason: `resolved to ${did} — ${issue}` });
+        continue;
+      }
       logger.info({ handle, did }, 'resolved watchlist handle');
-      resolved.push(normaliseDid(did));
+      resolved.push(did);
     } catch (err) {
       failures.push({ handle, reason: (err as Error).message ?? String(err) });
     }
@@ -63,12 +73,20 @@ export async function resolveWatchlistToDids(
   return [...new Set(resolved)];
 }
 
-function normaliseDid(did: string): string {
-  // DIDs are case-sensitive by spec but the PLC/web methods convention is
-  // lowercase. We don't lowercase the method-specific id because that would
-  // break did:web. Only the prefix is folded.
-  if (did.startsWith('did:plc:')) return 'did:plc:' + did.slice(8).toLowerCase();
-  return did;
+/**
+ * `did:plc:` method-specific ids are conventionally lowercase. We reject any
+ * uppercase in the MSID at boot rather than silently lowercasing — case-folding
+ * could collide with did:web identifiers (where case is significant), and the
+ * operator typically meant to copy a canonical DID anyway.
+ */
+function validateDidCase(did: string): string | null {
+  if (did.startsWith('did:plc:')) {
+    const msid = did.slice('did:plc:'.length);
+    if (/[A-Z]/.test(msid)) {
+      return `did:plc identifiers must be lowercase (use ${did.toLowerCase()})`;
+    }
+  }
+  return null;
 }
 
 async function resolveHandle(

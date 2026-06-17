@@ -31,6 +31,14 @@ import {
   buildReplyText,
 } from './replier/format.ts';
 import { isLabelerOwnUri, recordFeedback } from './feedback/store.ts';
+import {
+  clearQueueRow,
+  enqueueReply,
+  hasQueuedReply,
+  recordFailure,
+  takeReadyBatch,
+  type ReplyKind,
+} from './replier/queue.ts';
 
 async function main(): Promise<void> {
   const cfg = getConfig();
@@ -194,21 +202,30 @@ async function main(): Promise<void> {
     };
   };
 
-  /** Has a reply been recorded against this mention-source URI already? */
+  /**
+   * Has a reply been delivered *or* queued against this mention-source URI?
+   * Either way we shouldn't add another job — the queued one will eventually
+   * either succeed or end up in `status='failed'`.
+   */
   const hasReplied = (replyToUri: string): boolean => {
-    return !!db
+    const delivered = !!db
       .prepare(`SELECT 1 FROM mention_reply WHERE replied_to_uri = ? LIMIT 1`)
       .get(replyToUri);
+    if (delivered) return true;
+    return hasQueuedReply(db, replyToUri);
   };
 
-  /** Send and persist a Bluesky reply with the given pre-rendered text. */
+  /**
+   * Send a Bluesky reply. Success → mention_reply row. Failure → reply_queue
+   * for the drain worker to retry with exponential backoff.
+   */
   const sendReply = async (args: {
     text: string;
     parentUri: string;
     parentCid: string;
     rootUri: string;
     rootCid: string;
-    replyKind: 'verdict' | 'no-claim' | 'no-match' | 'no-target';
+    replyKind: ReplyKind;
     proposalId?: number;
   }): Promise<void> => {
     if (!bsky) return;
@@ -227,9 +244,66 @@ async function main(): Promise<void> {
         'mention-reply posted',
       );
     } catch (err) {
-      logger.error({ err, kind: args.replyKind, repliedTo: args.parentUri }, 'mention-reply post failed');
+      const inserted = enqueueReply(db, {
+        parentUri: args.parentUri,
+        parentCid: args.parentCid,
+        rootUri: args.rootUri,
+        rootCid: args.rootCid,
+        text: args.text,
+        replyKind: args.replyKind,
+        proposalId: args.proposalId,
+      });
+      logger.warn(
+        { err, kind: args.replyKind, repliedTo: args.parentUri, queued: inserted },
+        'mention-reply post failed — queued for retry',
+      );
     }
   };
+
+  /** Drain a batch of queued replies; called periodically. */
+  const drainReplyQueue = async (): Promise<void> => {
+    if (!bsky) return;
+    const batch = takeReadyBatch(db, 10);
+    if (batch.length === 0) return;
+    logger.debug({ count: batch.length }, 'draining reply queue');
+    for (const job of batch) {
+      try {
+        const result = await bsky.postReply({
+          text: job.text,
+          parent: { uri: job.parentUri, cid: job.parentCid },
+          root: { uri: job.rootUri, cid: job.rootCid },
+        });
+        db.prepare(
+          `INSERT INTO mention_reply (proposal_id, reply_kind, reply_uri, reply_cid, replied_to_uri)
+           VALUES (?, ?, ?, ?, ?)`,
+        ).run(job.proposalId ?? null, job.replyKind, result.uri, result.cid, job.parentUri);
+        clearQueueRow(db, job.id);
+        logger.info(
+          { kind: job.replyKind, replyUri: result.uri, repliedTo: job.parentUri, attempts: job.attempts + 1 },
+          'queued mention-reply delivered',
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        recordFailure(db, job.id, job.attempts, msg);
+        logger.warn(
+          { err: msg, kind: job.replyKind, repliedTo: job.parentUri, attempts: job.attempts + 1 },
+          'queued mention-reply still failing',
+        );
+      }
+    }
+  };
+
+  // Start the drain loop. Interval is short enough that recovery from a
+  // transient failure feels responsive, long enough not to hammer Bluesky.
+  let drainTimer: NodeJS.Timeout | undefined;
+  if (bsky) {
+    const DRAIN_INTERVAL_MS = 30_000;
+    drainTimer = setInterval(() => {
+      drainReplyQueue().catch((err) => logger.error({ err }, 'drainReplyQueue threw'));
+    }, DRAIN_INTERVAL_MS);
+    // Kick once immediately so a restart picks up anything left behind.
+    setTimeout(() => drainReplyQueue().catch(() => {}), 1000);
+  }
 
   /** Post a Bluesky reply with the verdict when conditions are met. */
   const maybeReplyToMention = async (proposalId: number): Promise<void> => {
@@ -534,6 +608,7 @@ async function main(): Promise<void> {
   const shutdown = async (reason: string): Promise<void> => {
     logger.info({ reason }, 'shutting down');
     abort.abort();
+    if (drainTimer) clearInterval(drainTimer);
     await surface.stop?.();
     await labelerServer.stop();
     closeDb();

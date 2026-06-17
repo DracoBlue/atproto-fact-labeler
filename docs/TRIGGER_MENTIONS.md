@@ -359,6 +359,18 @@ To add more languages, extend `TRANSLATIONS` in
 `src/replier/i18n.ts` and add the new key to `SUPPORTED_LANGS`. The
 picker, format functions, and tests pick it up automatically.
 
+### Reply delivery is retried
+
+If Bluesky's API rejects the reply (5xx, 429, network error), the labeler
+persists the attempt to `reply_queue` instead of dropping it. A background
+worker drains the queue every 30 s with exponential backoff
+(60 s → 1 h, max 7 attempts) so transient failures recover on their own.
+Rows that exhaust all retries land in `status='failed'` and stop trying.
+
+The dedup check (`hasReplied`) consults both `mention_reply` and
+`reply_queue`, so a re-triggered mention while a previous reply is still
+queued doesn't enqueue a second job.
+
 ### Operational notes
 
 - App passwords can be revoked from `bsky.app` settings at any time.

@@ -15,25 +15,35 @@ export interface FeedbackEntry {
 
 export interface StoredFeedback extends FeedbackEntry {
   id: number;
+  count: number;
+  firstReportedAt: string;
   reportedAt: string;
   resolvedAt: string | null;
   resolution: string | null;
 }
 
-/** Persist a single piece of feedback. Returns the inserted row id. */
+/**
+ * Persist a single piece of feedback. Duplicates on
+ * (subject_uri, reason_type, reason) bump the `count` and `reported_at`
+ * instead of creating a new row — keeps the operator's view clean when a bad
+ * actor floods the endpoint. Returns the row id (existing or new).
+ */
 export function recordFeedback(db: DbLike, entry: FeedbackEntry): number {
   const result = db
     .prepare(
       `INSERT INTO feedback (subject_uri, subject_cid, reason_type, reason)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(subject_uri, COALESCE(reason_type, ''), COALESCE(reason, ''))
+       DO UPDATE SET count = count + 1, reported_at = datetime('now')
+       RETURNING id`,
     )
-    .run(
+    .get(
       entry.subjectUri,
       entry.subjectCid ?? null,
       entry.reasonType ?? null,
       entry.reason ?? null,
-    );
-  return Number(result.lastInsertRowid);
+    ) as { id: number };
+  return result.id;
 }
 
 export interface ListFeedbackOptions {
@@ -58,8 +68,8 @@ export function listFeedback(db: DbLike, opts: ListFeedbackOptions = {}): Stored
 
   const rows = db
     .prepare(
-      `SELECT id, subject_uri, subject_cid, reason_type, reason, reported_at,
-              resolved_at, resolution
+      `SELECT id, subject_uri, subject_cid, reason_type, reason,
+              count, first_reported_at, reported_at, resolved_at, resolution
          FROM feedback
          ${where}
          ORDER BY id DESC
@@ -71,6 +81,8 @@ export function listFeedback(db: DbLike, opts: ListFeedbackOptions = {}): Stored
     subject_cid: string | null;
     reason_type: string | null;
     reason: string | null;
+    count: number;
+    first_reported_at: string;
     reported_at: string;
     resolved_at: string | null;
     resolution: string | null;
@@ -82,6 +94,8 @@ export function listFeedback(db: DbLike, opts: ListFeedbackOptions = {}): Stored
     subjectCid: r.subject_cid ?? undefined,
     reasonType: r.reason_type ?? undefined,
     reason: r.reason ?? undefined,
+    count: r.count,
+    firstReportedAt: r.first_reported_at,
     reportedAt: r.reported_at,
     resolvedAt: r.resolved_at,
     resolution: r.resolution,

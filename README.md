@@ -52,7 +52,10 @@ post) and watchlist (named accounts) are opt-in. See
 
 ## Requirements
 
-- **Node ≥ 22** and **pnpm ≥ 9** (or Docker, see below).
+- **Node ≥ 24** and **pnpm ≥ 11** (or Docker, see below).
+  After `pnpm install`, the native `better-sqlite3` build runs because
+  `pnpm-workspace.yaml` allows it (`allowBuilds`). If pnpm still warns
+  about ignored builds, run `pnpm install --force` once.
 - An **OpenAI-compatible chat-completions endpoint**. Anything that speaks
   the OpenAI API works — OpenAI itself, [LM Studio](https://lmstudio.ai/),
   [Ollama](https://ollama.com/blog/openai-compatibility),

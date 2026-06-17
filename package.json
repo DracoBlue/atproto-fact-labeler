@@ -7,9 +7,10 @@
   "author": "DracoBlue",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=24",
+    "pnpm": ">=11"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@11.0.0",
   "scripts": {
     "ingest": "tsx src/cli/ingest-claimreview.ts",
     "start": "tsx src/index.ts",

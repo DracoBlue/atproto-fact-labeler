@@ -90,11 +90,37 @@ describe('resolveWatchlistToDids', () => {
     expect(out).toEqual(['did:plc:alice']);
   });
 
-  it('lowercases did:plc method-specific ids', async () => {
-    const out = await resolveWatchlistToDids(['did:plc:ABCDEF'], {
+  it('rejects uppercase did:plc method-specific ids at boot', async () => {
+    await expect(
+      resolveWatchlistToDids(['did:plc:ABCDEF'], {
+        appviewUrl: 'https://x.test',
+        fetchImpl: fakeFetch([]),
+      }),
+    ).rejects.toThrow(/lowercase.*did:plc:abcdef/);
+  });
+
+  it('rejects resolved DIDs that come back with uppercase', async () => {
+    const fetchImpl = fakeFetch([
+      () => new Response(JSON.stringify({ did: 'did:plc:ABCDEF' }), { status: 200 }),
+    ]);
+    await expect(
+      resolveWatchlistToDids(['alice.example.org'], { appviewUrl: 'https://x.test', fetchImpl }),
+    ).rejects.toThrow(/lowercase/);
+  });
+
+  it('lets a clean lowercase did:plc through', async () => {
+    const out = await resolveWatchlistToDids(['did:plc:abcdef'], {
       appviewUrl: 'https://x.test',
       fetchImpl: fakeFetch([]),
     });
     expect(out).toEqual(['did:plc:abcdef']);
+  });
+
+  it('does not case-validate did:web entries', async () => {
+    const out = await resolveWatchlistToDids(['did:web:Example.com'], {
+      appviewUrl: 'https://x.test',
+      fetchImpl: fakeFetch([]),
+    });
+    expect(out).toEqual(['did:web:Example.com']);
   });
 });

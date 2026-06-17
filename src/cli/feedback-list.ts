@@ -68,8 +68,10 @@ async function main(): Promise<void> {
   process.stdout.write('='.repeat(72) + '\n');
   for (const row of rows) {
     const status = row.resolvedAt ? `resolved (${row.resolvedAt})` : 'open';
+    const countNote = row.count > 1 ? `  ×${row.count}` : '';
+    const firstSeen = row.count > 1 ? `  first ${row.firstReportedAt}` : '';
     process.stdout.write(
-      `\n#${row.id}  ${row.reportedAt}  [${status}]\n` +
+      `\n#${row.id}  ${row.reportedAt}${countNote}${firstSeen}  [${status}]\n` +
         `  subject : ${row.subjectUri}\n`,
     );
     if (row.reasonType) {

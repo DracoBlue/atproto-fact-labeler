@@ -11,15 +11,19 @@ function freshDb() {
   const raw = new Database(':memory:');
   raw.exec(`
     CREATE TABLE feedback (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject_uri   TEXT    NOT NULL,
-      subject_cid   TEXT,
-      reason_type   TEXT,
-      reason        TEXT,
-      reported_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-      resolved_at   TEXT,
-      resolution    TEXT
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject_uri       TEXT    NOT NULL,
+      subject_cid       TEXT,
+      reason_type       TEXT,
+      reason            TEXT,
+      count             INTEGER NOT NULL DEFAULT 1,
+      first_reported_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      reported_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+      resolved_at       TEXT,
+      resolution        TEXT
     );
+    CREATE UNIQUE INDEX ux_feedback_dedup
+      ON feedback(subject_uri, COALESCE(reason_type, ''), COALESCE(reason, ''));
   `);
   return {
     db: {
@@ -118,5 +122,40 @@ describe('recordFeedback + listFeedback', () => {
     expect(last).toBeTruthy();
     const filtered = listFeedback(db, { since: last });
     expect(filtered.length).toBeGreaterThan(0);
+  });
+
+  it('dedupes duplicates and bumps count instead of creating new rows', () => {
+    const { db, raw } = freshDb();
+    const entry = {
+      subjectUri: 'at://did:plc:fact-labeler/post/3kx',
+      reasonType: 'com.atproto.moderation.defs#reasonOther',
+      reason: 'verdict is wrong',
+    };
+    const a = recordFeedback(db, entry);
+    const b = recordFeedback(db, entry);
+    const c = recordFeedback(db, entry);
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    const all = (raw.prepare('SELECT count FROM feedback').all() as Array<{ count: number }>);
+    expect(all).toHaveLength(1);
+    expect(all[0]!.count).toBe(3);
+  });
+
+  it('NULL-safe dedup on null reason_type / reason', () => {
+    const { db, raw } = freshDb();
+    recordFeedback(db, { subjectUri: 'at://x/y' });
+    recordFeedback(db, { subjectUri: 'at://x/y' });
+    const rows = raw.prepare('SELECT count FROM feedback').all() as Array<{ count: number }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.count).toBe(2);
+  });
+
+  it('different (subject, reason_type, reason) tuples create separate rows', () => {
+    const { db, raw } = freshDb();
+    recordFeedback(db, { subjectUri: 'at://x/y', reason: 'first' });
+    recordFeedback(db, { subjectUri: 'at://x/y', reason: 'second' });
+    recordFeedback(db, { subjectUri: 'at://x/z', reason: 'first' });
+    const n = (raw.prepare('SELECT COUNT(*) AS n FROM feedback').get() as { n: number }).n;
+    expect(n).toBe(3);
   });
 });

@@ -188,22 +188,52 @@ function migrate(db: DbLike): void {
     CREATE UNIQUE INDEX IF NOT EXISTS ux_mention_reply_to_uri
       ON mention_reply(replied_to_uri);
 
-    -- User reports against the labeler's own posts. We don't run the pipeline
+    -- User reports against the labelers own posts. We dont run the pipeline
     -- on our own work; instead we capture the report so the operator can
-    -- review and correct verdicts that were wrong.
+    -- review and correct verdicts that were wrong. The count column is
+    -- bumped on duplicates so spam flooding doesnt multiply rows.
     CREATE TABLE IF NOT EXISTS feedback (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject_uri   TEXT    NOT NULL,
-      subject_cid   TEXT,
-      reason_type   TEXT,
-      reason        TEXT,
-      reported_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-      resolved_at   TEXT,
-      resolution    TEXT
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject_uri     TEXT    NOT NULL,
+      subject_cid     TEXT,
+      reason_type     TEXT,
+      reason          TEXT,
+      count           INTEGER NOT NULL DEFAULT 1,
+      first_reported_at TEXT  NOT NULL DEFAULT (datetime('now')),
+      reported_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+      resolved_at     TEXT,
+      resolution      TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_feedback_subject_uri ON feedback(subject_uri);
     CREATE INDEX IF NOT EXISTS idx_feedback_unresolved  ON feedback(resolved_at);
+
+    -- One row per (subject, reasonType, reason) tuple. NULL-safe via COALESCE.
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_feedback_dedup
+      ON feedback(subject_uri, COALESCE(reason_type, ''), COALESCE(reason, ''));
+
+    -- Replies the labeler tried to post but couldn't deliver (Bluesky 5xx,
+    -- network, rate-limit, etc.). The drain worker retries with exponential
+    -- backoff. UNIQUE(parent_uri) guarantees one queued entry per mention.
+    CREATE TABLE IF NOT EXISTS reply_queue (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_uri      TEXT    NOT NULL UNIQUE,
+      parent_cid      TEXT    NOT NULL,
+      root_uri        TEXT    NOT NULL,
+      root_cid        TEXT    NOT NULL,
+      text            TEXT    NOT NULL,
+      reply_kind      TEXT    NOT NULL,
+      proposal_id     INTEGER REFERENCES proposal(id),
+      attempts        INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      last_error      TEXT,
+      status          TEXT    NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending','failed')),
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_reply_queue_pending
+      ON reply_queue(next_attempt_at) WHERE status = 'pending';
 
     CREATE TABLE IF NOT EXISTS label_emit (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -236,6 +266,8 @@ function migrate(db: DbLike): void {
   addColumnIfMissing(db, 'proposal', 'trigger_source_lang', 'TEXT');
   addColumnIfMissing(db, 'mention_reply', 'reply_kind', "TEXT NOT NULL DEFAULT 'verdict'");
   ensureMentionReplyAcceptsNoTarget(db);
+  addColumnIfMissing(db, 'feedback', 'count', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfMissing(db, 'feedback', 'first_reported_at', "TEXT NOT NULL DEFAULT (datetime('now'))");
 }
 
 /**
