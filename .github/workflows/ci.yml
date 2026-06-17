@@ -14,18 +14,62 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.0.0
+          version: 11
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test
-        run: pnpm test
+      - name: Test with coverage (junit + cobertura)
+        run: pnpm vitest run --reporter=default --reporter=junit --outputFile=test-report.junit.xml --coverage --coverage.reporter=text --coverage.reporter=cobertura --coverage.reporter=html
+
+      - name: Publish test results to step summary
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: test-report.junit.xml
+          detailed_summary: true
+          include_passed: false
+          fail_on_failure: true
+
+      - name: Publish coverage to step summary
+        if: always()
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage/cobertura-coverage.xml
+          format: markdown
+          output: both
+          badge: true
+          fail_below_min: false
+          thresholds: '60 80'
+
+      - name: Append coverage to job summary
+        if: always()
+        run: |
+          if [ -f code-coverage-results.md ]; then
+            echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+            cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload coverage HTML artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 14
+
+      - name: Upload junit artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit
+          path: test-report.junit.xml
+          retention-days: 14
 
   lint:
     runs-on: ubuntu-latest
@@ -34,11 +78,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.0.0
+          version: 11
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
