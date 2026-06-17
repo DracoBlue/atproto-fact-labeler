@@ -149,4 +149,44 @@ describe('evaluateTrigger', () => {
       expect(evaluateTrigger(them, { ...ALL_OFF, mentions: true })?.reason).toBe('mention');
     });
   });
+
+  describe('mention in a quote-post', () => {
+    const MENTION_FACET = {
+      features: [{ $type: 'app.bsky.richtext.facet#mention', did: LABELER_DID }],
+    };
+
+    it('targets the quoted record when a quote-post mentions the labeler', () => {
+      const post = basePost({
+        facets: [MENTION_FACET],
+        quotedRecord: {
+          uri: 'at://did:plc:bob/app.bsky.feed.post/quoted',
+          cid: 'bafy-quoted',
+        },
+      });
+      const hit = evaluateTrigger(post, { ...ALL_OFF, mentions: true });
+      expect(hit).toEqual({
+        reason: 'mention-quote',
+        targetUri: 'at://did:plc:bob/app.bsky.feed.post/quoted',
+        targetIsSourcePost: false,
+      });
+    });
+
+    it('reply parent takes precedence over quoted record', () => {
+      const post = basePost({
+        facets: [MENTION_FACET],
+        replyParent: { uri: 'at://reply-parent', cid: 'rp' },
+        quotedRecord: { uri: 'at://quoted', cid: 'q' },
+      });
+      const hit = evaluateTrigger(post, { ...ALL_OFF, mentions: true });
+      expect(hit?.reason).toBe('mention-reply');
+      expect(hit?.targetUri).toBe('at://reply-parent');
+    });
+
+    it('falls back to standalone mention when neither reply nor quote', () => {
+      const post = basePost({ facets: [MENTION_FACET] });
+      const hit = evaluateTrigger(post, { ...ALL_OFF, mentions: true });
+      expect(hit?.reason).toBe('mention');
+      expect(hit?.targetIsSourcePost).toBe(true);
+    });
+  });
 });

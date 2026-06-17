@@ -126,6 +126,50 @@ Alice's PDS broadcasts the create event onto the Jetstream relay.
    `http://localhost:14831/posts?uri=at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob`
    to see the matched fact-checks with links to CORRECTIV, AFP, Snopes.
 
+## Mention in a quote-post
+
+If Alice **quote-posts** Bob's post and adds `@facts.example.org check this`:
+
+```jsonc
+// at://did:plc:alice-abcdef/app.bsky.feed.post/3kxalice
+{
+  "$type":     "app.bsky.feed.post",
+  "text":      "@facts.example.org check this",
+  "createdAt": "2026-06-17T10:01:00.000Z",
+  "facets": [
+    {
+      "features": [{
+        "$type": "app.bsky.richtext.facet#mention",
+        "did":   "did:plc:fact-labeler-abcdef"
+      }]
+    }
+  ],
+  "embed": {
+    "$type":  "app.bsky.embed.record",
+    "record": {
+      "uri": "at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob",
+      "cid": "bafy-bob"
+    }
+  }
+}
+```
+
+`evaluateTrigger` returns
+`{ reason: 'mention-quote', targetUri: <Bob's post URI>, targetIsSourcePost: false }`.
+The dispatcher resolves Bob's post via AppView and runs the pipeline
+against **Bob's quoted claim**, not Alice's commentary. Behaves the same
+way as a mention-in-reply.
+
+Quote-with-media (`app.bsky.embed.recordWithMedia`) is supported too —
+the inner `record.record.uri` is used.
+
+**Precedence** when a mention post is both a reply and a quote (Alice
+replies to Carol with a post quoting Bob):
+
+1. `replyParent` wins — `mention-reply` targets Carol.
+2. `quotedRecord` is the fallback — `mention-quote` targets Bob.
+3. Neither set → `mention` targets Alice's own post.
+
 ## Standalone mention (no reply)
 
 If Alice writes the assertion herself with a mention:

@@ -45,7 +45,30 @@ interface JetstreamPostRecord {
     index?: { byteStart: number; byteEnd: number };
     features?: Array<{ $type?: string; did?: string }>;
   }>;
-  embed?: { $type?: string };
+  embed?: {
+    $type?: string;
+    /** Set for app.bsky.embed.record — single-quote. */
+    record?: {
+      uri?: string;
+      cid?: string;
+      /** Set for app.bsky.embed.recordWithMedia — wraps the actual quote. */
+      record?: { uri?: string; cid?: string };
+    };
+  };
+}
+
+/** Extract a single quoted-record reference from a post's embed, if any. */
+function extractQuotedRecord(
+  embed: JetstreamPostRecord['embed'],
+): { uri: string; cid?: string } | undefined {
+  if (!embed) return undefined;
+  if (embed.$type === 'app.bsky.embed.record' && embed.record?.uri) {
+    return { uri: embed.record.uri, cid: embed.record.cid };
+  }
+  if (embed.$type === 'app.bsky.embed.recordWithMedia' && embed.record?.record?.uri) {
+    return { uri: embed.record.record.uri, cid: embed.record.record.cid };
+  }
+  return undefined;
 }
 
 export interface JetstreamOptions {
@@ -177,6 +200,7 @@ function toIngestedPost(evt: JetstreamCommitEvent): IngestedPost | null {
     replyRoot: rec.reply?.root
       ? { uri: rec.reply.root.uri, cid: rec.reply.root.cid }
       : undefined,
+    quotedRecord: extractQuotedRecord(rec.embed),
   };
 }
 

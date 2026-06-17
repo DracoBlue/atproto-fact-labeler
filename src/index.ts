@@ -24,6 +24,7 @@ import type { HitlSurface } from './hitl/types.ts';
 import type { Proposal, TriggerContext } from './pipeline/orchestrator.ts';
 import { BskyClient } from './replier/bsky.ts';
 import { buildNoClaimReply, buildNoMatchReply, buildReplyText } from './replier/format.ts';
+import { isLabelerOwnUri, recordFeedback } from './feedback/store.ts';
 
 async function main(): Promise<void> {
   const cfg = getConfig();
@@ -222,7 +223,11 @@ async function main(): Promise<void> {
     if (!bsky) return;
     const ctx = loadTriggerCtx(proposalId);
     if (!ctx) return;
-    if (ctx.reason !== 'mention' && ctx.reason !== 'mention-reply') return;
+    if (
+      ctx.reason !== 'mention' &&
+      ctx.reason !== 'mention-reply' &&
+      ctx.reason !== 'mention-quote'
+    ) return;
     if (hasReplied(ctx.source_uri)) return;
 
     const publishers = (
@@ -288,7 +293,11 @@ async function main(): Promise<void> {
     claimsWithMatches: number;
   }): Promise<void> => {
     if (!bsky) return;
-    if (args.triggerReason !== 'mention' && args.triggerReason !== 'mention-reply') return;
+    if (
+      args.triggerReason !== 'mention' &&
+      args.triggerReason !== 'mention-reply' &&
+      args.triggerReason !== 'mention-quote'
+    ) return;
     if (hasReplied(args.sourceUri)) return;
 
     let text: string;
@@ -354,7 +363,9 @@ async function main(): Promise<void> {
     // the user knows we looked and what we (didn't) find.
     if (
       proposals.length === 0 &&
-      (trigger.reason === 'mention' || trigger.reason === 'mention-reply') &&
+      (trigger.reason === 'mention' ||
+        trigger.reason === 'mention-reply' ||
+        trigger.reason === 'mention-quote') &&
       trigger.sourceUri &&
       trigger.sourceCid
     ) {
@@ -402,12 +413,36 @@ async function main(): Promise<void> {
       logger.warn({ uri }, 'could not resolve target post via AppView');
       return;
     }
+    // Belt-and-braces self-guard: the trigger layer already drops posts
+    // authored by the labeler, but a mention chain or report can reference
+    // a post we authored. Reports against our own posts are filtered upstream
+    // into the feedback channel; this catches everything else.
+    if (fetched.did === cfg.LABELER_DID) {
+      logger.info({ uri }, 'dropped self-targeted dispatch (post authored by labeler)');
+      return;
+    }
     await dispatchPost(fetched, trigger);
   };
 
   // --- Reports trigger (variant 3) -----------------------------------------
   if (cfg.TRIGGER_REPORTS) {
     registerReportRoutes(labelerServer.app, async (report) => {
+      // A user reporting one of our own posts is signalling "you got something
+      // wrong" — record it as operator feedback instead of running the pipeline
+      // on our own work.
+      if (isLabelerOwnUri(report.subjectUri, cfg.LABELER_DID)) {
+        const id = recordFeedback(db, {
+          subjectUri: report.subjectUri,
+          subjectCid: report.subjectCid,
+          reasonType: report.reasonType,
+          reason: report.reason,
+        });
+        logger.warn(
+          { feedbackId: id, uri: report.subjectUri, reasonType: report.reasonType },
+          'report against own post — recorded as feedback',
+        );
+        return;
+      }
       logger.info({ uri: report.subjectUri, reasonType: report.reasonType }, 'report received');
       await dispatchByUri(report.subjectUri, { reason: 'report' });
     });
@@ -500,7 +535,11 @@ async function main(): Promise<void> {
  * thread root so it can construct a syntactically correct Bluesky reply.
  */
 function buildTriggerContext(post: IngestedPost, hit: TriggerHit): TriggerContext {
-  if (hit.reason === 'mention' || hit.reason === 'mention-reply') {
+  if (
+    hit.reason === 'mention' ||
+    hit.reason === 'mention-reply' ||
+    hit.reason === 'mention-quote'
+  ) {
     const root = post.replyRoot ?? { uri: post.uri, cid: post.cid };
     return {
       reason: hit.reason,

@@ -29,6 +29,12 @@ export interface IngestedPost {
   replyParent?: { uri: string; cid?: string };
   /** Set when the post is a reply — root of the thread (rarely useful for us). */
   replyRoot?: { uri: string; cid?: string };
+  /**
+   * Set when the post quotes another post (`app.bsky.embed.record` or
+   * `app.bsky.embed.recordWithMedia`). A mention in a quote-post targets
+   * the quoted record, just like a mention in a reply targets the parent.
+   */
+  quotedRecord?: { uri: string; cid?: string };
 }
 
 export type PostHandler = (post: IngestedPost) => Promise<void> | void;

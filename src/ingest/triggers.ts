@@ -22,7 +22,12 @@ export interface TriggerConfig {
   labelerHandle?: string;
 }
 
-export type TriggerReason = 'firehose' | 'mention' | 'mention-reply' | 'watchlist';
+export type TriggerReason =
+  | 'firehose'
+  | 'mention'
+  | 'mention-reply'
+  | 'mention-quote'
+  | 'watchlist';
 
 export interface TriggerHit {
   reason: TriggerReason;
@@ -61,11 +66,22 @@ export function evaluateTrigger(post: IngestedPost, cfg: TriggerConfig): Trigger
     if (cfg.labelerHandle) opts.handle = cfg.labelerHandle;
     const det = detectMention(post, opts);
     if (det.matched) {
+      // Precedence: reply > quote > standalone.
       if (post.replyParent?.uri) {
         // "@labeler check this" on someone else's post — target the parent.
         return {
           reason: 'mention-reply',
           targetUri: post.replyParent.uri,
+          targetIsSourcePost: false,
+        };
+      }
+      if (post.quotedRecord?.uri) {
+        // "@labeler check this" quote-posting someone else's post — target the
+        // quoted record. Same intent as mention-reply: the user is pointing
+        // at someone else's claim and asking us to assess it.
+        return {
+          reason: 'mention-quote',
+          targetUri: post.quotedRecord.uri,
           targetIsSourcePost: false,
         };
       }

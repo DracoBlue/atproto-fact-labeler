@@ -179,7 +179,7 @@ overwhelmed.
 
 | Trigger | Env | Default | Source | Volume | Per-trigger doc |
 | --- | --- | --- | --- | --- | --- |
-| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked. Optional: post a Bluesky reply to the mention author with `REPLY_TO_MENTIONS=true`. | low | [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) |
+| **Mentions** | `TRIGGER_MENTIONS=true` | on | A Bluesky user `@mentions` the labeler — facet preferred, plain-text fallback via `LABELER_HANDLE`. In a reply, the **parent post** is fact-checked; in a quote-post, the **quoted record** is fact-checked. Optional: post a Bluesky reply to the mention author with `REPLY_TO_MENTIONS=true`. | low | [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) |
 | **Reports** | `TRIGGER_REPORTS=true` | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. The reported post is fact-checked. | low–medium | [docs/TRIGGER_REPORTS.md](./docs/TRIGGER_REPORTS.md) |
 | **Watchlist** | `TRIGGER_WATCHLIST=did:plc:a,did:plc:b` | empty | The post's author DID is in the list. Useful for proactively monitoring politicians, news outlets, known repeat spreaders. | controllable | [docs/TRIGGER_WATCHLIST.md](./docs/TRIGGER_WATCHLIST.md) |
 | **Firehose** | `TRIGGER_FIREHOSE=true` | off | Every post. Volume is realistically ~hundreds per second after pre-filtering. Only enable with a high-throughput LLM endpoint. | very high | [docs/TRIGGER_FIREHOSE.md](./docs/TRIGGER_FIREHOSE.md) |

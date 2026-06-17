@@ -188,6 +188,23 @@ function migrate(db: DbLike): void {
     CREATE UNIQUE INDEX IF NOT EXISTS ux_mention_reply_to_uri
       ON mention_reply(replied_to_uri);
 
+    -- User reports against the labeler's own posts. We don't run the pipeline
+    -- on our own work; instead we capture the report so the operator can
+    -- review and correct verdicts that were wrong.
+    CREATE TABLE IF NOT EXISTS feedback (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject_uri   TEXT    NOT NULL,
+      subject_cid   TEXT,
+      reason_type   TEXT,
+      reason        TEXT,
+      reported_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      resolved_at   TEXT,
+      resolution    TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_feedback_subject_uri ON feedback(subject_uri);
+    CREATE INDEX IF NOT EXISTS idx_feedback_unresolved  ON feedback(resolved_at);
+
     CREATE TABLE IF NOT EXISTS label_emit (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       post_uri    TEXT    NOT NULL,

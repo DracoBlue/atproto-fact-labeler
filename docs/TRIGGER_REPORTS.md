@@ -145,6 +145,44 @@ curl -s -X POST http://localhost:14831/xrpc/com.atproto.moderation.createReport 
 The reported post is dispatched immediately. Watch the HITL surface
 (stdin / Telegram / auto) for the resulting proposal.
 
+## Reports against the labeler's own posts → feedback channel
+
+A report whose `subject.uri` belongs to the labeler account itself is
+treated as **user feedback**, not as a normal dispatch. We never run the
+fact-check pipeline on our own work — that's both pointless (we already
+know what we said) and a recursion risk. Instead the report is persisted
+in the `feedback` table for an operator to review.
+
+The check is a cheap string match (`at://<labelerDid>/...`); no AppView
+round-trip needed.
+
+### Reviewing feedback
+
+```bash
+pnpm run feedback:list                     # 50 most recent rows
+pnpm run feedback:list --unresolved        # only rows without a resolution
+pnpm run feedback:list --since 2026-06-01  # since a date
+pnpm run feedback:list --limit 100         # cap output
+```
+
+Sample output:
+
+```
+#3  2026-06-17 12:14:02  [open]
+  subject : at://did:plc:fact-labeler-abcdef/app.bsky.feed.post/3kxrep1
+  type    : com.atproto.moderation.defs#reasonOther
+  reason  : The verdict is wrong, CORRECTIV is outdated.
+```
+
+A "resolved" workflow (marking, replying, retiring the original verdict)
+is not yet wired — the rows are read-only from the CLI today. When you
+act on a piece of feedback, mark it manually:
+
+```bash
+sqlite3 data/labeler.sqlite \
+  "UPDATE feedback SET resolved_at = datetime('now'), resolution = 'retired verdict' WHERE id = 3;"
+```
+
 ## Edge cases
 
 - **Account-level report** (`subject = did:plc:bob…`): currently logged
