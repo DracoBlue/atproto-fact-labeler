@@ -36,10 +36,10 @@ Bluesky / Jetstream
  @skyware/labeler  →  signed label on subscribeLabels  +  detail HTML page
 ```
 
-The pipeline is **lookup-first**: most claims are answered by an existing
-fact-check entry. Running our own retrieval-augmented LLM verification is a
-fallback for novel claims and is stubbed in this v0 — see the `S4` notes in
-`src/pipeline/orchestrator.ts`.
+The pipeline is **lookup-first**: a claim is only labeled when there's a
+matching fact-check entry from a third-party publisher in the local index.
+Claims without a match are dropped — this labeler does not generate
+verdicts of its own.
 
 ## Requirements
 

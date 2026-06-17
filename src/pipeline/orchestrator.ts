@@ -5,7 +5,6 @@
  *   S1 extract   → LLM atomic claim list
  *   S2 lookup    → FTS over ClaimReview index
  *   S3 normalise → publisher rating → internal verdict
- *   S4 RAG fallback (stub — not run by default in v1)
  *   S5 propose   → write a proposal to the HITL queue
  *
  * Each proposal carries enough context for a human or auto-accept policy to decide.
@@ -42,14 +41,6 @@ export interface PipelineEnv {
   extractStub?: (post: IngestedPost) => ReturnType<typeof extractClaims>;
 }
 
-interface ProcessOptions {
-  /**
-   * If true, claims with no ClaimReview match are dropped silently (no proposal).
-   * Default true to keep proposal volume manageable. Set false when wiring S4.
-   */
-  dropNoMatch?: boolean;
-}
-
 const INSERT_POST_CACHE = `
   INSERT OR REPLACE INTO post_cache (uri, cid, did, text, lang, indexed_at, seen_at)
   VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -83,9 +74,7 @@ const INSERT_PROPOSAL = `
 export async function processPost(
   post: IngestedPost,
   env: PipelineEnv = {},
-  opts: ProcessOptions = {},
 ): Promise<Proposal[]> {
-  const dropNoMatch = opts.dropNoMatch ?? true;
   const db = env.db ?? getDb();
 
   // S0 — persist the post (idempotent).
@@ -121,11 +110,7 @@ export async function processPost(
     }, db);
 
     if (!lookup.candidates.length) {
-      if (dropNoMatch) {
-        logger.debug({ claim: c.atomic_text }, 'no claim-review match, skipping (S4 disabled)');
-        continue;
-      }
-      // S4 fallback would go here — for v1 we drop.
+      logger.debug({ claim: c.atomic_text }, 'no claim-review match, skipping');
       continue;
     }
 
