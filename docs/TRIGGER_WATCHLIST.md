@@ -82,12 +82,15 @@ Bob's PDS broadcasts the create event onto Jetstream.
      first.)
 3. **Pipeline.**
    - **S1 extract** — `"Unemployment in Germany is at 15%."`
-   - **S2 lookup** — CORRECTIV's `"Arbeitslosigkeit in Deutschland"`
-     entries (cross-lingual via tokenisation), dpa-Faktencheck's
-     `"Arbeitslosenquote"` items, Reuters' English equivalents.
-   - **S3 normalise** — publisher ratings (`Größtenteils falsch`, `Falsch`,
-     `Mostly False`) aggregate to `verdict=false`, confidence high,
-     votes=2.
+   - **S2 retrieve** — dense cosine returns CORRECTIV's
+     `"Arbeitslosigkeit in Deutschland"` entries (crosslingual EN→DE),
+     dpa-Faktencheck's `"Arbeitslosenquote"` items, Reuters' English
+     equivalents.
+   - **S3 entail** — NLI marks each as `entailment` since publishers
+     reviewed the same statistical claim.
+   - **S4 match** — publisher ratings (`Größtenteils falsch`, `Falsch`,
+     `Mostly False`) pass through and aggregate to `verdict=false`,
+     confidence high, votes=2.
    - **S5 propose** — proposal pushed to HITL.
 4. **HITL.** Reviewer accepts (or rejects if the claim is actually true
    — the labeler doesn't know in advance; HITL still owns the decision).

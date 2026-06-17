@@ -27,7 +27,10 @@ Bluesky / Jetstream                    com.atproto.moderation.createReport
  LLM extraction (any OpenAI-compatible API — local or hosted)
         │
         ▼
- ClaimReview lookup (local SQLite index, built from Google Data Commons feed)
+ dense retrieval (multilingual embeddings over the local ClaimReview index)
+        │
+        ▼
+ NLI polarity gate (entailment / contradiction / neutral — drop neutral, flip on contradiction)
         │
         ▼
  publisher-rating normaliser → internal verdict {true,false,mixed,unknown,disputed,outdated}
@@ -39,10 +42,16 @@ Bluesky / Jetstream                    com.atproto.moderation.createReport
  @skyware/labeler  →  signed label on subscribeLabels  +  detail HTML page
 ```
 
-The pipeline is **lookup-first**: a claim is only labeled when there's a
-matching fact-check entry from a third-party publisher in the local index.
-Claims without a match are dropped — this labeler does not generate
-verdicts of its own.
+The pipeline is **lookup-first**: a claim is only labeled when an existing
+fact-check from a third-party publisher matches and the NLI judge
+classifies it as either entailing or contradicting the post's claim. The
+contradiction case flips the publisher's verdict so a post saying *"the
+earth is not flat"* gets correctly labeled as supported by fact-checks
+that refute *"the earth is flat"*. Claims with no surviving match are
+dropped — this labeler does not generate verdicts of its own.
+See [docs/PIPELINE.md](./docs/PIPELINE.md) for the architecture and
+[docs/RESEARCH-MATCHING.md](./docs/RESEARCH-MATCHING.md) for the
+literature it was built from.
 
 **Triggers are user-initiated by default.** Running an LLM extraction on
 every Bluesky post (~30 M/day) is impractical for any single-LLM setup, so
@@ -88,6 +97,10 @@ cp .env.example .env
 pnpm run ingest                    # uses CLAIMREVIEW_FEED_PATH from .env
 # or: pnpm run ingest path/to/data.json
 
+# Embed every claim_reviewed text so dense retrieval can find them.
+# Required after every ingest. ~12 min for a 92k-row corpus on M3 Max.
+pnpm cli:embed-rebuild
+
 # Run
 pnpm run start
 ```
@@ -117,25 +130,88 @@ Pre-built images are published to GitHub Container Registry on each release:
 docker pull ghcr.io/dracoblue/atproto-fact-labeler:latest
 ```
 
+The published `docker-compose.yml` is the supported deploy surface — it
+documents the volume layout, the LM-Studio-on-host bridge, and every
+configurable env var with a sensible default.
+
 ```bash
-docker run -d \
-  -p 14831:14831 \
-  -v fact-labeler-data:/data \
-  -v "$PWD/data.json:/feed/data.json:ro" \
-  -e OPENAI_API_KEY=sk-lm-... \
-  -e OPENAI_BASE_URL=http://host.docker.internal:1234/v1 \
-  -e CLAIMREVIEW_FEED_PATH=/feed/data.json \
-  -e HITL_MODE=auto \
-  ghcr.io/dracoblue/atproto-fact-labeler:latest
+# 1. Download the fact-check feed next to your compose file
+curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json -o data.json
+
+# 2. Provide the LLM endpoint — by default we expect LM Studio on the host
+#    at port 1234 with an extraction model AND an embedding model loaded.
+#    See § "LM Studio host setup" below.
+export OPENAI_API_KEY=lm-studio   # any non-empty value if the server doesn't check
+
+# 3. One-off: import the ClaimReview feed into the labeler's SQLite index
+docker compose run --rm fact-labeler pnpm ingest
+
+# 4. One-off: embed every claim_reviewed text so dense retrieval can find them.
+#    ~12 min for a 92k-row corpus on Apple Silicon. Required after every ingest.
+docker compose run --rm fact-labeler pnpm cli:embed-rebuild
+
+# 5. Start the labeler service
+docker compose up -d
 ```
 
-The image defaults `SQLITE_PATH=/data/labeler.sqlite`. Mount a named volume
-at `/data` to persist the fact-check index and labeler key between runs.
+Verify it's up:
 
-Build from source:
+```bash
+curl http://localhost:14831/healthz   # → ok
+docker compose logs -f fact-labeler
+```
+
+The image defaults `SQLITE_PATH=/data/labeler.sqlite`. The compose file
+mounts a named `fact-labeler-data` volume there so the index and labeler
+signing key persist across restarts.
+
+### LM Studio host setup
+
+The labeler in Docker reaches the LM Studio server on the Docker host
+via `host.docker.internal:1234`. Two models must be loaded in LM Studio
+before the embed-rebuild and the service runs:
+
+| Slot | Default `.env` value | Notes |
+| --- | --- | --- |
+| Extraction LLM (Stage S1) | `OPENAI_MODEL=google/gemma-4-e2b` | Any chat model works. Reasoning models (qwen3, deepseek-r1) need `OPENAI_MAX_TOKENS≥4096` |
+| NLI judge (Stage 3) | reuses `OPENAI_MODEL` when `NLI_MODE=llm-judge` (default) | Larger models give better edge-case judgement |
+| Embedding (Stage 1) | `EMBEDDING_MODEL=text-embedding-granite-embedding-278m-multilingual` | Ships with LM Studio; multilingual; 768 dim |
+
+Load all three (or two if NLI shares the LLM slot) via the LM Studio UI
+or:
+
+```bash
+lms load qwen3.6-27b
+lms load text-embedding-granite-embedding-278m-multilingual
+```
+
+To point at a different OpenAI-compatible server (OpenAI proper, vLLM,
+Ollama, etc.) set `OPENAI_BASE_URL` and optionally
+`EMBEDDING_BASE_URL` to override the host bridge.
+
+### One-shot ops inside the container
+
+```bash
+# Re-import after refreshing data.json
+docker compose run --rm fact-labeler pnpm ingest
+
+# Re-embed (model-aware — only stale rows by default)
+docker compose run --rm fact-labeler pnpm cli:embed-rebuild
+docker compose run --rm fact-labeler pnpm cli:embed-rebuild --force
+
+# Label a single Bluesky post manually
+docker compose run --rm fact-labeler pnpm cli:label https://bsky.app/profile/<handle>/post/<rkey>
+
+# Print lifecycle / on-wire status
+docker compose run --rm fact-labeler pnpm lifecycle:status
+```
+
+### Build from source
 
 ```bash
 docker build -t atproto-fact-labeler .
+# or with compose:
+docker compose build
 ```
 
 ## Configuration
@@ -146,8 +222,13 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | — (required) | API key for the OpenAI-compatible endpoint (any non-empty value if the server doesn't check) |
-| `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL |
-| `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model name (must be one the endpoint serves) |
+| `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL — used by the extraction LLM and (when `NLI_MODE=llm-judge`) the NLI judge |
+| `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction (Stage S1) and NLI-judge (Stage 3) model. Reasoning-class models (qwen3, deepseek-r1) work best on the NLI side |
+| `OPENAI_MAX_TOKENS` | `4096` | `max_tokens` per request — reasoning models need generous head-room or `finish_reason=length` swallows the answer |
+| `EMBEDDING_API_KEY` | _(falls back to OPENAI_API_KEY)_ | API key for the embedding endpoint |
+| `EMBEDDING_BASE_URL` | _(falls back to OPENAI_BASE_URL)_ | OpenAI-compatible `/v1/embeddings` base URL. Lets you host embeddings on a different server from the LLM |
+| `EMBEDDING_MODEL` | `text-embedding-granite-embedding-278m-multilingual` | Stage 1 dense-retrieval model. Granite-278m ships with LM Studio, 768 dim, EN↔DE crosslingual. See [docs/PIPELINE.md](./docs/PIPELINE.md) |
+| `NLI_MODE` | `llm-judge` | Stage 3 polarity gate. `llm-judge` prompts `OPENAI_MODEL` as a 3-class entailment judge. `dedicated` is reserved for a separate NLI server (not yet wired) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
 | `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. Word-boundary matched — `email@<handle>` and `<handle>.suffix` do **not** false-match. |
 | `REPLY_TO_MENTIONS` | `false` | Post a Bluesky reply to the mention author after a mention-triggered label is accepted. See [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) § Reply-to-mention |
@@ -245,6 +326,23 @@ http://localhost:14831/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx&format=
 
 HTML for humans, JSON via `format=json` or `Accept: application/json`.
 Liveness: `GET /healthz`.
+
+### Building the dense-retrieval index — `cli:embed-rebuild`
+
+After the first ClaimReview ingest (or after changing `EMBEDDING_MODEL`),
+embed every row in the local index:
+
+```bash
+pnpm cli:embed-rebuild              # only rows missing or stale
+pnpm cli:embed-rebuild --force      # re-embed every row
+pnpm cli:embed-rebuild --limit 500  # smoke-test on a slice
+```
+
+This is the prerequisite for Stage 1 retrieval — without it the pipeline
+returns zero candidates and the labeler is effectively offline.
+Throughput against LM Studio + granite-278m on M3 Max is ~130 emb/s
+(~12 min for a 92k-row corpus). The CLI is model-aware: rows tagged with
+a stale `embedding_model` get re-embedded on the next run.
 
 ### One-shot labeling — `cli:label`
 

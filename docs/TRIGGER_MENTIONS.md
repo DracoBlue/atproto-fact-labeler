@@ -110,12 +110,16 @@ Alice's PDS broadcasts the create event onto the Jetstream relay.
 4. **Pipeline.**
    - **S1 extract** — LLM extracts one atomic claim:
      `"The earth is flat."`
-   - **S2 lookup** — FTS over the ClaimReview index returns CORRECTIV's
-     `"Die Erde ist eine Scheibe"` (cross-lingual via stemmed tokens), AFP
-     Fact Check's `"the earth is flat"`, Snopes' `"Flat Earth claims"`.
-   - **S3 normalise** — every publisher's native rating maps to our
-     internal `false`. Aggregation: `verdict=false`,
-     `confidence≈0.95`, `votes=3`, `agreement=1.0`.
+   - **S2 retrieve** — dense cosine over the embedded ClaimReview index
+     returns CORRECTIV's `"Die Erde ist eine Scheibe"` (crosslingual at
+     cosine ≈ 0.81), AFP Fact Check's `"the earth is flat"`, Snopes'
+     `"Flat Earth claims"`, plus topical neighbours.
+   - **S3 entail** — NLI judge classifies each candidate as `entailment`
+     (publisher reviewed the same claim) for the three direct hits and
+     `neutral` for the topical neighbours.
+   - **S4 match** — neutral candidates are dropped, no flip needed
+     (entailment passes the publisher verdict through). Aggregation:
+     `verdict=false`, `confidence≈0.95`, `votes=3`, `agreement=1.0`.
    - **S5 propose** — proposal #N is pushed to the HITL surface.
 5. **HITL.** Reviewer accepts.
 6. **Emit.** `@skyware/labeler` signs and persists a `fact-refuted`
@@ -302,7 +306,7 @@ the underlying journalism:
 
 | Verdict | Link target |
 | --- | --- |
-| `supported`, `refuted`, `mixed`, `outdated`, `unknown` | **Top publisher's original article** — taken from `evidence.source_url`, ordered by FTS match quality. Most cases are clear and one source's URL is enough. |
+| `supported`, `refuted`, `mixed`, `outdated`, `unknown` | **Top publisher's original article** — taken from `evidence.source_url`, ordered by retrieval cosine after the NLI gate. Most cases are clear and one source's URL is enough. |
 | `disputed` | The labeler's **own detail page**. When publishers disagreed enough that we labeled the post as disputed, no single source's URL tells the whole story — the detail page lists every conflicting source side by side. |
 | `no-claim`, `no-match` | No link (these replies are short diagnostic messages without a target). |
 

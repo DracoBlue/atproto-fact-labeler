@@ -135,10 +135,12 @@ the same JSON directly with `curl` or `httpie`.)
    converts the response to an `IngestedPost`, and persists it.
 4. **Pipeline.**
    - **S1 extract** — `"Vaccines contain tracking microchips."`
-   - **S2 lookup** — Snopes' `"COVID-19 vaccines contain microchips"`,
-     PolitiFact's `"vaccine microchip tracker"`, Reuters Fact Check
-     `"microchip vaccine"`.
-   - **S3 normalise** — `verdict=false`, confidence high, votes=3.
+   - **S2 retrieve** — dense cosine returns Snopes' `"COVID-19 vaccines
+     contain microchips"`, PolitiFact's `"vaccine microchip tracker"`,
+     Reuters Fact Check `"microchip vaccine"` plus topical neighbours.
+   - **S3 entail** — NLI marks all three direct hits as `entailment`;
+     neighbours drop as `neutral`.
+   - **S4 match** — `verdict=false`, confidence high, votes=3.
    - **S5 propose** — proposal pushed to HITL.
 5. **HITL.** Reviewer accepts.
 6. **Emit.** `@skyware/labeler` signs and persists a `fact-refuted`

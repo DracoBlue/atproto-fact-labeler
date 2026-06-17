@@ -82,15 +82,21 @@ other users, every day, every second.
    - **S1 extract** — LLM is called with Alice's text. For Alice's post
      it returns:
      `"5G towers cause COVID."` (atomic, decontextualised).
-   - **S2 lookup** — Snopes' `"5G coronavirus"`, Reuters Fact Check
-     `"5G COVID-19"`, CORRECTIV's German equivalents.
-   - **S3 normalise** — every publisher's rating maps to `false`.
+   - **S2 retrieve** — dense cosine returns Snopes' `"5G coronavirus"`,
+     Reuters Fact Check `"5G COVID-19"`, CORRECTIV's German equivalents
+     plus topical neighbours.
+   - **S3 entail** — NLI marks the direct hits as `entailment`, drops the
+     topical neighbours as `neutral`.
+   - **S4 match** — pass-through publisher verdicts; every `false`
+     remains `false`. Aggregation: `verdict=false`.
    - **S5 propose** — proposal pushed to HITL.
 
    Most posts in firehose mode produce **no** proposal:
    - posts whose extracted claims aren't falsifiable
      (`is_falsifiable: false` — see `src/pipeline/extract.ts`),
-   - posts whose claims have no ClaimReview match,
+   - posts whose retrieval returns nothing above the `minCosine` floor,
+   - posts where every retrieved candidate is judged `neutral` by NLI
+     (`uncovered`),
    - posts whose confidence is below threshold.
 
    The pipeline cost is paid regardless — every post still passes through
