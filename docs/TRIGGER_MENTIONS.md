@@ -318,8 +318,9 @@ journalism that did the verification work, not to ourselves.
 | HITL defer | no yet — if a later accept fires, the verdict reply goes out then | — |
 | extraction returned no falsifiable claim | **yes** | `no-claim` |
 | at least one falsifiable claim but no ClaimReview match | **yes** | `no-match` |
+| target post couldn't be loaded (deleted, AppView unreachable) | **yes** | `no-target` |
 
-Diagnostic replies (`no-claim`, `no-match`) bypass HITL — they're a
+Diagnostic replies (`no-claim`, `no-match`, `no-target`) bypass HITL — they're a
 statement about our own pipeline's behaviour, not an editorial verdict on
 the user's content. Dedup is by mention-source URI: at most one reply
 per Alice's mention post, regardless of kind. Across restarts this is
