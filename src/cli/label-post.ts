@@ -20,35 +20,87 @@ import { BskyClient } from '../replier/bsky.ts';
 import { buildReplyText } from '../replier/format.ts';
 
 interface CliArgs {
-  uri: string;
+  rawTarget: string;
   reply: boolean;
   dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs | null {
-  let uri = '';
+  let rawTarget = '';
   let reply = false;
   let dryRun = false;
   for (const a of argv) {
     if (a === '--reply') reply = true;
     else if (a === '--dry-run' || a === '-n') dryRun = true;
     else if (a === '-h' || a === '--help') return null;
-    else if (a.startsWith('at://') && !uri) uri = a;
+    else if (!a.startsWith('--') && !rawTarget) rawTarget = a;
     else if (a.startsWith('--')) {
       process.stderr.write(`Unknown flag: ${a}\n`);
       return null;
     }
   }
-  if (!uri) return null;
-  return { uri, reply, dryRun };
+  if (!rawTarget) return null;
+  return { rawTarget, reply, dryRun };
+}
+
+/**
+ * Normalise a user-supplied post reference into an `at://` URI:
+ *   - already-at://       → returned as-is
+ *   - bsky.app URLs       → resolve handle to DID via AppView
+ *   - direct DID + rkey   → returned as-is
+ *
+ * Returns null when the input doesn't match a known shape.
+ */
+async function resolveToAtUri(
+  raw: string,
+  appviewBaseUrl: string,
+): Promise<string | null> {
+  if (raw.startsWith('at://')) return raw;
+
+  // https://bsky.app/profile/<handle-or-did>/post/<rkey>
+  // also accepts staging.bsky.app and any *.bsky.app subdomain
+  const bskyMatch = raw.match(
+    /^https?:\/\/[^/]*bsky\.app\/profile\/([^/]+)\/post\/([^/?#]+)/i,
+  );
+  if (bskyMatch) {
+    const actor = decodeURIComponent(bskyMatch[1]!);
+    const rkey = bskyMatch[2]!;
+    const did = actor.startsWith('did:')
+      ? actor
+      : await resolveHandle(actor, appviewBaseUrl);
+    if (!did) return null;
+    return `at://${did}/app.bsky.feed.post/${rkey}`;
+  }
+
+  return null;
+}
+
+async function resolveHandle(handle: string, appviewBaseUrl: string): Promise<string | null> {
+  const u = new URL('/xrpc/com.atproto.identity.resolveHandle', appviewBaseUrl);
+  u.searchParams.set('handle', handle);
+  try {
+    const res = await fetch(u.toString(), { headers: { accept: 'application/json' } });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { did?: string };
+    return body.did ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function printUsage(): void {
-  process.stderr.write(`Usage: pnpm cli:label <at-uri> [--reply] [--dry-run]
+  process.stderr.write(`Usage: pnpm cli:label <target> [--reply] [--dry-run]
 
-Fetch a single Bluesky post by URI, run the fact-check pipeline, and emit
-the resulting label. The operator IS the human review — proposals are
+Fetch a single Bluesky post, run the fact-check pipeline, and emit the
+resulting label. The operator IS the human review — proposals are
 auto-accepted.
+
+Accepted target formats:
+  at://did:plc:.../app.bsky.feed.post/3kxabc
+  https://bsky.app/profile/<handle>/post/<rkey>
+  https://bsky.app/profile/<did>/post/<rkey>
+
+Handles are resolved to DIDs via the public AppView.
 
 Options:
   --reply     Additionally post a Bluesky reply to the post itself with
@@ -60,7 +112,7 @@ Options:
 
 Example:
   pnpm cli:label at://did:plc:alice/app.bsky.feed.post/3kxabc
-  pnpm cli:label at://did:plc:alice/app.bsky.feed.post/3kxabc --reply
+  pnpm cli:label https://bsky.app/profile/alice.example.org/post/3kxabc --reply
 `);
 }
 
@@ -74,6 +126,21 @@ async function main(): Promise<void> {
   const cfg = getConfig();
   await getDbAsync();
   const db = getDb();
+
+  const uri = await resolveToAtUri(args.rawTarget, cfg.APPVIEW_URL);
+  if (!uri) {
+    process.stderr.write(
+      `\nCould not parse target "${args.rawTarget}".\n` +
+        '  Accepted shapes:\n' +
+        '    at://did:plc:.../app.bsky.feed.post/<rkey>\n' +
+        '    https://bsky.app/profile/<handle-or-did>/post/<rkey>\n',
+    );
+    closeDb();
+    process.exit(1);
+  }
+  if (uri !== args.rawTarget) {
+    process.stderr.write(`  Resolved → ${uri}\n`);
+  }
 
   // 1. Resolve the post via the AppView.
   const bsky =
@@ -99,8 +166,8 @@ async function main(): Promise<void> {
       : undefined,
   });
 
-  process.stderr.write(`\n→ Fetching ${args.uri} ...\n`);
-  const post = await appview.getPost(args.uri);
+  process.stderr.write(`\n→ Fetching ${uri} ...\n`);
+  const post = await appview.getPost(uri);
   if (!post) {
     process.stderr.write('  Could not load the post (404 or transient AppView failure).\n');
     closeDb();
