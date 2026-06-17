@@ -16,7 +16,19 @@ import { type Lang, t, translateVerdict } from './i18n.ts';
 export interface VerdictReplyInput {
   verdict: string;
   publishers: string[];
+  /**
+   * Our own detail page for this post — shows the full evidence and
+   * normalised rating. Used as the link when no primary source URL is
+   * available or when the verdict is `disputed`.
+   */
   detailUrl: string;
+  /**
+   * URL of the top-ranked publisher's original fact-check article. When set
+   * and the verdict is not `disputed`, this is the link the reply points
+   * at — one click closer to the underlying journalism. For `disputed`
+   * we fall back to `detailUrl` so the user sees all conflicting sources.
+   */
+  primarySourceUrl?: string;
   /** BCP-47 of the source post; falls back to `defaultLang`. */
   lang?: string;
   /** Configured default; defaults to English. */
@@ -38,7 +50,12 @@ export function buildReplyText(input: VerdictReplyInput): string {
   const detailsLabel = t(input.lang, 'details_label', fallback);
 
   const publishers = dedupe(input.publishers).filter(Boolean);
-  const link = ` ${detailsLabel}: ${input.detailUrl}`;
+  // Prefer the publisher's original article unless the verdict is `disputed`,
+  // in which case the detail page is more honest because it surfaces every
+  // conflicting source rather than anchoring on one.
+  const preferSource = !!input.primarySourceUrl && input.verdict !== 'disputed';
+  const linkUrl = preferSource ? input.primarySourceUrl! : input.detailUrl;
+  const link = ` ${detailsLabel}: ${linkUrl}`;
   const head = `${verdictLabel}: ${verdictWord}.`;
 
   const buildWith = (n: number): string => {

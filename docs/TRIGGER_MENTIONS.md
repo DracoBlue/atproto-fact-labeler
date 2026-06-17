@@ -223,13 +223,14 @@ The reply fires only when **all** of:
 ### Example reply payload
 
 After Alice's mention from the example above is accepted by the HITL,
-the labeler posts a reply on Alice's PDS:
+the labeler posts a reply on Alice's PDS, linking **directly to the
+original CORRECTIV article**:
 
 ```jsonc
 // at://did:plc:fact-labeler-abcdef/app.bsky.feed.post/<rkey>
 {
   "$type":     "app.bsky.feed.post",
-  "text":      "Verdict: refuted. Sources: CORRECTIV, AFP Fact Check, Snopes. Details: https://facts.example.org/posts?uri=at%3A%2F%2Fdid%3Aplc%3Abob-abcdef%2Fapp.bsky.feed.post%2F3kxbob",
+  "text":      "Verdict: refuted. Sources: CORRECTIV, AFP Fact Check, Snopes. Details: https://correctiv.org/faktencheck/wissenschaft/2018/01/30/erde-scheibe-kugel/",
   "createdAt": "2026-06-17T10:01:42.000Z",
   "reply": {
     "parent": {
@@ -249,6 +250,20 @@ the labeler posts a reply on Alice's PDS:
   `replyRoot` if set (Bob's post here) or her post URI otherwise.
 - The post body fits inside 280 characters; longer source lists are
   trimmed and the URL preserved.
+
+### Where the `Details:` link points
+
+The link is chosen per-verdict so the user lands one click closer to
+the underlying journalism:
+
+| Verdict | Link target |
+| --- | --- |
+| `supported`, `refuted`, `mixed`, `outdated`, `unknown` | **Top publisher's original article** — taken from `evidence.source_url`, ordered by FTS match quality. Most cases are clear and one source's URL is enough. |
+| `disputed` | The labeler's **own detail page**. When publishers disagreed enough that we labeled the post as disputed, no single source's URL tells the whole story — the detail page lists every conflicting source side by side. |
+| `no-claim`, `no-match` | No link (these replies are short diagnostic messages without a target). |
+
+This matches the labeler's epistemic stance: we route users to the
+journalism that did the verification work, not to ourselves.
 
 ### Reply behaviour by outcome
 

@@ -79,6 +79,37 @@ describe('buildReplyText', () => {
     expect(text).toContain('Details:');
   });
 
+  it('uses primarySourceUrl when provided and verdict is not disputed', () => {
+    const text = buildReplyText({
+      verdict: 'false',
+      publishers: ['CORRECTIV'],
+      detailUrl: 'https://facts.example.org/posts?uri=at://x',
+      primarySourceUrl: 'https://correctiv.org/faktencheck/wissenschaft/erde-scheibe',
+    });
+    expect(text).toContain('https://correctiv.org/faktencheck/wissenschaft/erde-scheibe');
+    expect(text).not.toContain('facts.example.org');
+  });
+
+  it('falls back to detailUrl when verdict is disputed', () => {
+    const text = buildReplyText({
+      verdict: 'disputed',
+      publishers: ['CORRECTIV', 'AFP'],
+      detailUrl: 'https://facts.example.org/posts?uri=at://x',
+      primarySourceUrl: 'https://correctiv.org/some-article',
+    });
+    expect(text).toContain('https://facts.example.org/posts?uri=at://x');
+    expect(text).not.toContain('correctiv.org/some-article');
+  });
+
+  it('falls back to detailUrl when primarySourceUrl is missing', () => {
+    const text = buildReplyText({
+      verdict: 'false',
+      publishers: ['CORRECTIV'],
+      detailUrl: 'https://facts.example.org/posts?uri=at://x',
+    });
+    expect(text).toContain('https://facts.example.org/posts?uri=at://x');
+  });
+
   it('caps text length at 280 chars', () => {
     const publishers = Array.from({ length: 20 }, (_, i) => `Publisher-${i}-with-long-name`);
     const text = buildReplyText({

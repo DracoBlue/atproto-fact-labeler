@@ -237,6 +237,16 @@ async function main(): Promise<void> {
       .map((r) => r.publisher ?? '')
       .filter(Boolean);
 
+    // Top-ranked evidence is the first row by id (insert order = lookup quality DESC).
+    const topSource = db
+      .prepare(
+        `SELECT source_url FROM evidence
+           WHERE verdict_id = (SELECT verdict_id FROM proposal WHERE id = ?)
+           ORDER BY id LIMIT 1`,
+      )
+      .get(proposalId) as { source_url: string | null } | undefined;
+    const primarySourceUrl = topSource?.source_url ?? undefined;
+
     const detailUrl =
       (cfg.LABELER_DETAIL_BASE_URL ?? cfg.LABELER_HOSTNAME).replace(/\/$/, '') +
       `/posts?uri=${encodeURIComponent(ctx.post_uri)}`;
@@ -245,6 +255,7 @@ async function main(): Promise<void> {
       verdict: ctx.verdict,
       publishers,
       detailUrl,
+      primarySourceUrl,
       lang: ctx.source_lang ?? undefined,
       defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
     });
