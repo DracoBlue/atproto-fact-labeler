@@ -54,6 +54,22 @@ export interface TriggerContext {
   /** Thread root for the reply, when known. */
   rootUri?: string;
   rootCid?: string;
+  /**
+   * BCP-47 language tag of the mentioning post. Used to pick reply translations
+   * so the bot answers the user in the user's own language.
+   */
+  sourceLang?: string;
+}
+
+/**
+ * Diagnostic information returned alongside any proposals. Lets callers see
+ * *why* no proposal was emitted (no falsifiable claim vs no ClaimReview match).
+ */
+export interface PipelineResult {
+  proposals: Proposal[];
+  extractedClaims: number;
+  falsifiableClaims: number;
+  claimsWithMatches: number;
 }
 
 const INSERT_POST_CACHE = `
@@ -85,15 +101,15 @@ const INSERT_PROPOSAL = `
   INSERT INTO proposal
     (post_uri, claim_id, verdict_id,
      trigger_reason, trigger_source_uri, trigger_source_cid,
-     trigger_root_uri, trigger_root_cid)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     trigger_root_uri, trigger_root_cid, trigger_source_lang)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 export async function processPost(
   post: IngestedPost,
   env: PipelineEnv = {},
   trigger: TriggerContext = { reason: 'unknown' },
-): Promise<Proposal[]> {
+): Promise<PipelineResult> {
   const db = env.db ?? getDb();
 
   // S0 — persist the post (idempotent).
@@ -111,16 +127,24 @@ export async function processPost(
     ? await env.extractStub(post)
     : await extractClaims({ text: post.text, lang: post.lang });
 
+  const proposals: Proposal[] = [];
+  let falsifiableClaims = 0;
+  let claimsWithMatches = 0;
+
   if (!extracted.claims.length) {
     logger.debug({ uri: post.uri }, 'no claims extracted');
-    return [];
+    return {
+      proposals,
+      extractedClaims: 0,
+      falsifiableClaims: 0,
+      claimsWithMatches: 0,
+    };
   }
-
-  const proposals: Proposal[] = [];
 
   for (const c of extracted.claims) {
     if (!c.is_falsifiable) continue;
     if ((c.confidence ?? 0) < 0.45) continue;
+    falsifiableClaims++;
 
     // S2 — lookup.
     const lookup = lookupCandidates(c.decontextualized_text || c.atomic_text, {
@@ -132,6 +156,7 @@ export async function processPost(
       logger.debug({ claim: c.atomic_text }, 'no claim-review match, skipping');
       continue;
     }
+    claimsWithMatches++;
 
     // S3 — normalise + aggregate.
     const normalised = lookup.candidates
@@ -194,6 +219,7 @@ export async function processPost(
       trigger.sourceCid ?? null,
       trigger.rootUri ?? null,
       trigger.rootCid ?? null,
+      trigger.sourceLang ?? null,
     );
     const proposalId = Number(proposalResult.lastInsertRowid);
 
@@ -212,5 +238,10 @@ export async function processPost(
     });
   }
 
-  return proposals;
+  return {
+    proposals,
+    extractedClaims: extracted.claims.length,
+    falsifiableClaims,
+    claimsWithMatches,
+  };
 }

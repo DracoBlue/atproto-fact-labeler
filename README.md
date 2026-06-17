@@ -152,6 +152,7 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `LABELER_BSKY_IDENTIFIER` | — | Required when `REPLY_TO_MENTIONS=true`. Handle or DID of the labeler account |
 | `LABELER_BSKY_APP_PASSWORD` | — | Required when `REPLY_TO_MENTIONS=true`. App password from bsky.app (never the main password) |
 | `LABELER_DETAIL_BASE_URL` | _(unset → `LABELER_HOSTNAME`)_ | Public URL of the labeler's detail page, used as deep-link in mention replies |
+| `LABELER_REPLY_DEFAULT_LANG` | `en` | Fallback language (`en` or `de`) used for mention replies when the mention post has no `langs` field or uses an unsupported language |
 | `LABELER_SIGNING_KEY` | _(auto-generated on first run)_ | Persist after first start |
 | `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` **and** the detail HTTP page |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public hostname for the labeler |

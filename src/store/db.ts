@@ -170,17 +170,23 @@ function migrate(db: DbLike): void {
 
     CREATE INDEX IF NOT EXISTS idx_proposal_decision ON proposal(decision);
 
-    -- Append-only log: which (proposal × label) pairs have we already
-    -- replied to with an authenticated PDS write?
+    -- Append-only log: which mention-source post URIs have we already
+    -- replied to with an authenticated PDS write? proposal_id is nullable so
+    -- diagnostic replies (no-claim / no-match) can be recorded too.
     CREATE TABLE IF NOT EXISTS mention_reply (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      proposal_id         INTEGER NOT NULL REFERENCES proposal(id),
+      proposal_id         INTEGER REFERENCES proposal(id),
+      reply_kind          TEXT    NOT NULL DEFAULT 'verdict'
+                                    CHECK (reply_kind IN ('verdict','no-claim','no-match')),
       reply_uri           TEXT    NOT NULL,
       reply_cid           TEXT    NOT NULL,
       replied_to_uri      TEXT    NOT NULL,
-      replied_at          TEXT    NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(proposal_id)
+      replied_at          TEXT    NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- One reply per mention-source URI, regardless of kind.
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mention_reply_to_uri
+      ON mention_reply(replied_to_uri);
 
     CREATE TABLE IF NOT EXISTS label_emit (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -210,6 +216,8 @@ function migrate(db: DbLike): void {
   addColumnIfMissing(db, 'proposal', 'trigger_source_cid', 'TEXT');
   addColumnIfMissing(db, 'proposal', 'trigger_root_uri', 'TEXT');
   addColumnIfMissing(db, 'proposal', 'trigger_root_cid', 'TEXT');
+  addColumnIfMissing(db, 'proposal', 'trigger_source_lang', 'TEXT');
+  addColumnIfMissing(db, 'mention_reply', 'reply_kind', "TEXT NOT NULL DEFAULT 'verdict'");
 }
 
 function addColumnIfMissing(db: DbLike, table: string, col: string, type: string): void {

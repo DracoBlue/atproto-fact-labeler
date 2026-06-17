@@ -23,7 +23,7 @@ import { TelegramHitl } from './hitl/telegram.ts';
 import type { HitlSurface } from './hitl/types.ts';
 import type { Proposal, TriggerContext } from './pipeline/orchestrator.ts';
 import { BskyClient } from './replier/bsky.ts';
-import { buildReplyText } from './replier/format.ts';
+import { buildNoClaimReply, buildNoMatchReply, buildReplyText } from './replier/format.ts';
 
 async function main(): Promise<void> {
   const cfg = getConfig();
@@ -118,22 +118,38 @@ async function main(): Promise<void> {
       logger.error({ err, proposalId }, 'failed to emit label');
     }
 
-    // Optional: reply to the mention post on Bluesky.
+    // Optional: reply to the mention post on Bluesky with the verdict.
     await maybeReplyToMention(proposalId);
   };
 
-  /** Post a Bluesky reply to the mention author when conditions are met. */
-  const maybeReplyToMention = async (proposalId: number): Promise<void> => {
-    if (!bsky) return;
-    const ctx = db
+  /**
+   * Resolve trigger context from a proposal record. Used by the verdict-reply
+   * path so we know who to reply to, in which thread, and in which language.
+   */
+  const loadTriggerCtx = (
+    proposalId: number,
+  ):
+    | {
+        reason: string;
+        source_uri: string;
+        source_cid: string;
+        root_uri: string | null;
+        root_cid: string | null;
+        source_lang: string | null;
+        verdict: string;
+        post_uri: string;
+      }
+    | null => {
+    const row = db
       .prepare(
-        `SELECT p.trigger_reason     AS reason,
-                p.trigger_source_uri AS source_uri,
-                p.trigger_source_cid AS source_cid,
-                p.trigger_root_uri   AS root_uri,
-                p.trigger_root_cid   AS root_cid,
-                v.label              AS verdict,
-                p.id                 AS proposal_id
+        `SELECT p.trigger_reason       AS reason,
+                p.trigger_source_uri   AS source_uri,
+                p.trigger_source_cid   AS source_cid,
+                p.trigger_root_uri     AS root_uri,
+                p.trigger_root_cid     AS root_cid,
+                p.trigger_source_lang  AS source_lang,
+                v.label                AS verdict,
+                p.post_uri             AS post_uri
            FROM proposal p
            JOIN verdict v ON v.id = p.verdict_id
           WHERE p.id = ?`,
@@ -145,20 +161,70 @@ async function main(): Promise<void> {
           source_cid: string | null;
           root_uri: string | null;
           root_cid: string | null;
+          source_lang: string | null;
           verdict: string;
-          proposal_id: number;
+          post_uri: string;
         }
       | undefined;
+    if (!row) return null;
+    if (!row.reason || !row.source_uri || !row.source_cid) return null;
+    return {
+      reason: row.reason,
+      source_uri: row.source_uri,
+      source_cid: row.source_cid,
+      root_uri: row.root_uri,
+      root_cid: row.root_cid,
+      source_lang: row.source_lang,
+      verdict: row.verdict,
+      post_uri: row.post_uri,
+    };
+  };
+
+  /** Has a reply been recorded against this mention-source URI already? */
+  const hasReplied = (replyToUri: string): boolean => {
+    return !!db
+      .prepare(`SELECT 1 FROM mention_reply WHERE replied_to_uri = ? LIMIT 1`)
+      .get(replyToUri);
+  };
+
+  /** Send and persist a Bluesky reply with the given pre-rendered text. */
+  const sendReply = async (args: {
+    text: string;
+    parentUri: string;
+    parentCid: string;
+    rootUri: string;
+    rootCid: string;
+    replyKind: 'verdict' | 'no-claim' | 'no-match';
+    proposalId?: number;
+  }): Promise<void> => {
+    if (!bsky) return;
+    try {
+      const result = await bsky.postReply({
+        text: args.text,
+        parent: { uri: args.parentUri, cid: args.parentCid },
+        root: { uri: args.rootUri, cid: args.rootCid },
+      });
+      db.prepare(
+        `INSERT INTO mention_reply (proposal_id, reply_kind, reply_uri, reply_cid, replied_to_uri)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(args.proposalId ?? null, args.replyKind, result.uri, result.cid, args.parentUri);
+      logger.info(
+        { kind: args.replyKind, replyUri: result.uri, repliedTo: args.parentUri },
+        'mention-reply posted',
+      );
+    } catch (err) {
+      logger.error({ err, kind: args.replyKind, repliedTo: args.parentUri }, 'mention-reply post failed');
+    }
+  };
+
+  /** Post a Bluesky reply with the verdict when conditions are met. */
+  const maybeReplyToMention = async (proposalId: number): Promise<void> => {
+    if (!bsky) return;
+    const ctx = loadTriggerCtx(proposalId);
     if (!ctx) return;
     if (ctx.reason !== 'mention' && ctx.reason !== 'mention-reply') return;
-    if (!ctx.source_uri || !ctx.source_cid) return;
+    if (hasReplied(ctx.source_uri)) return;
 
-    const already = db
-      .prepare(`SELECT 1 FROM mention_reply WHERE proposal_id = ?`)
-      .get(proposalId);
-    if (already) return;
-
-    // Top publishers — at most 3, deduped.
     const publishers = (
       db
         .prepare(
@@ -173,36 +239,75 @@ async function main(): Promise<void> {
 
     const detailUrl =
       (cfg.LABELER_DETAIL_BASE_URL ?? cfg.LABELER_HOSTNAME).replace(/\/$/, '') +
-      `/posts?uri=${encodeURIComponent(
-        (
-          db
-            .prepare(`SELECT post_uri FROM proposal WHERE id = ?`)
-            .get(proposalId) as { post_uri: string }
-        ).post_uri,
-      )}`;
-    const text = buildReplyText({ verdict: ctx.verdict, publishers, detailUrl });
+      `/posts?uri=${encodeURIComponent(ctx.post_uri)}`;
 
-    const root = ctx.root_uri && ctx.root_cid
-      ? { uri: ctx.root_uri, cid: ctx.root_cid }
-      : { uri: ctx.source_uri, cid: ctx.source_cid };
+    const text = buildReplyText({
+      verdict: ctx.verdict,
+      publishers,
+      detailUrl,
+      lang: ctx.source_lang ?? undefined,
+      defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
+    });
 
-    try {
-      const result = await bsky.postReply({
-        text,
-        parent: { uri: ctx.source_uri, cid: ctx.source_cid },
-        root,
+    await sendReply({
+      text,
+      parentUri: ctx.source_uri,
+      parentCid: ctx.source_cid,
+      rootUri: ctx.root_uri ?? ctx.source_uri,
+      rootCid: ctx.root_cid ?? ctx.source_cid,
+      replyKind: 'verdict',
+      proposalId,
+    });
+  };
+
+  /**
+   * When a mention trigger produced no proposal (no falsifiable claim, or no
+   * ClaimReview match), post a short diagnostic reply so the user knows we
+   * looked and what we found.
+   */
+  const maybeReplyDiagnostic = async (args: {
+    triggerReason: string;
+    sourceUri: string;
+    sourceCid: string;
+    rootUri: string;
+    rootCid: string;
+    sourceLang?: string;
+    extractedClaims: number;
+    falsifiableClaims: number;
+    claimsWithMatches: number;
+  }): Promise<void> => {
+    if (!bsky) return;
+    if (args.triggerReason !== 'mention' && args.triggerReason !== 'mention-reply') return;
+    if (hasReplied(args.sourceUri)) return;
+
+    let text: string;
+    let replyKind: 'no-claim' | 'no-match';
+    if (args.falsifiableClaims === 0) {
+      replyKind = 'no-claim';
+      text = buildNoClaimReply({
+        lang: args.sourceLang,
+        defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
       });
-      db.prepare(
-        `INSERT INTO mention_reply (proposal_id, reply_uri, reply_cid, replied_to_uri)
-         VALUES (?, ?, ?, ?)`,
-      ).run(proposalId, result.uri, result.cid, ctx.source_uri);
-      logger.info(
-        { proposalId, replyUri: result.uri, repliedTo: ctx.source_uri },
-        'mention-reply posted',
-      );
-    } catch (err) {
-      logger.error({ err, proposalId }, 'mention-reply post failed');
+    } else if (args.claimsWithMatches === 0) {
+      replyKind = 'no-match';
+      text = buildNoMatchReply({
+        lang: args.sourceLang,
+        defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
+      });
+    } else {
+      // Claims with matches but every one was dropped before propose() —
+      // currently impossible in our orchestrator, but kept as a no-op for safety.
+      return;
     }
+
+    await sendReply({
+      text,
+      parentUri: args.sourceUri,
+      parentCid: args.sourceCid,
+      rootUri: args.rootUri,
+      rootCid: args.rootCid,
+      replyKind,
+    });
   };
 
   const surface: HitlSurface =
@@ -217,19 +322,42 @@ async function main(): Promise<void> {
   /** Common dispatcher: take a fully-formed post and run it through the pipeline. */
   const dispatchPost = async (post: IngestedPost, trigger: TriggerContext): Promise<void> => {
     logger.info({ uri: post.uri, reason: trigger.reason }, 'dispatch');
-    let proposals: Proposal[];
+    let result: Awaited<ReturnType<typeof processPost>>;
     try {
-      proposals = await processPost(post, {}, trigger);
+      result = await processPost(post, {}, trigger);
     } catch (err) {
       logger.error({ err, uri: post.uri }, 'pipeline error');
       return;
     }
+
+    const proposals: Proposal[] = result.proposals;
     for (const p of proposals) {
       try {
         await surface.enqueue(p);
       } catch (err) {
         logger.error({ err, proposalId: p.proposalId }, 'HITL enqueue failed');
       }
+    }
+
+    // If a mention produced no proposal at all, send a diagnostic reply so
+    // the user knows we looked and what we (didn't) find.
+    if (
+      proposals.length === 0 &&
+      (trigger.reason === 'mention' || trigger.reason === 'mention-reply') &&
+      trigger.sourceUri &&
+      trigger.sourceCid
+    ) {
+      await maybeReplyDiagnostic({
+        triggerReason: trigger.reason,
+        sourceUri: trigger.sourceUri,
+        sourceCid: trigger.sourceCid,
+        rootUri: trigger.rootUri ?? trigger.sourceUri,
+        rootCid: trigger.rootCid ?? trigger.sourceCid,
+        sourceLang: trigger.sourceLang,
+        extractedClaims: result.extractedClaims,
+        falsifiableClaims: result.falsifiableClaims,
+        claimsWithMatches: result.claimsWithMatches,
+      });
     }
   };
 
@@ -369,6 +497,7 @@ function buildTriggerContext(post: IngestedPost, hit: TriggerHit): TriggerContex
       sourceCid: post.cid,
       rootUri: root.uri,
       rootCid: root.cid,
+      sourceLang: post.lang,
     };
   }
   return { reason: hit.reason };

@@ -250,18 +250,51 @@ the labeler posts a reply on Alice's PDS:
 - The post body fits inside 280 characters; longer source lists are
   trimmed and the URL preserved.
 
-### What HITL rejection / no-match means
+### Reply behaviour by outcome
 
-| HITL outcome | Mention reply behaviour |
-| --- | --- |
-| accept → label emitted | reply is posted |
-| reject | no reply (we don't want to amplify proposals a moderator rejected) |
-| defer | no reply yet — if a later accept fires for the same proposal, the reply goes out then |
-| extraction returned no falsifiable claim | no proposal, no reply |
-| ClaimReview lookup returned no match | no proposal, no reply |
+| Outcome | Reply | Reply kind |
+| --- | --- | --- |
+| HITL accept → label emitted | yes | `verdict` |
+| HITL reject | no | — (we don't amplify proposals a moderator rejected) |
+| HITL defer | no yet — if a later accept fires, the verdict reply goes out then | — |
+| extraction returned no falsifiable claim | **yes** | `no-claim` |
+| at least one falsifiable claim but no ClaimReview match | **yes** | `no-match` |
 
-If you want a "we looked but found nothing" reply, that's not built —
-open an issue if you need it.
+Diagnostic replies (`no-claim`, `no-match`) bypass HITL — they're a
+statement about our own pipeline's behaviour, not an editorial verdict on
+the user's content. Dedup is by mention-source URI: at most one reply
+per Alice's mention post, regardless of kind. Across restarts this is
+enforced by a unique index on `mention_reply.replied_to_uri`.
+
+### Internationalisation
+
+Replies are posted in the **mention author's language**, picked from the
+`langs` field of Alice's post. Currently supported: English (`en`) and
+German (`de`). BCP-47 region subtags are normalised (`de-AT` → `de`).
+
+When the mention post has no `langs`, or uses an unsupported language,
+the reply falls back to `LABELER_REPLY_DEFAULT_LANG` (default `en`).
+
+Example diagnostic replies:
+
+```
+en  "I couldn't find a falsifiable factual claim in that post — nothing to fact-check."
+de  "Ich konnte in dem Beitrag keine prüfbare Tatsachenbehauptung finden — nichts zu prüfen."
+
+en  "I checked, but no fact-check publisher I know of has covered that claim yet."
+de  "Ich habe geprüft, aber bislang hat keine mir bekannte Faktencheck-Quelle diese Aussage abgedeckt."
+```
+
+Verdict replies translate the head as well:
+
+```
+en  Verdict: refuted. Sources: CORRECTIV, AFP. Details: https://…
+de  Einschätzung: widerlegt. Quellen: CORRECTIV, AFP. Details: https://…
+```
+
+To add more languages, extend `TRANSLATIONS` in
+`src/replier/i18n.ts` and add the new key to `SUPPORTED_LANGS`. The
+picker, format functions, and tests pick it up automatically.
 
 ### Operational notes
 

@@ -65,6 +65,11 @@ const Schema = z.object({
   LABELER_BSKY_APP_PASSWORD: z.string().optional(),
   /** Public detail-page base URL — embedded in mention replies as a deep-link. */
   LABELER_DETAIL_BASE_URL: z.string().optional(),
+  /**
+   * Default BCP-47 language tag used when the mention post has no `langs` set
+   * or its language isn't in the supported list. Currently supported: en, de.
+   */
+  LABELER_REPLY_DEFAULT_LANG: z.enum(['en', 'de']).default('en'),
 
   // HITL
   HITL_MODE: z.enum(['stdin', 'telegram', 'auto']).default('stdin'),

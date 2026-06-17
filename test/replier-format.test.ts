@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildReplyText } from '../src/replier/format.ts';
+import { buildNoClaimReply, buildNoMatchReply, buildReplyText } from '../src/replier/format.ts';
 
 describe('buildReplyText', () => {
   it('formats a refuted verdict with sources and link', () => {
@@ -23,6 +23,40 @@ describe('buildReplyText', () => {
       detailUrl: 'https://x.test/p',
     });
     expect(text).toContain('not enough information');
+  });
+
+  it('localises into German when requested', () => {
+    const text = buildReplyText({
+      verdict: 'false',
+      publishers: ['CORRECTIV'],
+      detailUrl: 'https://x.test/p',
+      lang: 'de',
+    });
+    expect(text).toContain('Einschätzung');
+    expect(text).toContain('widerlegt');
+    expect(text).toContain('Quellen');
+    expect(text).toContain('Details');
+  });
+
+  it('honours BCP-47 subtags like de-AT', () => {
+    const text = buildReplyText({
+      verdict: 'true',
+      publishers: [],
+      detailUrl: 'https://x.test/p',
+      lang: 'de-AT',
+    });
+    expect(text).toContain('bestätigt');
+  });
+
+  it('falls back to defaultLang for unsupported languages', () => {
+    const text = buildReplyText({
+      verdict: 'false',
+      publishers: [],
+      detailUrl: 'https://x.test/p',
+      lang: 'fr',
+      defaultLang: 'de',
+    });
+    expect(text).toContain('widerlegt');
   });
 
   it('dedupes publishers', () => {
@@ -53,5 +87,36 @@ describe('buildReplyText', () => {
       detailUrl: 'https://facts.example.org/posts?uri=at://did:plc:very-long-author/app.bsky.feed.post/3kxabcdef',
     });
     expect(text.length).toBeLessThanOrEqual(280);
+  });
+});
+
+describe('buildNoClaimReply', () => {
+  it('produces an English diagnostic by default', () => {
+    const text = buildNoClaimReply();
+    expect(text).toContain("couldn't find");
+    expect(text).toContain('falsifiable');
+  });
+
+  it('localises into German', () => {
+    const text = buildNoClaimReply({ lang: 'de' });
+    expect(text).toContain('Tatsachenbehauptung');
+  });
+
+  it('falls back to defaultLang when source lang unsupported', () => {
+    const text = buildNoClaimReply({ lang: 'jp', defaultLang: 'de' });
+    expect(text).toContain('Tatsachenbehauptung');
+  });
+});
+
+describe('buildNoMatchReply', () => {
+  it('produces an English diagnostic by default', () => {
+    const text = buildNoMatchReply();
+    expect(text).toContain('checked');
+    expect(text).toContain('publisher');
+  });
+
+  it('localises into German', () => {
+    const text = buildNoMatchReply({ lang: 'de' });
+    expect(text).toContain('Faktencheck-Quelle');
   });
 });

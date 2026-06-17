@@ -114,7 +114,7 @@ async function main(): Promise<void> {
 
   for (const c of cases) {
     logger.info({ uri: c.post.uri, text: c.post.text }, 'driving smoke case');
-    const proposals = await processPost(c.post, {
+    const result = await processPost(c.post, {
       extractStub: async () => ({
         claims: c.stubClaims,
         extractorVersion: 'smoke-stub',
@@ -122,10 +122,16 @@ async function main(): Promise<void> {
       }),
     });
     logger.info(
-      { proposals: proposals.length, verdicts: proposals.map((p) => p.verdict) },
+      {
+        proposals: result.proposals.length,
+        verdicts: result.proposals.map((p) => p.verdict),
+        extractedClaims: result.extractedClaims,
+        falsifiableClaims: result.falsifiableClaims,
+        claimsWithMatches: result.claimsWithMatches,
+      },
       'orchestrator returned',
     );
-    for (const p of proposals) {
+    for (const p of result.proposals) {
       await surface.enqueue(p);
     }
   }
