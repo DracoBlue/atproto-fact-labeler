@@ -13,10 +13,16 @@ export interface PreparedStatement {
   all(...params: unknown[]): unknown[];
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface DbLike {
   exec(sql: string): void;
   prepare(sql: string): PreparedStatement;
-  transaction<T>(fn: (...args: T[]) => unknown): (...args: T[]) => void;
+  /**
+   * Wraps a callback in a SQLite transaction; the returned function executes it.
+   * Typed with `any` because better-sqlite3's `transaction` is generic in a way
+   * that doesn't survive interface erasure; callers pass concrete shapes.
+   */
+  transaction(fn: (...args: any[]) => unknown): (...args: any[]) => unknown;
   close(): void;
   pragma(value: string): unknown;
 }
@@ -26,8 +32,7 @@ export async function openDatabase(path: string): Promise<DbLike> {
   return {
     exec: (sql) => db.exec(sql),
     prepare: (sql): PreparedStatement => db.prepare(sql) as unknown as PreparedStatement,
-    transaction: ((fn: (...args: unknown[]) => unknown) =>
-      db.transaction(fn as never)) as unknown as DbLike['transaction'],
+    transaction: (fn) => db.transaction(fn),
     close: () => db.close(),
     pragma: (value) => db.pragma(value),
   };

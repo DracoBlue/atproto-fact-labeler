@@ -17,7 +17,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Setup)'"
+    "smoke": "tsx src/cli/smoke-test.ts",
+    "retire": "tsx src/cli/retire.ts",
+    "retire:check": "tsx src/cli/retire.ts --dry-run",
+    "lifecycle:status": "tsx src/cli/lifecycle-status.ts",
+    "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Going live)'"
   },
   "dependencies": {
     "@skyware/labeler": "^0.2.0",
