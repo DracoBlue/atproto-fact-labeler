@@ -80,7 +80,6 @@ You'll see something like:
 
 ```
 labeler server listening on http://127.0.0.1:14831
-detail HTTP server listening on http://127.0.0.1:14832
 starting Jetstream ingest
 ```
 
@@ -104,7 +103,6 @@ docker pull ghcr.io/dracoblue/atproto-fact-labeler:latest
 ```bash
 docker run -d \
   -p 14831:14831 \
-  -p 14832:14832 \
   -v fact-labeler-data:/data \
   -v "$PWD/data.json:/feed/data.json:ro" \
   -e OPENAI_API_KEY=sk-lm-... \
@@ -135,9 +133,8 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction model |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
 | `LABELER_SIGNING_KEY` | _(auto-generated on first run)_ | Persist after first start |
-| `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` |
+| `LABELER_PORT` | `14831` | `subscribeLabels` / `queryLabels` **and** the detail HTTP page |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public hostname for the labeler |
-| `DETAIL_PORT` | `14832` | HTTP "why?" page |
 | `JETSTREAM_URL` | `wss://jetstream2.us-east.bsky.network/subscribe` | Live firehose |
 | `JETSTREAM_FIXTURE` | _(unset)_ | Path to JSONL fixture (offline replay) |
 | `HITL_MODE` | `stdin` | `stdin` · `telegram` · `auto` |
@@ -160,14 +157,15 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 
 ### Detail HTTP page
 
-For any post the service has touched:
+Served from the same port as the labeler. For any post the service has touched:
 
 ```
-http://localhost:14832/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx
-http://localhost:14832/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx&format=json
+http://localhost:14831/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx
+http://localhost:14831/posts?uri=at://did:plc:.../app.bsky.feed.post/3kx&format=json
 ```
 
 HTML for humans, JSON via `format=json` or `Accept: application/json`.
+Liveness: `GET /healthz`.
 
 ### Lifecycle status
 

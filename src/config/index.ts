@@ -34,9 +34,6 @@ const Schema = z.object({
   // ClaimReview source
   CLAIMREVIEW_FEED_PATH: z.string().default('data.json'),
 
-  // Detail page
-  DETAIL_PORT: z.coerce.number().int().positive().default(14832),
-
   // Log level
   LOG_LEVEL: z.string().default('info'),
 });

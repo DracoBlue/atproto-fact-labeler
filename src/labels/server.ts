@@ -64,7 +64,12 @@ function ensureSigningKey(): string {
   return fresh;
 }
 
+/** Underlying Fastify instance — exact type comes from @skyware/labeler's bundled Fastify. */
+export type LabelerApp = LabelerServer['app'];
+
 export interface FactLabelerServer {
+  /** Mount extra routes here before start(). */
+  app: LabelerApp;
   start(): Promise<void>;
   stop(): Promise<void>;
   emitLabel(label: FactLabel): Promise<void>;
@@ -86,6 +91,7 @@ export function createLabelerServer(): FactLabelerServer {
   });
 
   return {
+    app: server.app,
     async start(): Promise<void> {
       return new Promise((resolveFn, reject) => {
         server.start(cfg.LABELER_PORT, (err, address) => {

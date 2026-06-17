@@ -16,7 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml tsconfig.json ./
 COPY src ./src
 VOLUME /data
-EXPOSE 14831 14832
+EXPOSE 14831
 ENV SQLITE_PATH=/data/labeler.sqlite
 USER node
 CMD ["pnpm", "start"]

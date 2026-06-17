@@ -3,8 +3,7 @@ services:
     image: ghcr.io/dracoblue/atproto-fact-labeler:latest
     # build: .   # uncomment to build from source instead of pulling GHCR
     ports:
-      - "14831:14831"   # labeler: subscribeLabels / queryLabels
-      - "14832:14832"   # detail HTTP "why?" page
+      - "14831:14831"   # labeler (subscribeLabels / queryLabels) + detail /posts
     volumes:
       - fact-labeler-data:/data
       # Mount your Data Commons feed read-only and point CLAIMREVIEW_FEED_PATH at it:
@@ -19,7 +18,6 @@ services:
       - LABELER_SIGNING_KEY=${LABELER_SIGNING_KEY:-}
       - LABELER_HOSTNAME=${LABELER_HOSTNAME:-http://localhost:14831}
       - LABELER_PORT=14831
-      - DETAIL_PORT=14832
       # --- Ingest ---
       - JETSTREAM_URL=${JETSTREAM_URL:-wss://jetstream2.us-east.bsky.network/subscribe}
       # --- HITL ---

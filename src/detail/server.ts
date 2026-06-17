@@ -1,22 +1,16 @@
 /**
  * Per-post detail HTTP endpoint.
  *
- * Serves the "why?" page for a labeled post: lists the matched claims, our
- * normalised verdict, and the ranked evidence with attribution links to each
- * publisher. We surface URLs and attribution only — no verbatim fact-check text,
- * because per-entry text in the ingested ClaimReview feed remains under the
- * publisher's own copyright (only the compilation is CC BY 4.0).
+ * Registered on the same Fastify instance as the @skyware/labeler server so
+ * everything is served on a single port (LABELER_PORT).
  *
  * Routes:
  *   GET /posts?uri=<at-uri>           HTML
  *   GET /posts?uri=<at-uri>&format=json   JSON
  *   GET /healthz                       liveness
  */
-import Fastify, { type FastifyInstance } from 'fastify';
-
-import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
-import { logger } from '../util/logger.ts';
+import type { LabelerApp } from '../labels/server.ts';
 
 interface Row {
   claim_id: number;
@@ -166,9 +160,7 @@ ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (ye
 </html>`;
 }
 
-export function buildDetailServer(): FastifyInstance {
-  const app = Fastify({ logger: false });
-
+export function registerDetailRoutes(app: LabelerApp): void {
   app.get('/healthz', async () => ({ ok: true }));
 
   app.get<{ Querystring: { uri?: string; format?: string } }>(
@@ -190,14 +182,4 @@ export function buildDetailServer(): FastifyInstance {
       return renderHtml(uri, data.postText, data.claims);
     },
   );
-
-  return app;
-}
-
-export async function startDetailServer(): Promise<FastifyInstance> {
-  const cfg = getConfig();
-  const app = buildDetailServer();
-  await app.listen({ port: cfg.DETAIL_PORT, host: '127.0.0.1' });
-  logger.info({ port: cfg.DETAIL_PORT }, 'detail HTTP server listening');
-  return app;
 }

@@ -12,7 +12,7 @@ import { runFixture } from './ingest/fixture.ts';
 import { processPost } from './pipeline/orchestrator.ts';
 import { createLabelerServer } from './labels/server.ts';
 import { verdictToLabel } from './labels/vocabulary.ts';
-import { startDetailServer } from './detail/server.ts';
+import { registerDetailRoutes } from './detail/server.ts';
 import { AutoHitl } from './hitl/auto.ts';
 import { StdinHitl } from './hitl/stdin.ts';
 import { TelegramHitl } from './hitl/telegram.ts';
@@ -26,9 +26,8 @@ async function main(): Promise<void> {
   const abort = new AbortController();
 
   const labelerServer = createLabelerServer();
+  registerDetailRoutes(labelerServer.app);
   await labelerServer.start();
-
-  const detailApp = await startDetailServer();
 
   /** Decision handler: write back to DB and emit a label if accepted. */
   const onDecision = async ({
@@ -142,7 +141,6 @@ async function main(): Promise<void> {
     logger.info({ reason }, 'shutting down');
     abort.abort();
     await surface.stop?.();
-    await detailApp.close();
     await labelerServer.stop();
     closeDb();
     process.exit(0);
