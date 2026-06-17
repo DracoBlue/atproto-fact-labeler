@@ -2,9 +2,11 @@
  * Map publisher-native fact-check ratings ("Falsch", "Pants on Fire", ...) to our
  * internal verdict vocabulary.
  *
- * Per the Harvard Misinformation Review study (Snopes vs PolitiFact, see
- * docs/SOURCES.md §5): 69.6 % of cross-publisher ratings agree once a normalisation
- * layer is applied — most divergence is taxonomy, not facts.
+ * Cross-publisher agreement is high once a normalisation layer is applied: a
+ * Harvard Misinformation Review study on Snopes vs PolitiFact found ~70 % of
+ * ratings on matching claims agree, with only one genuine factual conflict in
+ * the sample. Most divergence is taxonomy ("Pants on Fire" vs "False"), not
+ * fact.
  *
  * This file is intentionally a pure data table + a small matcher. Easy to test,
  * easy to extend per publisher.

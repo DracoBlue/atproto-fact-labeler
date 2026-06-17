@@ -6,8 +6,10 @@
  * - Reconnects with exponential backoff.
  * - Calls `onPost` for every new post.
  *
- * Jetstream is the cheap JSON stream (vs. the signed CBOR firehose). See
- * docs/ARCHITECTURE.md §1 and docs/COMPONENTS.md for the rationale.
+ * Jetstream is the cheap JSON stream from Bluesky (much smaller than the signed
+ * CBOR firehose). It is *not* self-authenticating, which is fine for our use
+ * case: we re-fetch any post we are about to label via the AppView before
+ * making decisions, so we never trust a Jetstream event in isolation.
  */
 import WebSocket from 'ws';
 import { logger } from '../util/logger.ts';

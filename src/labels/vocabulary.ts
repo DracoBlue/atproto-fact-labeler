@@ -2,7 +2,10 @@
  * Map our internal verdict vocabulary to the labels we emit on the wire.
  *
  * Label values follow the kebab-case constraint from the atproto label spec
- * (see docs/ARCHITECTURE.md §1: ≤ 128 bytes, `[a-z]` + internal dashes).
+ * at https://atproto.com/specs/label : `val` is ≤ 128 bytes, lowercase ASCII
+ * letters + internal dashes, no leading or trailing dash, no punctuation /
+ * whitespace / non-ASCII. The `!`-prefix is reserved for system-level
+ * behaviour directives and is not used here.
  */
 import type { Verdict } from '../pipeline/normalise-rating.ts';
 

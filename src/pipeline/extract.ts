@@ -2,8 +2,10 @@
  * Stage S1 — extract atomic, falsifiable claims from a post.
  *
  * Calls LM Studio via the OpenAI-compatible API. Output is constrained by a JSON
- * Schema so the model returns parseable structured data. See docs/COMPONENTS.md
- * §1 for the prompting rationale (DnDScore decomposition + decontextualisation).
+ * Schema so the model returns parseable structured data. We split each post into
+ * one *atomic* claim per assertion, then produce a *decontextualised* standalone
+ * version of each so downstream lookup can match against fact-check databases
+ * without relying on the post's surrounding context.
  */
 import OpenAI from 'openai';
 import { z } from 'zod';

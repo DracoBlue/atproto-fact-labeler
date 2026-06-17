@@ -3,8 +3,9 @@
  *
  * Serves the "why?" page for a labeled post: lists the matched claims, our
  * normalised verdict, and the ranked evidence with attribution links to each
- * publisher. We surface URLs and attribution only — no verbatim fact-check text
- * (see docs/SOURCES.md §12).
+ * publisher. We surface URLs and attribution only — no verbatim fact-check text,
+ * because per-entry text in the ingested ClaimReview feed remains under the
+ * publisher's own copyright (only the compilation is CC BY 4.0).
  *
  * Routes:
  *   GET /posts?uri=<at-uri>           HTML

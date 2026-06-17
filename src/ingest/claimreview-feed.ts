@@ -2,9 +2,11 @@
  * Stream-parse the Google Data Commons Fact Check JSON DataFeed and insert each
  * ClaimReview entry into SQLite (table `claim_review`).
  *
- * The feed compilation is CC BY 4.0 (Google Data Commons); per-entry text remains
- * under the original publisher's copyright. We store URL + metadata + a normalised
- * rating only, plus a verbatim attribution string. See docs/SOURCES.md.
+ * Licensing: the feed *compilation* is CC BY 4.0 (Google Data Commons), but the
+ * *individual entries' text* (claim, verdict, rationale) remain under each
+ * publisher's own copyright. We deliberately store only URL + metadata +
+ * normalised rating, plus a verbatim attribution string. We never copy the
+ * publisher's verdict prose verbatim into our records.
  */
 import { createReadStream } from 'node:fs';
 import { resolve } from 'node:path';

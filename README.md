@@ -10,15 +10,6 @@ back to its source. The vocabulary on the wire is descriptive
 (`fact-supported`, `fact-refuted`, `fact-disputed`, `fact-unknown`,
 `fact-outdated`, `fact-mixed`).
 
-For the longer-form design rationale, see [`docs/`](./docs):
-
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — runtime topology
-- [EPISTEMICS.md](./docs/EPISTEMICS.md) — who verifies what, on what basis
-- [SOURCES.md](./docs/SOURCES.md) — fact-check feed licensing
-- [COMPONENTS.md](./docs/COMPONENTS.md) — extraction & verification components
-- [PRIOR_ART.md](./docs/PRIOR_ART.md) — what we borrowed from
-- [RESEARCH.md](./docs/RESEARCH.md) — atproto labeler ecosystem survey
-
 License: MIT (see [LICENSE](./LICENSE)).
 
 ---
@@ -49,8 +40,8 @@ Bluesky / Jetstream
 
 The pipeline is **lookup-first**: most claims are answered by an existing
 fact-check entry. Running our own retrieval-augmented LLM verification is a
-fallback for novel claims and is stubbed in this v0 (see
-[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §3).
+fallback for novel claims and is stubbed in this v0 — see the `S4` notes in
+`src/pipeline/orchestrator.ts`.
 
 ---
 
@@ -372,7 +363,6 @@ src/
 └── index.ts                 main entrypoint
 test/                        vitest unit tests
 fixtures/posts.jsonl         sample posts for offline dev
-docs/                        design docs
 ```
 
 ---
@@ -384,8 +374,9 @@ docs/                        design docs
 - **Individual ClaimReview entries**: the *text* (claim, verdict, rationale)
   remains under each publisher's own copyright. We store only the URL,
   metadata, normalised rating, and a verbatim attribution string. We do not
-  mirror publisher text into our PDS records. See
-  [`docs/SOURCES.md`](./docs/SOURCES.md) §12 for the per-publisher posture.
+  mirror publisher text. Default posture for every publisher is therefore
+  citation-only — link users out to the publisher's article, never reproduce
+  it. Adjust per publisher only with explicit written permission.
 - Our own normalised verdict + matching work + labels are MIT-licensed and
   redistributable.
 
