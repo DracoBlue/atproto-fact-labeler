@@ -1,0 +1,39 @@
+services:
+  fact-labeler:
+    image: ghcr.io/dracoblue/atproto-fact-labeler:latest
+    # build: .   # uncomment to build from source instead of pulling GHCR
+    ports:
+      - "14831:14831"   # labeler: subscribeLabels / queryLabels
+      - "14832:14832"   # detail HTTP "why?" page
+    volumes:
+      - fact-labeler-data:/data
+      # Mount your Data Commons feed read-only and point CLAIMREVIEW_FEED_PATH at it:
+      - ./data.json:/feed/data.json:ro
+    environment:
+      # --- LLM (LM Studio or any OpenAI-compatible endpoint) ---
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-google/gemma-4-e2b}
+      # --- Labeler identity ---
+      - LABELER_DID=${LABELER_DID:-did:plc:placeholder-replace-after-setup}
+      - LABELER_SIGNING_KEY=${LABELER_SIGNING_KEY:-}
+      - LABELER_HOSTNAME=${LABELER_HOSTNAME:-http://localhost:14831}
+      - LABELER_PORT=14831
+      - DETAIL_PORT=14832
+      # --- Ingest ---
+      - JETSTREAM_URL=${JETSTREAM_URL:-wss://jetstream2.us-east.bsky.network/subscribe}
+      # --- HITL ---
+      - HITL_MODE=${HITL_MODE:-auto}
+      - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
+      - TG_REVIEWER_CHAT_ID=${TG_REVIEWER_CHAT_ID:-}
+      # --- Storage ---
+      - SQLITE_PATH=/data/labeler.sqlite
+      - CLAIMREVIEW_FEED_PATH=/feed/data.json
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+    extra_hosts:
+      # so containers can reach LM Studio running on the Docker host
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  fact-labeler-data:

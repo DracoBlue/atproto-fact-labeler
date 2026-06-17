@@ -2,9 +2,6 @@ node_modules
 dist
 .DS_Store
 
-# Design / research docs were preparation, not part of the shipped repo.
-docs/
-
 # Local environment + secrets
 .env
 .env.*
