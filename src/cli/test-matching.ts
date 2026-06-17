@@ -133,7 +133,7 @@ async function main(): Promise<void> {
       const confStr = actualConfidence == null ? '-' : actualConfidence.toFixed(3);
       process.stderr.write(
         `  ${mark} ${evalResult.outcome.toUpperCase()} — verdict=${actualVerdict} conf=${confStr}` +
-          ` (retrieved=${match.retrieved} entail=${match.entailed} contradict=${match.contradicted} neutral=${match.neutral})` +
+          ` (retrieved=${match.retrieved} reranked=${match.reranked} entail=${match.entailed} contradict=${match.contradicted} neutral=${match.neutral})` +
           ` [${(elapsedMs / 1000).toFixed(1)}s]\n`,
       );
       if (evalResult.outcome === 'fail') {
@@ -162,6 +162,7 @@ async function main(): Promise<void> {
             elapsedMs: r.elapsedMs,
             reason: r.reason,
             retrieved: r.match.retrieved,
+            reranked: r.match.reranked,
             entailed: r.match.entailed,
             contradicted: r.match.contradicted,
             neutral: r.match.neutral,

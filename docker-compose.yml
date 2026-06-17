@@ -24,6 +24,14 @@ services:
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-granite-embedding-278m-multilingual}
 
+      # --- Reranker (Stage 2: relevance gate before NLI) ---
+      # llm: single batched LLM call rates top-K candidates for relevance.
+      #      Keeps top RERANK_KEEP above RERANK_THRESHOLD.
+      # off: skip Stage 2 — Stage 3 NLI runs on every retrieved candidate.
+      - RERANK_MODE=${RERANK_MODE:-llm}
+      - RERANK_KEEP=${RERANK_KEEP:-5}
+      - RERANK_THRESHOLD=${RERANK_THRESHOLD:-0.5}
+
       # --- NLI (Stage 3: polarity gate) ---
       # llm-judge: prompt OPENAI_MODEL as a 3-class entailment judge (default).
       # dedicated: reserved for a separate NLI server (not yet implemented).

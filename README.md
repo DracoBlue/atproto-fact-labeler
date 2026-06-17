@@ -30,6 +30,9 @@ Bluesky / Jetstream                    com.atproto.moderation.createReport
  dense retrieval (multilingual embeddings over the local ClaimReview index)
         │
         ▼
+ relevance rerank (single batched LLM call — drop irrelevant before NLI pays per-pair cost)
+        │
+        ▼
  NLI polarity gate (entailment / contradiction / neutral — drop neutral, flip on contradiction)
         │
         ▼
@@ -228,7 +231,10 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | `EMBEDDING_API_KEY` | _(falls back to OPENAI_API_KEY)_ | API key for the embedding endpoint |
 | `EMBEDDING_BASE_URL` | _(falls back to OPENAI_BASE_URL)_ | OpenAI-compatible `/v1/embeddings` base URL. Lets you host embeddings on a different server from the LLM |
 | `EMBEDDING_MODEL` | `text-embedding-granite-embedding-278m-multilingual` | Stage 1 dense-retrieval model. Granite-278m ships with LM Studio, 768 dim, EN↔DE crosslingual. See [docs/PIPELINE.md](./docs/PIPELINE.md) |
-| `NLI_MODE` | `llm-judge` | Stage 3 polarity gate. `llm-judge` prompts `OPENAI_MODEL` as a 3-class entailment judge. `dedicated` is reserved for a separate NLI server (not yet wired) |
+| `RERANK_MODE` | `llm` | Stage 2 relevance rerank. `llm` uses one batched call against `OPENAI_MODEL` to rate retrieved candidates 0..1. `off` skips Stage 2 entirely |
+| `RERANK_KEEP` | `5` | Max candidates kept after Stage 2 rerank — Stage 3 NLI runs on this many at most |
+| `RERANK_THRESHOLD` | `0.5` | Drop candidates whose rerank score is below this floor |
+| `NLI_MODE` | `llm-judge` | Stage 3 polarity gate. `llm-judge` prompts `OPENAI_MODEL` as a 3-class entailment judge. `dedicated` is reserved (see [`docs/ADR_nli_llm_judge_over_mdeberta.md`](./docs/ADR_nli_llm_judge_over_mdeberta.md)) |
 | `LABELER_DID` | `did:plc:placeholder-…` | Labeler service DID (set after going live) |
 | `LABELER_HANDLE` | _(unset)_ | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. Word-boundary matched — `email@<handle>` and `<handle>.suffix` do **not** false-match. |
 | `REPLY_TO_MENTIONS` | `false` | Post a Bluesky reply to the mention author after a mention-triggered label is accepted. See [docs/TRIGGER_MENTIONS.md](./docs/TRIGGER_MENTIONS.md) § Reply-to-mention |

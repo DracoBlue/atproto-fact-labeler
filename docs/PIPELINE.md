@@ -15,8 +15,13 @@
   base64 incompatibility).
 - `src/pipeline/retrieve.ts` — Stage 1 dense retrieval. Cosine top-K with
   `minCosine` floor 0.55.
+- `src/pipeline/rerank.ts` — Stage 2 LLM-as-relevance-judge. Single
+  batched call rates all retrieved candidates 0..1, keeps top
+  `RERANK_KEEP` above `RERANK_THRESHOLD`. Drops irrelevant candidates
+  before Stage 3 NLI pays the per-pair cost.
 - `src/pipeline/entail.ts` — Stage 3 NLI gate via LLM-as-judge. Strict JSON
-  Schema response.
+  Schema response. **Why not a dedicated NLI head** like mDeBERTa:
+  see [`ADR_nli_llm_judge_over_mdeberta.md`](./ADR_nli_llm_judge_over_mdeberta.md).
 - `src/pipeline/matching.ts` — Stage 4 polarity-aware aggregation; flips
   publisher verdict on `contradiction`, drops `neutral`, returns null if 0
   candidates survive.
@@ -117,28 +122,32 @@ a 200k-entry ClaimReview corpus.
 
 ## Current state vs. ideal
 
-The architecture diagram above shows four stages. Production today runs three:
+The architecture diagram above shows four stages. All four are now shipped:
 
 | Stage | Status | Note |
 | --- | --- | --- |
 | 1 Retrieve (dense) | **shipped** | granite-278m-multilingual via LM Studio |
-| 2 Cross-encoder rerank | **skipped** | no LM-Studio-compatible cross-encoder; would need Infinity or Transformers.js |
-| 3 NLI polarity gate | **shipped** | LLM-as-judge via qwen3.6-27b, 4–9 s per pair |
+| 2 LLM relevance rerank | **shipped** | single batched LLM call rates top-K → keeps RERANK_KEEP above RERANK_THRESHOLD |
+| 3 NLI polarity gate | **shipped** | LLM-as-judge via qwen3.6-27b (see [ADR](./ADR_nli_llm_judge_over_mdeberta.md)) |
 | 4 Aggregate w/ polarity | **shipped** | drops `neutral`, flips on `contradiction` |
 
-**Why is skipping Stage 2 acceptable as a first sensible public version?**
+**Why LLM-as-reranker instead of a dedicated cross-encoder
+(`bge-reranker-v2-m3` etc.)?** Same Transformers.js / ONNX risk analysis
+that drove the NLI decision: we already have a working, accurate LLM
+endpoint, and Stage 2 only needs to ask the simpler question "is this
+candidate even on-topic?" — not the harder NLI relationship question.
+One batched call (~5–8 s on qwen3-27B) replaces 5 of the 10 Stage-3
+NLI calls (~7 s each), so net wall-clock per claim drops from ~70 s to
+~35-45 s on the full polarity-matrix fixture.
 
-The Stage 2 reranker's job is to narrow top-50 to top-5 with high precision
-before NLI runs. We retrieve top-K=10 instead of 50, and let NLI run on all
-10 — same final-stage precision, but ~10 NLI calls per claim (~40–90 s)
-instead of 5 (~20–45 s). The wall-clock cost is real but doesn't change the
-verdict quality; the gating fact ("does it label true claims as refuted?")
-is determined by Stage 3, not Stage 2.
+For *uncovered* claims (`my dog is brown`, `Mick Jagger is dead`),
+Stage 2 typically drops every retrieved candidate to score 0 and
+Stage 3 is skipped entirely. Empirically measured: "my dog is brown"
+went from 34 s → 11 s wall-clock — **−66 %**.
 
-When latency matters (firehose mode at scale), Stage 2 becomes mandatory.
-The natural next step is adding `BAAI/bge-reranker-v2-m3` via Transformers.js
-in-process or via an Infinity sidecar; that drops top-10 → top-5 in ~50 ms
-and halves NLI cost.
+A future dedicated cross-encoder path remains documented in §
+"Future extensions" — would help if firehose-mode volume grows enough
+to make the rerank LLM call itself the bottleneck.
 
 ## Stage 1 — Dense retrieval
 
@@ -194,7 +203,7 @@ same action + same domain, different year. Truth-condition-wise these are
 independent propositions. **Only NLI can disambiguate** — which is the
 research finding (Full Fact `t(v) = t(u)`) made concrete in our data.
 
-## Stage 2 — Cross-encoder reranker
+## Stage 2 — Relevance rerank
 
 **Why a reranker.** Bi-encoder retrieval (Stage 1) maps claim and candidate
 into the same vector space independently. That's fast but loses pairwise
@@ -205,18 +214,41 @@ jointly, which is materially more accurate at small k.
 > Cross-Encoder **0.1913** > Bi-Encoder 0.1787 > BM25 0.1452.
 > ([SK_DU paper](https://aclanthology.org/2024.fever-1.11.pdf))
 
-**Model**: [`BAAI/bge-reranker-v2-m3`](https://huggingface.co/BAAI/bge-reranker-v2-m3).
-- 568 MB, multilingual.
-- Outputs a calibrated relevance score for each `(claim, candidate)` pair.
+**Implementation (deployed)**: LLM-as-relevance-judge via the same
+`OPENAI_MODEL` we use for extraction and NLI. One **single batched
+call** rates every retrieved candidate 0..1 against the user's claim
+in one round-trip. We keep the top `RERANK_KEEP` (default 5) whose
+score ≥ `RERANK_THRESHOLD` (default 0.5) and discard the rest before
+Stage 3 NLI runs.
 
-**Threshold τ_rerank.** *Concrete number not standardised in the literature
-— papers tune per dataset.* We will calibrate on a held-out set; reasonable
-starting value 0.6 (the reranker's sigmoided logit). Candidates with score
-below τ_rerank are dropped. After this stage we keep at most 5 candidates.
+The rerank prompt asks a much simpler question than NLI does — just
+"is this candidate even on-topic?". The model returns a strict JSON
+schema with one `{idx, score}` per candidate. On parse failure the
+stage degrades to a no-op (passes the top `keep` Stage 1 results
+through with `rerankScore = cosine`), so a transient LLM hiccup never
+loses the pipeline.
 
-**If 0 candidates pass τ_rerank → label is `uncovered`.** No aggregation, no
-fallback to lower-quality matches. This is the principled answer to failure
-mode B (no quality gate).
+**Why not `BAAI/bge-reranker-v2-m3` via Transformers.js**: same ONNX
+ergonomics concern documented in
+[`ADR_nli_llm_judge_over_mdeberta.md`](./ADR_nli_llm_judge_over_mdeberta.md).
+Worth revisiting if the Stage 2 LLM call itself becomes the bottleneck
+(it currently doesn't).
+
+**Measured impact** on `pnpm test:matching` (M3 Max, qwen3.6-27B):
+
+| Case | Before rerank | After rerank | Delta |
+| --- | --- | --- | --- |
+| the earth is round | 45 s | 33 s | −27 % |
+| My dog is brown (uncovered) | 34 s | 11 s | **−66 %** — Stage 2 drops all candidates, Stage 3 never runs |
+| (full 13-case fixture) | 826 s | see verified outcomes table | — |
+
+The big uncovered-case wins come from Stage 2 zeroing out every
+candidate — Stage 3 sees an empty list and `uncovered` is returned
+without paying for any NLI calls.
+
+**If 0 candidates pass `RERANK_THRESHOLD` → label is `uncovered`.** No
+aggregation, no fallback to lower-quality matches. This is the
+principled answer to failure mode B (no quality gate).
 
 ## Stage 3 — NLI polarity gate
 

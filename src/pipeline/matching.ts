@@ -14,8 +14,10 @@
  * principle from Full Fact: if the publisher reviewed P and our claim H
  * contradicts P, then a "false" verdict on P implies a "true" verdict on H.
  */
+import { getConfig } from '../config/index.ts';
 import { logger } from '../util/logger.ts';
 import { retrieveCandidates, type RetrieveCandidate } from './retrieve.ts';
+import { rerankCandidates } from './rerank.ts';
 import { judgeNli, type NliLabel } from './entail.ts';
 import {
   aggregateVerdicts,
@@ -27,6 +29,8 @@ import {
 import type { DbLike } from '../store/runtime-sqlite.ts';
 
 export interface MatchedCandidate extends RetrieveCandidate {
+  /** Stage 2 rerank score, undefined when reranking was skipped. */
+  rerankScore?: number;
   nliLabel: NliLabel;
   nliConfidence: number;
   /** Normalised publisher verdict BEFORE polarity flip. */
@@ -42,6 +46,8 @@ export interface MatchingResult {
   candidates: MatchedCandidate[];
   /** Diagnostic counters. */
   retrieved: number;
+  /** Candidates after Stage 2 rerank (== retrieved when rerank disabled). */
+  reranked: number;
   entailed: number;
   contradicted: number;
   neutral: number;
@@ -82,18 +88,34 @@ export async function matchClaim(
   options: MatchingOptions = {},
   db?: DbLike,
 ): Promise<MatchingResult> {
+  const cfg = getConfig();
   const retrieve = await retrieveCandidates(
     claim,
     { topK: options.topK ?? 10, minCosine: options.minCosine },
     db,
   );
 
+  // Stage 2 — relevance rerank. Cuts the top-K=10 down to RERANK_KEEP (default 5)
+  // so Stage 3 NLI only runs on the most relevant survivors.
+  let postRerank: Array<RetrieveCandidate & { rerankScore?: number }> = retrieve.candidates;
+  if (cfg.RERANK_MODE === 'llm' && retrieve.candidates.length > 0) {
+    const rer = await rerankCandidates(claim, retrieve.candidates, {
+      keep: cfg.RERANK_KEEP,
+      threshold: cfg.RERANK_THRESHOLD,
+    });
+    postRerank = rer.candidates;
+    logger.debug(
+      { input: retrieve.candidates.length, kept: rer.candidates.length, scores: rer.allScores },
+      'matching: post-rerank',
+    );
+  }
+
   const matched: MatchedCandidate[] = [];
   let entailed = 0;
   let contradicted = 0;
   let neutral = 0;
 
-  for (const cand of retrieve.candidates) {
+  for (const cand of postRerank) {
     const judgment = await judgeNli(claim, cand.claimReviewed);
     if (!judgment) {
       // Treat unparseable as neutral — safe default (drop).
@@ -147,6 +169,7 @@ export async function matchClaim(
   logger.debug(
     {
       retrieved: retrieve.candidates.length,
+      reranked: postRerank.length,
       entailed,
       contradicted,
       neutral,
@@ -159,6 +182,7 @@ export async function matchClaim(
     aggregated,
     candidates: matched,
     retrieved: retrieve.candidates.length,
+    reranked: postRerank.length,
     entailed,
     contradicted,
     neutral,
