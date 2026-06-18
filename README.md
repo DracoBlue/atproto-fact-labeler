@@ -74,7 +74,9 @@ post) and watchlist (named accounts) are opt-in. See
   [vLLM](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html),
   llama.cpp's server, Together, Groq, Mistral, etc. Configure it via
   `OPENAI_BASE_URL` + `OPENAI_API_KEY` + `OPENAI_MODEL`. A small model is
-  enough for extraction (e.g. `google/gemma-4-e2b` on LM Studio).
+  used both for extraction (S1) and as the NLI judge (S3). Reasoning-class
+  models work best — `qwen3.6-27b` for all-local, `google/gemini-2.5-flash`
+  for Vercel. See [docs/ADR_model_choices.md](./docs/ADR_model_choices.md).
 - A copy of the **Google Data Commons Fact Check feed**:
   ```bash
   curl -L \
@@ -172,29 +174,53 @@ The image defaults `SQLITE_PATH=/data/labeler.sqlite`. The compose file
 mounts a named `fact-labeler-data` volume there so the index and labeler
 signing key persist across restarts.
 
-### LM Studio host setup
+### Deployment shapes
+
+The labeler has two OpenAI-compatible model slots — LLM (Stages S1
+extract + S2 rerank + S3 NLI) and embedding (S1 retrieve). Three
+documented deployment shapes; full benchmark + rationale in
+[`docs/ADR_model_choices.md`](./docs/ADR_model_choices.md):
+
+| Shape | LLM slot | Embedding slot | Best for |
+| --- | --- | --- | --- |
+| **All-local** | `qwen3.6-27b` on LM Studio | `granite-278m-multilingual` on LM Studio | offline / air-gapped / privacy |
+| **Hybrid** (recommended for Coolify-style hosts) | `google/gemini-2.5-flash` on Vercel | `granite-278m-multilingual` on LM Studio | best retrieval quality + cost-controlled LLM |
+| **Pure-Vercel** | `google/gemini-2.5-flash` on Vercel | `google/text-multilingual-embedding-002` on Vercel | zero local-process dependency |
+
+#### LM Studio host setup (all-local + hybrid)
 
 The labeler in Docker reaches the LM Studio server on the Docker host
-via `host.docker.internal:1234`. Two models must be loaded in LM Studio
-before the embed-rebuild and the service runs:
-
-| Slot | Default `.env` value | Notes |
-| --- | --- | --- |
-| Extraction LLM (Stage S1) | `OPENAI_MODEL=google/gemma-4-e2b` | Any chat model works. Reasoning models (qwen3, deepseek-r1) need `OPENAI_MAX_TOKENS≥4096` |
-| NLI judge (Stage 3) | reuses `OPENAI_MODEL` when `NLI_MODE=llm-judge` (default) | Larger models give better edge-case judgement |
-| Embedding (Stage 1) | `EMBEDDING_MODEL=text-embedding-granite-embedding-278m-multilingual` | Ships with LM Studio; multilingual; 768 dim |
-
-Load all three (or two if NLI shares the LLM slot) via the LM Studio UI
-or:
+via `host.docker.internal:1234`. Models to load:
 
 ```bash
+# All-local:
 lms load qwen3.6-27b
+lms load text-embedding-granite-embedding-278m-multilingual
+
+# Hybrid: only the embedding model needs to be local
 lms load text-embedding-granite-embedding-278m-multilingual
 ```
 
-To point at a different OpenAI-compatible server (OpenAI proper, vLLM,
-Ollama, etc.) set `OPENAI_BASE_URL` and optionally
-`EMBEDDING_BASE_URL` to override the host bridge.
+#### Pure-Vercel — no LM Studio at all
+
+Set both `OPENAI_BASE_URL` and `EMBEDDING_BASE_URL` to the Vercel
+gateway and use the documented Vercel model names:
+
+```ini
+OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1
+OPENAI_API_KEY=<vercel-key>
+OPENAI_MODEL=google/gemini-2.5-flash
+
+EMBEDDING_BASE_URL=https://ai-gateway.vercel.sh/v1
+EMBEDDING_API_KEY=<vercel-key>
+EMBEDDING_MODEL=google/text-multilingual-embedding-002
+```
+
+Cost reference: ~$0.07 for the one-time 92k-row index rebuild, ~$1 per
+1.4 M query calls.
+
+For a production deploy walkthrough (DNS, reverse proxy, persistent
+storage, going-live checklist), see [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ### One-shot ops inside the container
 
@@ -230,7 +256,7 @@ flags for Docker). Source of truth: `src/config/index.ts`.
 | --- | --- | --- |
 | `OPENAI_API_KEY` | — (required) | API key for the OpenAI-compatible endpoint (any non-empty value if the server doesn't check) |
 | `OPENAI_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible chat-completions base URL — used by the extraction LLM and (when `NLI_MODE=llm-judge`) the NLI judge |
-| `OPENAI_MODEL` | `google/gemma-4-e2b` | Extraction (Stage S1) and NLI-judge (Stage 3) model. Reasoning-class models (qwen3, deepseek-r1) work best on the NLI side |
+| `OPENAI_MODEL` | `qwen3.6-27b` | Extraction (S1), reranker (S2), NLI judge (S3). All-local default; for Vercel use `google/gemini-2.5-flash`. See [docs/ADR_model_choices.md](./docs/ADR_model_choices.md) |
 | `OPENAI_MAX_TOKENS` | `4096` | `max_tokens` per request — reasoning models need generous head-room or `finish_reason=length` swallows the answer |
 | `EMBEDDING_API_KEY` | _(falls back to OPENAI_API_KEY)_ | API key for the embedding endpoint |
 | `EMBEDDING_BASE_URL` | _(falls back to OPENAI_BASE_URL)_ | OpenAI-compatible `/v1/embeddings` base URL. Lets you host embeddings on a different server from the LLM |

@@ -12,7 +12,9 @@ services:
       # --- LLM (any OpenAI-compatible endpoint: OpenAI, LM Studio, Ollama, vLLM, ...) ---
       - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
-      - OPENAI_MODEL=${OPENAI_MODEL:-google/gemma-4-e2b}
+      # Default: all-local qwen3.6-27b. For Vercel use OPENAI_MODEL=google/gemini-2.5-flash.
+      # See docs/ADR_model_choices.md.
+      - OPENAI_MODEL=${OPENAI_MODEL:-qwen3.6-27b}
       # Reasoning models (qwen3, deepseek-r1) need headroom or finish_reason=length
       # swallows the answer. Set 0 to let the server pick its default.
       - OPENAI_MAX_TOKENS=${OPENAI_MAX_TOKENS:-4096}

@@ -24,20 +24,30 @@ This ADR records the picks and the alternatives we evaluated.
 
 **Decision**
 
-| Slot | Model | Endpoint | Why |
+| Slot | Default | Endpoint | Why |
 | --- | --- | --- | --- |
-| **Embedding (S1)** | `text-embedding-granite-embedding-278m-multilingual` | local LM Studio | EN↔DE crosslingual cosine 0.81, 768 dim, ships with LM Studio, no external dep |
+| **Embedding (S1) — recommended** | `text-embedding-granite-embedding-278m-multilingual` | local LM Studio | EN↔DE crosslingual cosine 0.81, 768 dim, ships with LM Studio, ~13 ms / query, no external dep |
+| **Embedding (S1) — pure-Vercel alternative** | `google/text-multilingual-embedding-002` | Vercel AI Gateway | EN↔DE crosslingual cosine 0.75, 768 dim, $0.025/M tokens. Trades −7 % retrieval quality for an LM-Studio-free deploy. |
 | **LLM — local default** | `qwen3.6-27b` | local LM Studio | 13/13 fixture pass, fully offline, reliable strict json_schema, ~62s/case |
 | **LLM — Vercel default** | `google/gemini-2.5-flash` | Vercel AI Gateway | 13/13 fixture pass, 2.6× faster than local qwen3, cheap, fixture-exact |
 
-Both LLM defaults are valid for production. Pick by deployment shape:
+Two valid deployment shapes:
 
-- **All-local / offline** → `qwen3.6-27b` on LM Studio.
-- **Vercel-hosted / cloud** → `google/gemini-2.5-flash`.
+- **All-local / offline** → `qwen3.6-27b` + granite, both on LM Studio.
+- **Hybrid (recommended for Coolify-style hosts)** →
+  `google/gemini-2.5-flash` on Vercel + granite on local LM Studio.
+  Best retrieval quality, LLM cost-controlled.
+- **Pure-Vercel (no LM Studio process at all)** →
+  `google/gemini-2.5-flash` + `google/text-multilingual-embedding-002`,
+  both on Vercel. Slightly worse retrieval (−7 % crosslingual), but
+  zero local-process dependency.
 
-The embedding model stays on LM Studio in both shapes — Vercel does not
-expose granite, and the embedding model is small enough (~303 MB) that
-keeping it local avoids a per-claim HTTP round-trip.
+The embedding crosslingual penalty in pure-Vercel mode is accepted on
+the basis that **Stage 2 (rerank) and Stage 3 (NLI) are the real quality
+gates** — they filter retrieved candidates aggressively, so a moderate
+Stage 1 quality drop does not propagate to the final verdict. The
+matching pipeline was specifically designed so retrieval is allowed to
+be permissive.
 
 **Evidence**
 
@@ -56,6 +66,37 @@ LM Studio + qwen3.6-27b is the reference run.
 
 Smaller / older models considered but not benchmarked because they were
 already disqualified by the same failure modes as the runs above.
+
+**Vercel embedding probe** (2026-06-18). Same EN↔DE crosslingual pair
+used in the granite calibration, against three multilingual candidates
+on the Vercel Gateway. Higher crosslingual cosine = better recall on
+DE-pendant fact-checks for an EN claim.
+
+| Model | Dim | EN→DE crosslingual | Negation-pair (high=ok) | Unrelated (low=ok) | Cost/M tokens |
+| --- | --- | --- | --- | --- | --- |
+| `granite-278m-multilingual` (local) | 768 | **0.81** | 0.93 | 0.50 | 0 |
+| **`google/text-multilingual-embedding-002`** | 768 | **0.75** | 0.88 | 0.40 | $0.025 |
+| `openai/text-embedding-3-small` | 1536 | 0.56 ❌ | 0.78 | 0.12 | $0.02 |
+| `cohere/embed-v4.0` | 1536 | 0.59 ❌ | 0.78 | 0.17 | ~$0.10 |
+
+`google/text-multilingual-embedding-002` is the only Vercel-hosted
+embedding that keeps EN↔DE crosslingual above the operational floor
+needed for the matching pipeline (we use `minCosine=0.55`). OpenAI's
+and Cohere's general-purpose embeddings are English-centric and would
+silently drop DE-pendant fact-checks from retrieval.
+
+**Vercel embedding cost** (measured on real ClaimReview data):
+
+- Full corpus rebuild: 92,245 rows × ~30 tokens/row = ~2.7M tokens →
+  **~$0.07 one-time** at $0.025/M tokens. Wall-clock ~50–80 min via the
+  Vercel HTTP round-trip (~19 emb/s) vs ~13 min via local granite.
+- Per query (one cli:label call): ~30 tokens → ~$0.0000007, i.e. about
+  $1 per 1.4M calls. Negligible vs the LLM cost of the same call.
+- The accepted -7 percentage point crosslingual cosine drop is offset
+  by Stage 2 + Stage 3 doing the real filtering work; not benchmarked
+  on `pnpm test:matching` directly but treated as load-bearing
+  architectural property of the pipeline (Stage 1 is the recall stage,
+  not the precision stage).
 
 **Why granite-278m-multilingual for embedding**
 

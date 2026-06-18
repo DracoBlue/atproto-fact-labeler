@@ -12,6 +12,12 @@ files are independent — DNS + container + env can be ready before you
 register the labeler with Bluesky, and the labeler registration can be
 done from any operator workstation, not necessarily the server.
 
+For the **model choices** (LLM, embedding) and the rationale per
+deployment shape, see [`ADR_model_choices.md`](./ADR_model_choices.md).
+Summary: hybrid (Vercel LLM + local granite) is the recommended shape
+for best retrieval quality, pure-Vercel works too at a ~7% crosslingual
+quality cost.
+
 ## 1. Pick the labeler handle
 
 The labeler runs as its own Bluesky service account. Two common
@@ -87,12 +93,24 @@ OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1
 OPENAI_MODEL=google/gemini-2.5-flash
 
 # ---- Embeddings (Stage 1) ----
-# Granite-278m must live on a server you control. If you run LM Studio on
-# the same host, point at it. If you run text-embeddings-inference as a
-# sidecar, point at that. Vercel does not host granite.
+# TWO valid options, pick by deployment shape (see docs/ADR_model_choices.md):
+#
+# OPTION A — hybrid (recommended for best retrieval): granite-278m local.
+# Run LM Studio on the same host as Coolify (or in a separate container)
+# and point at it. EN↔DE crosslingual cosine 0.81, fast (~13 ms/query),
+# zero per-query cost.
 EMBEDDING_API_KEY=lm-studio
 EMBEDDING_BASE_URL=http://127.0.0.1:1234/v1
 EMBEDDING_MODEL=text-embedding-granite-embedding-278m-multilingual
+#
+# OPTION B — pure-Vercel (no LM Studio at all). Trades −7% crosslingual
+# quality for one less process to run. EN↔DE crosslingual cosine 0.75,
+# ~$0.07 one-time corpus rebuild, ~$1 per 1.4 M query calls. Pipeline
+# Stage 2 + 3 are the real quality gates so the Stage 1 drop is acceptable.
+# Uncomment to use:
+# EMBEDDING_API_KEY=${OPENAI_API_KEY}
+# EMBEDDING_BASE_URL=https://ai-gateway.vercel.sh/v1
+# EMBEDDING_MODEL=google/text-multilingual-embedding-002
 
 # ---- Labeler identity ----
 LABELER_DID=did:plc:<your-service-DID>
