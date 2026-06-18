@@ -30,7 +30,12 @@ let _client: OpenAI | undefined;
 function client(): OpenAI {
   if (_client) return _client;
   const cfg = getConfig();
-  _client = new OpenAI({ apiKey: cfg.OPENAI_API_KEY, baseURL: cfg.OPENAI_BASE_URL });
+  // See src/pipeline/extract.ts for why we disable response compression.
+  _client = new OpenAI({
+    apiKey: cfg.OPENAI_API_KEY,
+    baseURL: cfg.OPENAI_BASE_URL,
+    defaultHeaders: { 'Accept-Encoding': 'identity' },
+  });
   return _client;
 }
 

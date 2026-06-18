@@ -19,7 +19,15 @@ let _client: OpenAI | undefined;
 function client(): OpenAI {
   if (_client) return _client;
   const cfg = getConfig();
-  _client = new OpenAI({ apiKey: cfg.OPENAI_API_KEY, baseURL: cfg.OPENAI_BASE_URL });
+  // Vercel AI Gateway intermittently truncates gzipped response bodies, which
+  // surfaces in node-fetch as ERR_STREAM_PREMATURE_CLOSE on the Gunzip stream.
+  // Asking for identity encoding makes responses uncompressed and the
+  // body-stream-close ambiguity disappears.
+  _client = new OpenAI({
+    apiKey: cfg.OPENAI_API_KEY,
+    baseURL: cfg.OPENAI_BASE_URL,
+    defaultHeaders: { 'Accept-Encoding': 'identity' },
+  });
   return _client;
 }
 
