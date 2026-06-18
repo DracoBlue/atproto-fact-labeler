@@ -123,7 +123,11 @@ the local fact-check index, and proposing labels via your HITL surface.
 When you press `a`/`y`, the label is signed by `@skyware/labeler` and
 served on `subscribeLabels`. Without a real Bluesky service account
 registered in PLC, the label won't be honoured by the public AppView yet —
-see [docs/LIFECYCLE.md](./docs/LIFECYCLE.md) for going live.
+see [docs/DEPLOY.md](./docs/DEPLOY.md) for the infrastructure side of
+a production deploy (DNS, reverse proxy, Coolify/Caddy/Traefik,
+persistent storage, going-live checklist) and
+[docs/LIFECYCLE.md](./docs/LIFECYCLE.md) for the Bluesky-side lifecycle
+(skyware registration, retire, clear).
 
 ## Docker (GHCR)
 
@@ -380,9 +384,12 @@ of recommended next steps. Safe to run any time.
 
 ## Further reading
 
-- **[docs/LIFECYCLE.md](./docs/LIFECYCLE.md)** — going live on Bluesky,
-  pausing, retiring labels, clearing the declaration. Required reading
-  before running this in production.
+- **[docs/DEPLOY.md](./docs/DEPLOY.md)** — production deploy via Coolify,
+  Caddy, Traefik, or any reverse-proxy host. DNS, custom handle setup,
+  persistent storage, going-live checklist.
+- **[docs/LIFECYCLE.md](./docs/LIFECYCLE.md)** — Bluesky-side lifecycle:
+  registering the labeler with skyware, pausing emissions, retiring
+  labels, clearing the declaration.
 - **[docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** — offline dev with
   fixtures, smoke test, running the test suite, commit conventions,
   source layout.

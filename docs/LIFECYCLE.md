@@ -5,6 +5,12 @@ online, paused, retired, cleared. Atproto labels are durable signed objects
 — turning the service off does **not** make them go away. The four phases
 below cover every transition you'll actually need.
 
+For the **infrastructure** side (DNS, reverse proxy, persistent storage,
+Coolify / Caddy / Traefik specifics, going-live checklist), see
+[`DEPLOY.md`](./DEPLOY.md). This file is the **Bluesky-side** lifecycle —
+skyware setup, retire, clear. The two are independent; DEPLOY.md happens
+first, then LIFECYCLE.md Phase 1.
+
 ## Phase 1 — Going online (one-time setup)
 
 To make the labels visible to real Bluesky users:
