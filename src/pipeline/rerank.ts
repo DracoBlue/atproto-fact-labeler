@@ -56,7 +56,24 @@ inherit the publisher's verdict (possibly with polarity flip on
 contradiction). A medium score means downstream NLI will reject the
 candidate anyway.
 
-Respond with strict JSON, one score per candidate, in input order.`;
+Respond with exactly this JSON shape — one {"idx": N, "score": X} entry
+per candidate, in input order, no other fields, no commentary:
+{"scores": [{"idx": 0, "score": 0.9}, {"idx": 1, "score": 0.4}, ...]}
+
+Example. User claim: "5G towers cause COVID-19"
+
+Candidates:
+  [0] False: 5G technology does not cause coronavirus, WHO confirms
+  [1] Earthquake death toll rises in Japan after Noto Peninsula tremor
+  [2] Verschwörung: 5G und COVID-19 — alles Fake News
+  [3] iPhone now supports 5G mmWave in additional markets
+
+Expected output:
+{"scores": [{"idx": 0, "score": 0.95}, {"idx": 1, "score": 0.05}, {"idx": 2, "score": 0.92}, {"idx": 3, "score": 0.15}]}
+
+Reasoning (do NOT include in your output): [0] and [2] review the exact
+claim. [1] is unrelated. [3] is same-topic 5G but a different
+proposition (commercial rollout, not health effect).`;
 
 const ScoreItemSchema = z.object({
   idx: z.number().int().nonnegative(),

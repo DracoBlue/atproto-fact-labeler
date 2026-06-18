@@ -67,7 +67,21 @@ Respond with strict JSON matching this schema:
   ]
 }
 
-If the post contains no falsifiable claims, return { "claims": [] }.`;
+If the post contains no falsifiable claims, return { "claims": [] }.
+
+Examples.
+
+Post: "The earth is flat. Wake up sheeple."
+{"claims": [{"atomic_text": "The earth is flat.", "decontextualized_text": "The earth is flat.", "span_start": 0, "span_end": 19, "is_falsifiable": true, "lang": "en", "entities": ["earth"], "confidence": 0.95}]}
+
+Post: "I love this restaurant!! Best pasta in town."
+{"claims": []}
+
+Post: "Trump won the 2020 election and Biden stole it."
+{"claims": [
+  {"atomic_text": "Trump won the 2020 election", "decontextualized_text": "Donald Trump won the 2020 US presidential election.", "span_start": 0, "span_end": 27, "is_falsifiable": true, "lang": "en", "entities": ["Trump", "2020 election"], "confidence": 0.9},
+  {"atomic_text": "Biden stole it", "decontextualized_text": "Joe Biden stole the 2020 US presidential election.", "span_start": 32, "span_end": 46, "is_falsifiable": true, "lang": "en", "entities": ["Biden", "2020 election"], "confidence": 0.9}
+]}`;
 
 const RESPONSE_FORMAT: OpenAI.ChatCompletionCreateParams['response_format'] = {
   type: 'json_schema',

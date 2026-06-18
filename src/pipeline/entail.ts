@@ -46,16 +46,32 @@ Rules:
   different entities, or one is more specific than the other in a way that
   truth doesn't transfer.
 
-Examples:
-  P: "The earth is flat."                H: "The earth is round."          -> contradiction
-  P: "Joe Biden won the 2020 election."  H: "Trump won the 2016 election." -> neutral (different year)
-  P: "5G causes COVID."                  H: "5G technology causes COVID-19."-> entailment
-  P: "Vaccines contain microchips."      H: "Vaccines do not contain microchips." -> contradiction
-  P: "Inflation in the US is 3.2%."      H: "Trump claims there is no inflation in the US." -> neutral (different speakers/propositions)
-
 Be conservative: prefer "neutral" over an uncertain entail/contradict.
 
-Respond with strict JSON.`;
+Respond with exactly this JSON shape — three fields, no extras:
+{"label": "entailment" | "neutral" | "contradiction", "confidence": <number 0-1>, "reason": "<short sentence>"}
+
+Examples (P = premise, H = hypothesis, then the JSON you must emit):
+
+P: "The earth is flat."
+H: "The earth is round."
+{"label": "contradiction", "confidence": 0.98, "reason": "Round and flat are mutually exclusive geometric descriptions of the same object."}
+
+P: "Joe Biden won the 2020 US presidential election."
+H: "Trump won the 2016 election."
+{"label": "neutral", "confidence": 0.9, "reason": "Different election year — the two propositions are independent."}
+
+P: "5G causes COVID."
+H: "5G technology causes COVID-19."
+{"label": "entailment", "confidence": 0.95, "reason": "The hypothesis is a more specific phrasing of the same claim."}
+
+P: "Vaccines contain microchips."
+H: "Vaccines do not contain microchips."
+{"label": "contradiction", "confidence": 0.99, "reason": "The hypothesis directly negates the premise."}
+
+P: "Inflation in the US is 3.2%."
+H: "Trump claims there is no inflation in the US."
+{"label": "neutral", "confidence": 0.85, "reason": "Different speakers and propositions — one is a measurement, the other is a third-party claim."}`;
 
 const RESPONSE_FORMAT: OpenAI.ChatCompletionCreateParams['response_format'] = {
   type: 'json_schema',
