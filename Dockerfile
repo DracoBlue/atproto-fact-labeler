@@ -11,27 +11,32 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM node:24-alpine
-ENV NODE_ENV=production \
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    NODE_ENV=production \
     SQLITE_PATH=/data/labeler.sqlite \
-    # CI=true tells pnpm we are non-interactive — needed if any code path
-    # (e.g. pnpm dlx for one-off ops like @skyware/labeler setup) ends up
-    # running pnpm at runtime.
+    # CI=true tells pnpm we are non-interactive — required so that one-off
+    # ops like `docker compose run --rm fact-labeler pnpm ingest` do not
+    # block on the verify-deps-before-run interactive purge prompt.
     CI=true
+# pnpm is available in the runtime image for operator one-off ops
+# (`pnpm ingest`, `pnpm cli:embed-rebuild`, `pnpm cli:label`,
+# `pnpm dlx @skyware/labeler ...`). The service start (CMD below) still
+# calls tsx directly to avoid pnpm's deps-status-check on every boot.
+RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-# Bring the workspace file along so the dep manifest is consistent if pnpm
-# is invoked at runtime for one-off ops (`pnpm cli:label`, etc.).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY src ./src
-# /app must be writable by the runtime user (tsx writes its build cache).
+# /app must be writable by the runtime user (tsx writes its build cache;
+# pnpm writes scratch files for the deps check even with CI=true).
 # /data is the persistent volume mount point — chown it so the labeler can
-# create the SQLite file on first boot.
+# create the SQLite file and the signing key on first boot.
 RUN mkdir -p /data && chown -R node:node /app /data
 VOLUME /data
 EXPOSE 14831
 USER node
 # Run tsx directly. Going through `pnpm start` triggers pnpm 11's
-# verify-deps-before-run check which writes scratch files to /app and (when
-# it sees a perceived mismatch) tries to purge node_modules — both fail
-# inside a stripped, non-interactive container even after chown + CI=true.
+# verify-deps-before-run check on every container boot. Calling tsx
+# directly skips that and starts the labeler in <1 s.
 CMD ["node_modules/.bin/tsx", "src/index.ts"]

@@ -65,14 +65,24 @@ a static file at that path.
 After either record is live, set the handle in Bluesky settings → Handle
 → "I have my own domain", and click verify.
 
-## 3. Get the fact-check feed onto the host
+## 3. Get the fact-check feed into the data volume
 
-The labeler ingests the **Google Data Commons Fact Check** feed. You
-need a copy of `data.json` (about 60 MB at time of writing) on the host:
+The labeler ingests the **Google Data Commons Fact Check** feed
+(`data.json`, about 60 MB at time of writing). It lives in the same
+persistent `/data` volume as the SQLite index and signing key — one
+volume to back up, one place to refresh:
 
 ```bash
-curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json -o data.json
+# Once the container is up, drop the feed into the data volume.
+# The runtime image is node:24-alpine which has wget, not curl:
+docker compose run --rm fact-labeler sh -c \
+  'wget -O /data/data.json https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json'
 ```
+
+If you'd rather not call out into the container at all, the host can
+download it next to your `docker-compose.yml` and you mount it into the
+volume — but the inline download keeps everything in the named volume,
+which is the cleaner backup story.
 
 You'll want to refresh this periodically — a cron or weekly CI job
 that re-downloads, re-ingests, and re-embeds is the standard pattern.
@@ -155,7 +165,7 @@ LOG_LEVEL=info
 
 ```ini
 SQLITE_PATH=/data/labeler.sqlite
-CLAIMREVIEW_FEED_PATH=/feed/data.json
+CLAIMREVIEW_FEED_PATH=/data/data.json
 ```
 
 `/data` should be a **persistent volume** — it carries the labeler's
@@ -185,8 +195,9 @@ TLS, and proxy WebSockets (this matters for `subscribeLabels`).
   `Dockerfile` and `docker-compose.yml`. Either works; the Dockerfile is
   simpler.
 - **Health check**: `/healthz`, expected 200, every 30 s.
-- **Persistent storage**: mount a named volume at `/data`. Mount your
-  downloaded `data.json` read-only at `/feed/data.json`.
+- **Persistent storage**: mount a named volume at `/data`. The fact-check
+  feed (`data.json`) lives inside this volume too — one mount, one
+  backup target.
 - **WebSocket**: enable WebSocket upgrade for the subscribeLabels path.
 - **Environment**: copy the production env values from § 4 into the
   Coolify "Environment Variables" tab. Mark secrets as *secret* so they
@@ -249,15 +260,22 @@ The Google Data Commons feed updates daily. To stay current:
 0 4 * * 1   /usr/local/bin/refresh-facts.sh
 ```
 
-`refresh-facts.sh`:
+`refresh-facts.sh` — runs the download inside the container so the file
+lands in the volume directly:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 cd /opt/atproto-fact-labeler
-curl -L --fail-with-body -o /tmp/data.json.new \
-  https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json
-mv /tmp/data.json.new /feed/data.json
+
+# Download the fresh feed into the data volume (atomic via tmp + mv).
+# Uses wget because node:24-alpine ships wget, not curl.
+docker compose run --rm fact-labeler sh -c '
+  set -e
+  wget -O /data/data.json.new https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json
+  mv /data/data.json.new /data/data.json
+'
+
 docker compose run --rm fact-labeler pnpm ingest
 docker compose run --rm fact-labeler pnpm cli:embed-rebuild
 ```

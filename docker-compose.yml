@@ -5,9 +5,10 @@ services:
     ports:
       - "14831:14831"   # labeler (subscribeLabels / queryLabels) + detail /posts
     volumes:
+      # Persistent volume — carries the SQLite index, the dense-retrieval
+      # embeddings, the labeler signing key, and the downloaded fact-check
+      # feed (data.json). One mount, one backup target.
       - fact-labeler-data:/data
-      # Mount your Data Commons feed read-only and point CLAIMREVIEW_FEED_PATH at it:
-      - ./data.json:/feed/data.json:ro
     environment:
       # --- LLM (any OpenAI-compatible endpoint: OpenAI, LM Studio, Ollama, vLLM, ...) ---
       - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
@@ -80,7 +81,7 @@ services:
 
       # --- Storage ---
       - SQLITE_PATH=/data/labeler.sqlite
-      - CLAIMREVIEW_FEED_PATH=/feed/data.json
+      - CLAIMREVIEW_FEED_PATH=/data/data.json
       - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
     extra_hosts:
