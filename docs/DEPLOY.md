@@ -238,9 +238,14 @@ Inside the container, *before* you declare the labeler to Bluesky:
 pnpm ingest
 # (or `docker compose run --rm fact-labeler pnpm ingest`)
 
-# 2. Compute dense-retrieval embeddings for every row
+# 2. Compute dense-retrieval embeddings for every row.
+#    Default --batch=32 is tuned for local LM Studio. Against Vercel use:
+#       pnpm cli:embed-rebuild --batch 16
+#    Vercel's AI Gateway intermittently closes the response stream on
+#    larger batches ("Premature close"). The CLI retries with exponential
+#    backoff before giving up, but smaller batches reduce noise.
 pnpm cli:embed-rebuild
-# (~12 min for 92 k rows on M3 Max; longer or shorter depending on host)
+# (~12 min for 92 k rows on M3 Max via local granite; 80-120 min via Vercel.)
 
 # 3. Optionally test the pipeline against the 13-case fixture
 pnpm test:matching

@@ -7,6 +7,13 @@
  *
  * If EMBEDDING_MODEL has changed since the last run, rows tagged with the
  * old model are re-embedded automatically (model-aware backfill).
+ *
+ * Default --batch=32 is tuned for local LM Studio. For remote endpoints
+ * (Vercel AI Gateway in particular) drop to --batch=16 — Vercel
+ * intermittently closes the response stream mid-body on larger batches.
+ * The CLI retries with exponential backoff before giving up, so a single
+ * "Premature close" is not fatal, but smaller batches make the rebuild
+ * smoother.
  */
 import { getConfig } from '../config/index.ts';
 import { getDbAsync, closeDb } from '../store/db.ts';
@@ -80,12 +87,34 @@ async function main(): Promise<void> {
     // chars). Truncate input claims aggressively. We embed the *claim_reviewed*
     // text which is typically already a single sentence.
     const inputs = rows.map((r) => r.claim_reviewed.slice(0, 1500));
+
+    // Remote endpoints (Vercel AI Gateway in particular) intermittently
+    // close the response stream mid-body ("Premature close"). Retry with
+    // exponential backoff before giving up on the run.
     let result;
-    try {
-      result = await embedBatch(inputs);
-    } catch (err) {
-      logger.error({ err: (err as Error).message, batchStart: rows[0]?.id }, 'embed batch failed');
-      throw err;
+    let attempt = 0;
+    const maxAttempts = 5;
+    while (true) {
+      try {
+        result = await embedBatch(inputs);
+        break;
+      } catch (err) {
+        attempt++;
+        const msg = (err as Error).message;
+        if (attempt >= maxAttempts) {
+          logger.error(
+            { err: msg, batchStart: rows[0]?.id, attempts: attempt },
+            'embed batch failed after retries',
+          );
+          throw err;
+        }
+        const delayMs = 1000 * 2 ** (attempt - 1); // 1s, 2s, 4s, 8s
+        logger.warn(
+          { err: msg, batchStart: rows[0]?.id, attempt, maxAttempts, retryInMs: delayMs },
+          'embed batch transient failure — retrying',
+        );
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
     }
 
     const tx = db.transaction((items: Array<{ id: number; vec: Float32Array }>) => {
