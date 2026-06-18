@@ -75,21 +75,74 @@ const RESPONSE_FORMAT: OpenAI.ChatCompletionCreateParams['response_format'] = {
   },
 };
 
-const JudgmentSchema = z.object({
-  label: z.enum(['entailment', 'contradiction', 'neutral']),
+// Strict schema is what we ASK the model for via response_format. The parser
+// below is intentionally more lenient — many OpenAI-compatible gateways
+// (Vercel AI Gateway, LM Studio with MLX models, ...) do not actually enforce
+// strict json_schema and let models emit just { "label": "..." } or use a
+// different key name like "relationship". As long as we can recover the label,
+// the matching pipeline is functional; missing confidence defaults to a
+// sensible 0.7.
+const LABEL_VALUES = ['entailment', 'contradiction', 'neutral'] as const;
+type LabelValue = (typeof LABEL_VALUES)[number];
+
+const StrictJudgmentSchema = z.object({
+  label: z.enum(LABEL_VALUES),
   confidence: z.number().min(0).max(1),
   reason: z.string().optional(),
 });
 
-function parseJudgment(raw: string): NliJudgment | null {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-  if (!trimmed) return null;
+function tryRecoverPartialJson(raw: string): unknown {
+  // Some models (gemma-4-26b on LM Studio) start the JSON correctly then loop
+  // on whitespace until max_tokens kills them. Salvage by appending a closing
+  // brace if the string is an unterminated object starting with `{`.
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{')) return null;
+  let candidate = trimmed;
+  if (!candidate.endsWith('}')) {
+    // Strip trailing junk after the last quoted value, then close.
+    const lastQuote = candidate.lastIndexOf('"');
+    if (lastQuote > 0) {
+      candidate = candidate.slice(0, lastQuote + 1) + '}';
+    } else {
+      candidate = candidate + '}';
+    }
+  }
   try {
-    const parsed = JudgmentSchema.safeParse(JSON.parse(trimmed));
-    return parsed.success ? parsed.data : null;
+    return JSON.parse(candidate);
   } catch {
     return null;
   }
+}
+
+function parseJudgment(raw: string): NliJudgment | null {
+  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  if (!trimmed) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    parsed = tryRecoverPartialJson(trimmed);
+    if (parsed == null) return null;
+  }
+
+  // Strict pass first — gives us confidence + reason if the model honoured the schema.
+  const strict = StrictJudgmentSchema.safeParse(parsed);
+  if (strict.success) return strict.data;
+
+  // Lenient pass: pull a label out of any plausible key. Accept "label",
+  // "relationship", "result", "class", "verdict" — all observed in the wild.
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+  const labelRaw = obj.label ?? obj.relationship ?? obj.relation ?? obj.result ?? obj.class ?? obj.verdict;
+  if (typeof labelRaw !== 'string') return null;
+  const label = labelRaw.toLowerCase() as LabelValue;
+  if (!LABEL_VALUES.includes(label)) return null;
+  const confidence = typeof obj.confidence === 'number' && obj.confidence >= 0 && obj.confidence <= 1
+    ? obj.confidence
+    : 0.7; // sensible default when the model omits confidence
+  const reason = typeof obj.reason === 'string' ? obj.reason : undefined;
+  return { label, confidence, reason };
 }
 
 export async function judgeNli(
@@ -114,11 +167,11 @@ export async function judgeNli(
 
   const choice = completion.choices[0];
   const message = choice?.message as
-    | { content?: string | null; reasoning_content?: string | null }
+    | { content?: string | null; reasoning_content?: string | null; reasoning?: string | null }
     | undefined;
   const raw = (message?.content && message.content.trim().length > 0
     ? message.content
-    : (message?.reasoning_content ?? '')) || '';
+    : (message?.reasoning_content ?? message?.reasoning ?? '')) || '';
 
   if (!raw) {
     logger.warn({ finishReason: choice?.finish_reason }, 'NLI judge returned empty content');

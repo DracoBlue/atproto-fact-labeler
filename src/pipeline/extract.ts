@@ -29,7 +29,7 @@ const ClaimSchema = z.object({
   span_start: z.number().int().nonnegative().nullable().optional(),
   span_end: z.number().int().nonnegative().nullable().optional(),
   is_falsifiable: z.boolean(),
-  lang: z.string().optional(),
+  lang: z.string().nullable().optional(),
   entities: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1),
 });
@@ -89,7 +89,7 @@ const RESPONSE_FORMAT: OpenAI.ChatCompletionCreateParams['response_format'] = {
               span_start: { type: ['integer', 'null'] },
               span_end: { type: ['integer', 'null'] },
               is_falsifiable: { type: 'boolean' },
-              lang: { type: 'string' },
+              lang: { type: ['string', 'null'] },
               entities: { type: 'array', items: { type: 'string' } },
               confidence: { type: 'number', minimum: 0, maximum: 1 },
             },
@@ -99,6 +99,7 @@ const RESPONSE_FORMAT: OpenAI.ChatCompletionCreateParams['response_format'] = {
               'span_start',
               'span_end',
               'is_falsifiable',
+              'lang',
               'entities',
               'confidence',
             ],
@@ -162,11 +163,11 @@ export async function extractClaims(input: ExtractInput): Promise<ExtractResult>
   // `reasoning_content` instead of `content` when `response_format` is set —
   // LM Studio in particular does this. Fall back to it if `content` is empty.
   const message = choice?.message as
-    | { content?: string | null; reasoning_content?: string | null }
+    | { content?: string | null; reasoning_content?: string | null; reasoning?: string | null }
     | undefined;
   const raw = (message?.content && message.content.trim().length > 0
     ? message.content
-    : (message?.reasoning_content ?? '')) || '';
+    : (message?.reasoning_content ?? message?.reasoning ?? '')) || '';
 
   if (!raw && choice?.finish_reason === 'length') {
     logger.warn(

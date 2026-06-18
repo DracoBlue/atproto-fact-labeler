@@ -193,11 +193,11 @@ export async function rerankCandidates(
 
   const choice = completion.choices[0];
   const message = choice?.message as
-    | { content?: string | null; reasoning_content?: string | null }
+    | { content?: string | null; reasoning_content?: string | null; reasoning?: string | null }
     | undefined;
   const raw = (message?.content && message.content.trim().length > 0
     ? message.content
-    : (message?.reasoning_content ?? '')) || '';
+    : (message?.reasoning_content ?? message?.reasoning ?? '')) || '';
 
   const scores = parseResponse(raw, candidates.length);
   if (!scores) {
