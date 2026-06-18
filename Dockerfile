@@ -23,7 +23,16 @@ ENV PNPM_HOME=/pnpm \
 # (`pnpm ingest`, `pnpm cli:embed-rebuild`, `pnpm cli:label`,
 # `pnpm dlx @skyware/labeler ...`). The service start (CMD below) still
 # calls tsx directly to avoid pnpm's deps-status-check on every boot.
-RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
+#
+# We install pnpm via npm rather than corepack: corepack caches the
+# downloaded pnpm version in the *invoking user's* `~/.cache/node/corepack`.
+# When `corepack prepare` runs as root at build time and then USER switches
+# to `node`, the runtime `pnpm` invocation finds the node user's cache
+# empty and re-downloads pnpm on every operator command — visible as
+# `Corepack is about to download https://registry.npmjs.org/pnpm/...` on
+# every `pnpm run X`. Plain npm-install drops the binary under
+# `/usr/local/lib/node_modules` which is system-wide readable.
+RUN npm install -g pnpm@11.0.0 && npm cache clean --force
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
