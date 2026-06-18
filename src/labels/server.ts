@@ -94,7 +94,9 @@ export function createLabelerServer(): FactLabelerServer {
     app: server.app,
     async start(): Promise<void> {
       return new Promise((resolveFn, reject) => {
-        server.start(cfg.LABELER_PORT, (err, address) => {
+        // Bind to 0.0.0.0 so Traefik / other containers can reach the server.
+        // Fastify's default host is 127.0.0.1, which is loopback-only.
+        server.start({ port: cfg.LABELER_PORT, host: '0.0.0.0' }, (err, address) => {
           if (err) reject(err);
           else {
             logger.info({ address, did: cfg.LABELER_DID }, 'labeler server listening');
