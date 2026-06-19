@@ -10,7 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # pnpm version is read from package.json#packageManager — do not pass
       # `version:` here, or pnpm/action-setup@v4 errors with ERR_PNPM_BAD_PM_VERSION.
@@ -74,7 +74,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -92,7 +92,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build Docker image
         run: docker build -t atproto-fact-labeler .
