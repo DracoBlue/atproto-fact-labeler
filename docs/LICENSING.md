@@ -26,5 +26,6 @@ The labeler code itself is MIT — see [`LICENSE`](../LICENSE).
 The Google Data Commons feed is open-submission and ships SEO spam,
 blogspot blogs and other junk alongside real fact-checkers. We filter
 at ingest with a curated publisher allowlist — an editorial decision,
-not a licensing one. See [`PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md)
-for the criteria, the trade-offs, and how to add a publisher.
+not a licensing one. See [`FEED_QUALITY.md`](FEED_QUALITY.md) for the
+allowlist criteria, the trade-offs, how to add a publisher, and how to
+report bad upstream entries back to Google.

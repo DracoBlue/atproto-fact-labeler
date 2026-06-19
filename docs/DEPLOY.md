@@ -92,9 +92,9 @@ See § "Periodic re-ingest" below.
 alongside real fact-checkers. The ingester only inserts rows whose
 publisher is on a curated allowlist
 (`config/claimreview-publishers-allowlist.txt`). Read
-[`docs/PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md) before going
-live — that file decides which fact-checkers' verdicts your service
-propagates onto Bluesky.
+[`docs/FEED_QUALITY.md`](FEED_QUALITY.md) before going live — that
+file decides which fact-checkers' verdicts your service propagates
+onto Bluesky, and tells you how to report the spam back to Google.
 
 ## 4. Container env — production values
 
@@ -307,7 +307,7 @@ last refresh — for example to drop a previously-trusted publisher —
 also run `pnpm cleanup:claims` to delete the now-disallowed rows from
 the existing index. New ingests honour the allowlist, but already-
 ingested rows linger until removed. See
-[`PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md).
+[`FEED_QUALITY.md`](FEED_QUALITY.md).
 
 The `cli:embed-rebuild` is model-aware: only newly-ingested rows or
 rows tagged with an outdated `EMBEDDING_MODEL` get re-embedded. Refresh
