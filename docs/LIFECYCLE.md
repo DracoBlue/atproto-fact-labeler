@@ -175,22 +175,32 @@ When labels were emitted in error, or you want to take them off the wire
 without removing the labeler entirely. Use the built-in retire CLI:
 
 ```bash
-# 1. Preview what would be negated
+# 1. Preview what would be negated (server can stay running for this)
 pnpm run retire:check               # alias for retire --dry-run
 # or
 pnpm tsx src/cli/retire.ts --dry-run
 
-# 2. Apply (signs and emits a neg=true companion for every live label)
-pnpm run retire
-# or
-pnpm tsx src/cli/retire.ts
+# 2. Stop the live labeler — retire signs + emits through its own
+#    LabelerServer instance, which needs the same port and writes to the
+#    same labels.db. Two processes on labels.db would race.
+docker compose stop fact-labeler
 
-# Filter to a single label value:
-pnpm tsx src/cli/retire.ts --val=fact-refuted
+# 3. Apply (signs and emits a neg=true companion for every live label).
+#    `compose run --rm` spawns a fresh container that doesn't publish ports
+#    so the bind itself is clean too.
+docker compose run --rm fact-labeler pnpm retire
 
-# Filter to a single post:
-pnpm tsx src/cli/retire.ts --uri=at://did:plc:.../app.bsky.feed.post/3kx
+# 4. Bring the labeler back up.
+docker compose start fact-labeler
+
+# Filters work in both --dry-run and apply forms:
+docker compose run --rm fact-labeler pnpm retire --val=fact-refuted
+docker compose run --rm fact-labeler pnpm retire --uri=at://did:plc:.../app.bsky.feed.post/3kx
 ```
+
+If you forget to stop the labeler first, the retire CLI detects the
+EADDRINUSE on its own start() and prints the recipe above instead of a
+raw stack trace.
 
 Each negation is a real, signed atproto label with `neg=true`. AppViews
 stop hydrating the original on next sync. End users stop seeing the badge.

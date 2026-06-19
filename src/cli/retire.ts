@@ -66,7 +66,25 @@ async function main(): Promise<void> {
 
   const labeler = createLabelerServer();
   if (!args.dryRun) {
-    await labeler.start();
+    try {
+      await labeler.start();
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EADDRINUSE') {
+        process.stderr.write(
+          `\n  retire needs to start its own LabelerServer to sign + emit the negations,\n` +
+            `  but the labeler port is already in use — most likely the live labeler is\n` +
+            `  still running. Stop it first, then re-run retire, then start it again:\n\n` +
+            `    docker compose stop fact-labeler\n` +
+            `    docker compose run --rm fact-labeler pnpm retire\n` +
+            `    docker compose start fact-labeler\n\n` +
+            `  Both processes would otherwise race on the same labels.db file.\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+      throw err;
+    }
   }
 
   try {
