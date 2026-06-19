@@ -49,13 +49,30 @@ be named) before the details become public.
 
 ## What we already do
 
+- `tools.ozone.moderation.emitEvent` only accepts the labeler's own DID
+  (`src/labels/server.ts`). Any third-party Bluesky JWT — even a valid
+  one — is rejected, so no caller can use the labeler's signing key to
+  forge labels on arbitrary posts.
 - The detail page (`src/detail/server.ts`) HTML-escapes every dynamic
-  field and sets `<meta name="robots" content="noindex,nofollow,
-  noarchive,nosnippet">` plus `X-Robots-Tag` header so search engines
-  don't index the rendered attacker content.
+  field, restricts `href` URLs to `http(s):` (so a `javascript:` /
+  `data:` URL in feed content cannot ride into a clickable link), and
+  sets `<meta name="robots" content="noindex,nofollow,noarchive,
+  nosnippet">` plus `X-Robots-Tag` header so search engines don't
+  index rendered attacker content.
 - The `createReport` endpoint verifies the issuer's atproto service
-  JWT against the PLC-resolved signing key (`src/util/atproto-jwt.ts`).
-- All SQLite calls use prepared statements.
+  JWT against the PLC-resolved signing key (`src/util/atproto-jwt.ts`):
+  low-S enforcement, `iat`/`exp`/`aud`/`lxm` checks, an in-memory
+  `(iss, jti)` replay cache, and a per-call timeout on DID resolution.
+  `did:web` is refused by default — opt in only when you specifically
+  need self-hosted-PDS reporters — and when allowed, hostnames that
+  resolve to loopback / RFC1918 / link-local / cloud-metadata addresses
+  are blocked to prevent SSRF.
+- The freshly-generated signing key is written to `.env` with `mode
+  0o600` and `chmod`ed on update, so the secret isn't world-readable
+  on shared hosts.
+- All SQLite calls use prepared statements; the one place where an
+  identifier is interpolated (`PRAGMA table_info`) is guarded by an
+  identifier-allowlist regex.
 - The publisher allowlist (`config/claimreview-publishers-allowlist.txt`)
   filters out the obvious junk publishers at ingest, including an
   observed XSS-payload entry in the Google feed.

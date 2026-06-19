@@ -90,6 +90,20 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Only http(s) URLs land in `href`. Anything else (`javascript:`, `data:`,
+// `vbscript:`, scheme-relative, …) is rendered as plain text. The detail page
+// echoes URLs from the Google Data Commons Fact Check feed, which has
+// historically included XSS payloads in publisher fields; treating any
+// non-http(s) URL as opaque text is the cheapest defence.
+function isSafeHttpUrl(s: string): boolean {
+  try {
+    const u = new URL(s);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function renderHtml(postUri: string, postText: string | null, claims: Row[]): string {
   const claimsHtml = claims
     .map((c) => {
@@ -101,7 +115,11 @@ function renderHtml(postUri: string, postText: string | null, claims: Row[]): st
           ${e.rating_native ? `— <em>${escapeHtml(e.rating_native)}</em>` : ''}
           ${e.reviewed_at ? `<span class="date">(${escapeHtml(e.reviewed_at)})</span>` : ''}
           <br>
-          <a href="${escapeHtml(e.source_url)}" rel="noopener nofollow" target="_blank">${escapeHtml(e.source_url)}</a>
+          ${
+            isSafeHttpUrl(e.source_url)
+              ? `<a href="${escapeHtml(e.source_url)}" rel="noopener nofollow" target="_blank">${escapeHtml(e.source_url)}</a>`
+              : `<span class="unsafe-url" title="non-http(s) URL — rendered as text">${escapeHtml(e.source_url)}</span>`
+          }
           <div class="attribution">${escapeHtml(e.attribution)}</div>
         </li>`,
         )

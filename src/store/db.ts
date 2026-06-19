@@ -321,7 +321,15 @@ function ensureMentionReplyAcceptsNoTarget(db: DbLike): void {
   `);
 }
 
+// SQLite's PRAGMA does not bind identifiers, so `table` and `col` interpolate
+// directly. Callers in this file are all hard-coded literals — guard against a
+// future refactor accidentally piping user input here.
+const SAFE_IDENT = /^[a-z_][a-z0-9_]*$/i;
+
 function addColumnIfMissing(db: DbLike, table: string, col: string, type: string): void {
+  if (!SAFE_IDENT.test(table) || !SAFE_IDENT.test(col)) {
+    throw new Error(`refusing PRAGMA/ALTER on non-identifier '${table}.${col}'`);
+  }
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (cols.some((c) => c.name === col)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);

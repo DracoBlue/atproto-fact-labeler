@@ -5,6 +5,7 @@ import { p256 } from '@noble/curves/nist.js';
 import * as ui8 from 'uint8arrays';
 
 import {
+  _resetReplayCacheForTests,
   encodePublicKeyMultibase,
   verifyAtprotoServiceJwt,
 } from '../src/util/atproto-jwt.ts';
@@ -206,6 +207,118 @@ describe('verifyAtprotoServiceJwt — rejections', () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('could not resolve');
+  });
+
+  it('rejects did:web by default (SSRF surface)', async () => {
+    const sk = k256.utils.randomSecretKey();
+    const signed = makeJwt({
+      iss: 'did:web:example.com',
+      aud: AUD,
+      lxm: LXM,
+      exp: Math.floor(Date.now() / 1000) + 60,
+      alg: 'ES256K',
+      privateKey: sk,
+    });
+    // The verifier must short-circuit on the issuer scheme — fetchImpl should
+    // never be called.
+    let fetched = false;
+    const result = await verifyAtprotoServiceJwt(signed.jwt, {
+      expectedAud: AUD,
+      expectedLxm: LXM,
+      fetchImpl: (async () => {
+        fetched = true;
+        return new Response('{}', { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    expect(result.ok).toBe(false);
+    expect(fetched).toBe(false);
+  });
+
+  it('refuses did:web that resolves to a private host even when opted in', async () => {
+    const sk = k256.utils.randomSecretKey();
+    const signed = makeJwt({
+      iss: 'did:web:169.254.169.254',
+      aud: AUD,
+      lxm: LXM,
+      exp: Math.floor(Date.now() / 1000) + 60,
+      alg: 'ES256K',
+      privateKey: sk,
+    });
+    let fetched = false;
+    const result = await verifyAtprotoServiceJwt(signed.jwt, {
+      expectedAud: AUD,
+      expectedLxm: LXM,
+      allowDidWeb: true,
+      fetchImpl: (async () => {
+        fetched = true;
+        return new Response('{}', { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    expect(result.ok).toBe(false);
+    expect(fetched).toBe(false);
+  });
+
+  it('rejects iat in the future', async () => {
+    const sk = k256.utils.randomSecretKey();
+    const signed = makeJwt({
+      iss: ISS,
+      aud: AUD,
+      lxm: LXM,
+      exp: Math.floor(Date.now() / 1000) + 600,
+      iat: Math.floor(Date.now() / 1000) + 300,
+      alg: 'ES256K',
+      privateKey: sk,
+    });
+    const result = await verifyAtprotoServiceJwt(signed.jwt, {
+      expectedAud: AUD,
+      expectedLxm: LXM,
+      fetchImpl: fakeFetchFor(ISS, signed.pubkeyMultibase),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/iat/i);
+  });
+
+  it('refuses replay (same jti twice)', async () => {
+    _resetReplayCacheForTests();
+    const sk = k256.utils.randomSecretKey();
+    const payloadCommon = {
+      iss: ISS,
+      aud: AUD,
+      lxm: LXM,
+      exp: Math.floor(Date.now() / 1000) + 60,
+      alg: 'ES256K' as const,
+      privateKey: sk,
+    };
+    const headerB64 = ui8.toString(ui8.fromString('{"typ":"JWT","alg":"ES256K"}', 'utf8'), 'base64url');
+    const payloadObj = { ...payloadCommon, jti: 'unique-1' };
+    const payloadB64 = ui8.toString(
+      ui8.fromString(
+        JSON.stringify({ iss: ISS, aud: AUD, lxm: LXM, exp: payloadObj.exp, jti: 'unique-1' }),
+        'utf8',
+      ),
+      'base64url',
+    );
+    const signedInput = ui8.fromString(`${headerB64}.${payloadB64}`, 'utf8');
+    const sig = k256.sign(signedInput, sk);
+    const sigB64 = ui8.toString(sig, 'base64url');
+    const pubkey = k256.getPublicKey(sk);
+    const pubkeyMultibase = encodePublicKeyMultibase('ES256K', pubkey);
+    const jwt = `${headerB64}.${payloadB64}.${sigB64}`;
+
+    const r1 = await verifyAtprotoServiceJwt(jwt, {
+      expectedAud: AUD,
+      expectedLxm: LXM,
+      fetchImpl: fakeFetchFor(ISS, pubkeyMultibase),
+    });
+    expect(r1.ok).toBe(true);
+
+    const r2 = await verifyAtprotoServiceJwt(jwt, {
+      expectedAud: AUD,
+      expectedLxm: LXM,
+      fetchImpl: fakeFetchFor(ISS, pubkeyMultibase),
+    });
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.error).toMatch(/replay/i);
   });
 
   it('rejects an unsupported alg', async () => {

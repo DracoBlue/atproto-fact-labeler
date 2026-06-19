@@ -87,9 +87,14 @@ export function registerReportRoutes(
           plcUrl: opts.plcUrl,
         });
         if (!result.ok) {
-          logger.warn(
+          // Top-line at warn (so we notice rejections) without the reporter's
+          // DID. The full debug envelope (incl. iss) is logged at debug so
+          // operators can opt into it without leaking reporter identity on
+          // every invalid call.
+          logger.warn({ reason: result.error }, 'report JWT rejected');
+          logger.debug(
             { reason: result.error, jwt: result.details, expectedAud: opts.labelerDid, expectedLxm: LXM },
-            'report JWT rejected',
+            'report JWT rejected (details)',
           );
           reply.code(401);
           return { error: 'BadJwt', message: result.error };

@@ -8,7 +8,7 @@
  * - Exposes `emitLabel(...)` for the orchestrator to call on accepted proposals.
  */
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 
@@ -40,6 +40,8 @@ function ensureSigningKey(): string {
   const fresh = generateSigningKeyHex();
   // Try to persist back to .env so the user can keep the key.
   try {
+    // mode 0o600 — the .env carries the secp256k1 signing secret. Without
+    // explicit mode it lands at 0644 on Linux and any local user can read it.
     if (existsSync(ENV_FILE)) {
       const current = readFileSync(ENV_FILE, 'utf8');
       if (current.includes('LABELER_SIGNING_KEY=')) {
@@ -47,12 +49,19 @@ function ensureSigningKey(): string {
           /LABELER_SIGNING_KEY=.*$/m,
           `LABELER_SIGNING_KEY=${fresh}`,
         );
-        writeFileSync(ENV_FILE, updated);
+        writeFileSync(ENV_FILE, updated, { mode: 0o600 });
       } else {
-        appendFileSync(ENV_FILE, `\nLABELER_SIGNING_KEY=${fresh}\n`);
+        appendFileSync(ENV_FILE, `\nLABELER_SIGNING_KEY=${fresh}\n`, { mode: 0o600 });
       }
     } else {
-      writeFileSync(ENV_FILE, `LABELER_SIGNING_KEY=${fresh}\n`);
+      writeFileSync(ENV_FILE, `LABELER_SIGNING_KEY=${fresh}\n`, { mode: 0o600 });
+    }
+    // appendFileSync's mode only applies when creating the file. Tighten the
+    // perms on the existing file as well, so prior 0644 setups get fixed.
+    try {
+      chmodSync(ENV_FILE, 0o600);
+    } catch {
+      // chmod is a no-op on Windows / unsupported FS — best-effort only.
     }
     logger.warn(
       'generated a new secp256k1 signing key and wrote it to .env — keep this safe',
@@ -86,8 +95,11 @@ export function createLabelerServer(): FactLabelerServer {
     did: cfg.LABELER_DID,
     signingKey,
     dbPath,
-    // Auth: allow anyone in dev mode; in production this should be restricted.
-    auth: () => true,
+    // The skyware library parses the Bearer JWT into `did` for us. Only the
+    // labeler's own DID is allowed to call `tools.ozone.moderation.emitEvent`
+    // — otherwise any party with a valid Bluesky JWT could force a signed
+    // label-emit using our key.
+    auth: (did) => did === cfg.LABELER_DID,
   });
 
   return {
