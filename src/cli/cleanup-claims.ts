@@ -64,12 +64,23 @@ async function main(): Promise<void> {
 
   if (dryRun || toDelete.length === 0) return;
 
-  const stmt = db.prepare('DELETE FROM claim_review WHERE id = ?');
+  // evidence.claim_review_id references claim_review(id) without ON DELETE.
+  // Past verdicts may have cited a row we're about to drop — keep the
+  // evidence record as audit trail but NULL the link before the delete,
+  // otherwise the FK constraint fires.
+  const unlink = db.prepare('UPDATE evidence SET claim_review_id = NULL WHERE claim_review_id = ?');
+  const del = db.prepare('DELETE FROM claim_review WHERE id = ?');
   const tx = db.transaction((rows: Row[]) => {
-    for (const r of rows) stmt.run(r.id);
+    let unlinkedTotal = 0;
+    for (const r of rows) {
+      const res = unlink.run(r.id);
+      unlinkedTotal += Number(res.changes ?? 0);
+      del.run(r.id);
+    }
+    return unlinkedTotal;
   });
-  tx(toDelete);
-  logger.info({ deleted: toDelete.length }, 'cleanup complete');
+  const unlinked = tx(toDelete);
+  logger.info({ deleted: toDelete.length, evidenceUnlinked: unlinked }, 'cleanup complete');
 }
 
 main().catch((err: unknown) => {
