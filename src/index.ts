@@ -19,6 +19,7 @@ import { evaluateTrigger, type TriggerConfig, type TriggerHit } from './ingest/t
 import { resolveWatchlistToDids } from './config/resolve-watchlist.ts';
 import type { IngestedPost } from './ingest/types.ts';
 import { AutoHitl } from './hitl/auto.ts';
+import { AutoTelegramHitl } from './hitl/auto-telegram.ts';
 import { StdinHitl } from './hitl/stdin.ts';
 import { TelegramHitl } from './hitl/telegram.ts';
 import type { HitlSurface } from './hitl/types.ts';
@@ -417,15 +418,18 @@ async function main(): Promise<void> {
     });
   };
 
+  const autoPolicy = {
+    minConfidence: cfg.HITL_AUTO_MIN_CONFIDENCE,
+    minVotes: cfg.HITL_AUTO_MIN_VOTES,
+  };
   const surface: HitlSurface =
     cfg.HITL_MODE === 'telegram'
       ? new TelegramHitl(onDecision)
       : cfg.HITL_MODE === 'auto'
-        ? new AutoHitl(onDecision, {
-            minConfidence: cfg.HITL_AUTO_MIN_CONFIDENCE,
-            minVotes: cfg.HITL_AUTO_MIN_VOTES,
-          })
-        : new StdinHitl(onDecision);
+        ? new AutoHitl(onDecision, autoPolicy)
+        : cfg.HITL_MODE === 'auto-telegram'
+          ? new AutoTelegramHitl(onDecision, autoPolicy)
+          : new StdinHitl(onDecision);
 
   await surface.start?.(abort.signal);
 

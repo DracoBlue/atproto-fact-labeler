@@ -139,7 +139,7 @@ const Schema = z.object({
   LABELER_REPLY_DEFAULT_LANG: z.enum(['en', 'de']).default('en'),
 
   // HITL
-  HITL_MODE: z.enum(['stdin', 'telegram', 'auto']).default('stdin'),
+  HITL_MODE: z.enum(['stdin', 'telegram', 'auto', 'auto-telegram']).default('stdin'),
   TG_BOT_TOKEN: z.string().optional(),
   TG_REVIEWER_CHAT_ID: z.string().optional(),
   // Auto-HITL policy. After cleanup:claims pruned the spam publishers the
