@@ -33,7 +33,8 @@ Identity
   service DID         ${cfg.LABELER_DID}${placeholderDid ? '   ⚠ placeholder — not yet registered' : ''}
   signing key         ${signingKeyPresent ? 'present (' + cfg.LABELER_SIGNING_KEY.slice(0, 8) + '…)' : '⚠ missing — will be generated on next start'}
   label DB            ${labelDbExists ? labelDbPath : '⚠ not yet created (' + labelDbPath + ')'}
-  public endpoint     ${cfg.LABELER_HOSTNAME}:${cfg.LABELER_PORT}
+  public endpoint     ${cfg.LABELER_HOSTNAME}
+  internal listen     port ${cfg.LABELER_PORT}
 
 Wire counts
   total emissions     ${fmt(stats.emittedTotal)}
