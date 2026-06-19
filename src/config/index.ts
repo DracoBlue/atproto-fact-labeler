@@ -148,6 +148,9 @@ const Schema = z.object({
 
   // ClaimReview source
   CLAIMREVIEW_FEED_PATH: z.string().default('data.json'),
+  CLAIMREVIEW_PUBLISHER_ALLOWLIST: z
+    .string()
+    .default('config/claimreview-publishers-allowlist.txt'),
 
   // Log level
   LOG_LEVEL: z.string().default('info'),

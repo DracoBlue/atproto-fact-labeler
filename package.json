@@ -25,6 +25,7 @@
     "feedback:list": "tsx src/cli/feedback-list.ts",
     "cli:label": "tsx src/cli/label-post.ts",
     "cli:embed-rebuild": "tsx src/cli/embed-rebuild.ts",
+    "cleanup:claims": "tsx src/cli/cleanup-claims.ts",
     "test:matching": "tsx src/cli/test-matching.ts",
     "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see README §Going live)'"
   },

@@ -1,0 +1,175 @@
+# Allowed ClaimReview publishers.
+#
+# The Google Data Commons Fact Check feed mixes IFCN-tier fact-checkers with
+# blogspot/wordpress spam, SEO sites, gambling and at least one active XSS
+# injection attempt. We only ingest entries whose `author.url` hostname matches
+# a line in this file.
+#
+# Format:
+#   one host per line
+#   `*.example.com` matches example.com plus any subdomain
+#   `www.` is stripped before matching, so list the bare hostname
+#   blanks and `# ...` comments are ignored
+#
+# Add a new publisher here once you've verified they're a real fact-checker
+# (look for IFCN signatory, ClaimReview schema conformance, established
+# newsroom). When in doubt, leave them out — false negatives are recoverable,
+# poisoned evidence is not.
+
+# === Global / multi-region IFCN signatories ===
+politifact.com
+factcheck.org
+snopes.com
+fullfact.org
+africacheck.org
+chequeado.com
+aosfatos.org
+maldita.es
+newtral.es
+correctiv.org
+dpa-factchecking.com
+mimikama.org
+malumatfurus.org
+logicallyfacts.com
+logically.ai
+factstream.co
+
+# === Major newsroom fact-check desks ===
+*.dw.com
+dw.com
+br.de
+stern.de
+presseportal.de
+apa.at
+*.afp.com
+afp.com
+reuters.com
+channel4.com
+bbc.com
+bbc.co.uk
+washingtonpost.com
+nytimes.com
+usatoday.com
+buzzfeed.com
+thedispatch.com
+thejournal.ie
+abc.net.au
+*.vrt.be
+vrt.be
+knack.be
+rtbf.be
+*.radio-canada.ca
+radio-canada.ca
+verif.quebec
+sciencepresse.qc.ca
+lemonde.fr
+pa.media
+aap.com.au
+poynter.org
+rumorguard.org
+
+# === India ===
+factly.in
+*.youturn.in
+youturn.in
+*.factcrescendo.com
+factcrescendo.com
+*.thequint.com
+thequint.com
+vishvasnews.com
+boomlive.in
+altnews.in
+thip.media
+firstcheck.in
+*.medicaldialogues.in
+medicaldialogues.in
+newsmeter.in
+newschecker.in
+sochfactcheck.com
+amarujala.com
+manoramaonline.com
+mathrubhumi.com
+theprint.in
+esakal.com
+
+# === East / Southeast Asia ===
+*.factcheckcenter.jp
+factcheckcenter.jp
+cekfakta.tempo.co
+mygopen.com
+tfc-taiwan.org.tw
+rumorscanner.com
+*.jtbc.joins.com
+news.jtbc.joins.com
+*.espos.id
+espos.id
+timesindonesia.co.id
+
+# === MENA / Arabic ===
+arij.net
+akhbarmeter.org
+maharat-news.com
+verify-sy.com
+fareq.net
+almushahid.net
+tahaqaq.ps
+annir.ly
+falso.ly
+ilamsat.net
+
+# === Africa ===
+pesacheck.org
+dubawa.org
+
+# === Latin America / Iberia ===
+fastcheck.cl
+boatos.org
+lupa.uol.com.br
+*.folha.uol.com.br
+folha.uol.com.br
+projetocomprova.com.br
+sbtnews.sbt.com.br
+sbtnews.com.br
+metropoles.com
+univision.com
+telemundo.com
+pagellapolitica.it
+ladiaria.com.uy
+
+# === Eastern Europe / Balkans ===
+demagog.org.pl
+demagog.cz
+pravda.org.pl
+factcheck.bg
+
+# === Israel ===
+*.globes.co.il
+globes.co.il
+
+# === Iran ===
+factnameh.com
+
+# === Turkey ===
+dogrula.org
+
+# === Other Europe ===
+gezondheidenwetenschap.be
+factcheck.vlaanderen
+factcheckni.org
+du-check.eu
+factandfurious.com
+
+# === Mongolia ===
+mfcc.mn
+
+# === Belarus ===
+investigatebel.org
+
+# === Philippines ===
+factrakers.org
+verafiles.org
+tsek.ph
+
+# === Hong Kong ===
+factchecklab.org
+

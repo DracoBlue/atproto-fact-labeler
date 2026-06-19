@@ -12,9 +12,11 @@ import { createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
+import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
 import type { DbLike } from '../store/runtime-sqlite.ts';
 import { logger } from '../util/logger.ts';
+import { PublisherAllowlist } from './publisher-allowlist.ts';
 
 // stream-chain / stream-json are CommonJS without an "exports" field, so we
 // reach into them via createRequire to keep Node-ESM happy.
@@ -90,6 +92,7 @@ interface IngestStats {
   read: number;
   inserted: number;
   skipped: number;
+  skippedByAllowlist: number;
 }
 
 type RowTuple = readonly [
@@ -131,12 +134,24 @@ function buildRow(entry: ClaimReview): RowTuple | null {
 /** Returns ingest stats. */
 export async function ingestClaimReviewFeed(feedPath: string, db?: DbLike): Promise<IngestStats> {
   const target = db ?? getDb();
-  const stats: IngestStats = { read: 0, inserted: 0, skipped: 0 };
+  const stats: IngestStats = { read: 0, inserted: 0, skipped: 0, skippedByAllowlist: 0 };
   const insert = target.prepare(INSERT_SQL);
+
+  const cfg = getConfig();
+  const allowlist = PublisherAllowlist.fromFileOrEmpty(resolve(cfg.CLAIMREVIEW_PUBLISHER_ALLOWLIST));
+  if (allowlist.size === 0) {
+    logger.warn(
+      { allowlistPath: cfg.CLAIMREVIEW_PUBLISHER_ALLOWLIST },
+      'publisher allowlist missing or empty — ingesting every entry (NOT recommended)',
+    );
+  }
 
   // Path resolution: relative to cwd.
   const fullPath = resolve(feedPath);
-  logger.info({ feedPath: fullPath }, 'starting ClaimReview feed ingest');
+  logger.info(
+    { feedPath: fullPath, allowlistSize: allowlist.size },
+    'starting ClaimReview feed ingest',
+  );
 
   // Transactional batches for speed.
   const BATCH = 500;
@@ -164,6 +179,10 @@ export async function ingestClaimReviewFeed(feedPath: string, db?: DbLike): Prom
         const row = buildRow(entry);
         if (!row) {
           stats.skipped++;
+          continue;
+        }
+        if (allowlist.size > 0 && !allowlist.isAllowedUrl(entry.author?.url)) {
+          stats.skippedByAllowlist++;
           continue;
         }
         batch.push(row);
