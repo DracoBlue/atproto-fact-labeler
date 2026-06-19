@@ -195,12 +195,11 @@ export async function rerankCandidates(
   });
   const userContent = lines.join('\n');
 
-  // Cap rerank tokens lower than extraction/NLI: the response is a tiny
-  // JSON array of scores, but reasoning models (qwen3, deepseek-r1) will
-  // otherwise burn the full OPENAI_MAX_TOKENS budget on internal thinking
-  // before emitting the answer — once observed at 39 773 chars / 272 s for
-  // a single rerank call.
-  const rerankMaxTokens = Math.min(cfg.OPENAI_MAX_TOKENS || 1024, 1024);
+  // Reasoning models (qwen3, deepseek-r1, gemini-flash) spend a chunk of
+  // the budget on hidden chain-of-thought before emitting the actual JSON
+  // scores. Use the same cap as the other pipeline stages — bumping
+  // OPENAI_MAX_TOKENS is how operators give reasoning models more room.
+  const rerankMaxTokens = cfg.OPENAI_MAX_TOKENS || 4096;
 
   const completion = await client().chat.completions.create({
     model: cfg.OPENAI_MODEL,
@@ -224,7 +223,12 @@ export async function rerankCandidates(
   const scores = parseResponse(raw, candidates.length);
   if (!scores) {
     logger.warn(
-      { candidatesCount: candidates.length, rawLen: raw.length },
+      {
+        candidatesCount: candidates.length,
+        rawLen: raw.length,
+        rawHead: raw.slice(0, 500),
+        finishReason: choice?.finish_reason,
+      },
       'rerank: parse failed, falling back to cosine ordering',
     );
     return {
