@@ -143,6 +143,15 @@ pnpm cli:lang-rebuild
 
 Idempotent — re-running on a freshly-ingested DB is a no-op.
 
+**No `embed-rebuild` needed afterwards.** `lang-rebuild` only writes
+to the `claim_review.lang` column. The `embedding`, `embedding_dim`,
+and `embedding_model` columns are untouched, so Stage 1 retrieval
+keeps using the same vectors it already had — only the same-language
+filter that runs alongside the cosine match now has correct data to
+filter against. Embeddings need to be recomputed only when the
+`EMBEDDING_MODEL` itself changes (see
+[`DEPLOY.md` § Periodic re-ingest](DEPLOY.md#7-periodic-re-ingest)).
+
 After the rebuild, the same-language filter in
 `src/pipeline/retrieve.ts` becomes meaningful. The retrieve query then
 narrows by `claim_review.lang = ? OR lang IS NULL`; rows where eld

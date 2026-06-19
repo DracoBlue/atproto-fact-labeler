@@ -413,9 +413,10 @@ pnpm cli:lang-rebuild               # rewrite every row (default)
 ```
 
 Idempotent. New ingests already use the detector — `lang-rebuild` is
-only needed once per pre-existing index. Full rationale, library
-comparison, and operator workflow:
-[docs/LANGUAGE_DETECTION.md](./docs/LANGUAGE_DETECTION.md).
+only needed once per pre-existing index. **Does not require
+`embed-rebuild` afterwards** — only the `lang` column is touched, the
+embeddings stay valid. Full rationale, library comparison, and
+operator workflow: [docs/LANGUAGE_DETECTION.md](./docs/LANGUAGE_DETECTION.md).
 
 ### One-shot labeling — `cli:label`
 

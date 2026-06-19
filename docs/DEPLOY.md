@@ -303,10 +303,11 @@ docker compose run --rm fact-labeler pnpm cli:embed-rebuild
 ```
 
 For an index originally built before the `eld`-based language detector
-landed, slot a one-shot `pnpm cli:lang-rebuild` between `ingest` and
-`embed-rebuild` so the same-language SQL filter in Stage 1 retrieval
-has correct `lang` values to filter against. Idempotent — re-running on
-a freshly-ingested DB is a no-op. See
+landed, run a one-shot `pnpm cli:lang-rebuild` so the same-language SQL
+filter in Stage 1 retrieval has correct `lang` values to filter
+against. **Independent of `embed-rebuild`** — only the `lang` column is
+touched, embeddings are not re-computed. Idempotent — re-running on a
+freshly-ingested DB is a no-op. See
 [`LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md).
 
 If you edited `config/claimreview-publishers-allowlist.txt` since the
