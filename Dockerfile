@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
 RUN apk add --no-cache python3 make g++
@@ -10,7 +10,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
-FROM node:24-alpine
+FROM node:26-alpine
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
     NODE_ENV=production \
