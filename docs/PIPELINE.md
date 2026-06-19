@@ -48,7 +48,7 @@ flips the publisher's `false` verdict to `true`.
 
 The previous `src/pipeline/lookup.ts` (deleted) did a single SQLite FTS5
 `OR`-query over the ClaimReview table and aggregated the top-5 publisher
-native ratings. Two posts from `@jan.dracoblue.com` walked it into the
+native ratings. Two real test posts on Bluesky walked it into the
 classic failure modes:
 
 | Post | Truth | Labeler verdict | What actually happened |

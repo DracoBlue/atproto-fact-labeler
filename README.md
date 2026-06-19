@@ -101,6 +101,12 @@ pnpm install
 cp .env.example .env
 # Edit .env — at minimum set OPENAI_API_KEY
 
+# Download the Google Data Commons Fact Check feed (~60 MB).
+# `data.json` is gitignored — every install fetches its own copy.
+curl -L \
+  https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json \
+  -o data.json
+
 # Build the local fact-check index
 pnpm run ingest                    # uses CLAIMREVIEW_FEED_PATH from .env
 # or: pnpm run ingest path/to/data.json

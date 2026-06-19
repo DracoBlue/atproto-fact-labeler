@@ -8,8 +8,8 @@ loadEnv();
 const Schema = z.object({
   // LLM
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY must be set (API key for the OpenAI-compatible endpoint)'),
-  OPENAI_BASE_URL: z.string().url().default('http://127.0.0.1:1234/v1'),
-  OPENAI_MODEL: z.string().default('google/gemma-4-e2b'),
+  OPENAI_BASE_URL: z.string().url().default('https://ai-gateway.vercel.sh/v1'),
+  OPENAI_MODEL: z.string().default('google/gemini-2.5-flash'),
   /**
    * max_tokens sent on each chat-completions request. Reasoning models
    * (qwen3 family, deepseek-r1, etc.) burn tokens on internal "thinking" before
@@ -29,7 +29,7 @@ const Schema = z.object({
    * LM Studio, 768 dims, genuine multilingual (EN↔DE crosslingual cosine 0.81
    * measured on our test set). See docs/PIPELINE.md.
    */
-  EMBEDDING_MODEL: z.string().default('text-embedding-granite-embedding-278m-multilingual'),
+  EMBEDDING_MODEL: z.string().default('openai/text-embedding-3-small'),
 
   // --- Reranker (Stage 2: relevance gate before NLI) --------------------
   // `llm`: single batched LLM call rates each top-K retrieved candidate
