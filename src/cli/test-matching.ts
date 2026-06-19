@@ -29,6 +29,8 @@ interface TestCase {
   min_confidence?: number;
   category: string;
   notes?: string;
+  /** BCP-47 lang of the claim. Defaults to 'en' since the fixture is English. */
+  lang?: string;
 }
 
 interface CaseResult {
@@ -114,7 +116,11 @@ async function main(): Promise<void> {
       process.stderr.write(`[${i + 1}/${cases.length}] ${c.claim}\n`);
     }
     const t0 = Date.now();
-    const match = await matchClaim(c.claim, { topK: args.topK, minCosine: args.minCosine });
+    const match = await matchClaim(c.claim, {
+      topK: args.topK,
+      minCosine: args.minCosine,
+      lang: c.lang ?? 'en',
+    });
     const elapsedMs = Date.now() - t0;
     const evalResult = evaluate(c, match);
     const actualVerdict = match.aggregated?.verdict ?? 'uncovered';

@@ -17,6 +17,7 @@
 import { getConfig } from '../config/index.ts';
 import { logger } from '../util/logger.ts';
 import { retrieveCandidates, type RetrieveCandidate } from './retrieve.ts';
+import { detectLang } from '../ingest/detect-lang.ts';
 import { rerankCandidates } from './rerank.ts';
 import { judgeNli, type NliLabel } from './entail.ts';
 import {
@@ -89,9 +90,18 @@ export async function matchClaim(
   db?: DbLike,
 ): Promise<MatchingResult> {
   const cfg = getConfig();
+  // Union the declared lang (from the post / fact-check ingester) with the
+  // detected lang of the claim text itself. Users mis-tag posts (English
+  // body marked `de`, or no `langs` at all). Trying both is cheap — same
+  // SQL prepared statement, just more values in the IN clause — and lets
+  // us reach a wider candidate pool without dropping the same-language
+  // safety on the well-tagged majority.
+  const declared = options.lang ?? null;
+  const detected = detectLang(claim);
+  const langs = [...new Set([declared, detected].filter(Boolean) as string[])];
   const retrieve = await retrieveCandidates(
     claim,
-    { topK: options.topK ?? 10, minCosine: options.minCosine, lang: options.lang },
+    { topK: options.topK ?? 10, minCosine: options.minCosine, lang: langs },
     db,
   );
 

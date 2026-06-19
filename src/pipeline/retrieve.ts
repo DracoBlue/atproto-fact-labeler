@@ -35,12 +35,13 @@ export interface RetrieveOptions {
   /** Drop candidates below this cosine. Defaults to 0.55 — see file header. */
   minCosine?: number;
   /**
-   * BCP-47 lang of the claim. When set, retrieval restricts to ClaimReview
-   * rows in the same language plus rows without a language tag (treated as
-   * universal). Cross-lingual NLI is brittle, so single-language matching
-   * is the safer default.
+   * Accepted BCP-47 lang(s) of the claim. When set, retrieval restricts to
+   * ClaimReview rows in one of these languages, plus rows without a
+   * language tag. Pass multiple when the post's declared lang and the
+   * detected lang disagree (users mis-tag) — both are tried.
+   * Empty array / undefined = no filter.
    */
-  lang?: string;
+  lang?: string | string[];
 }
 
 export interface RetrieveResult {
@@ -58,15 +59,18 @@ const SELECT_INDEXED = `
     AND embedding_model = ?
 `;
 
-const SELECT_INDEXED_LANG = `
-  SELECT id, source_url, publisher, publisher_url, claim_reviewed,
-         rating_native, review_date, lang, attribution,
-         embedding, embedding_dim
-  FROM claim_review
-  WHERE embedding IS NOT NULL
-    AND embedding_model = ?
-    AND (lang = ? OR lang IS NULL)
-`;
+function selectIndexedLang(numLangs: number): string {
+  const placeholders = Array(numLangs).fill('?').join(', ');
+  return `
+    SELECT id, source_url, publisher, publisher_url, claim_reviewed,
+           rating_native, review_date, lang, attribution,
+           embedding, embedding_dim
+      FROM claim_review
+     WHERE embedding IS NOT NULL
+       AND embedding_model = ?
+       AND (lang IN (${placeholders}) OR lang IS NULL)
+  `;
+}
 
 export async function retrieveCandidates(
   claim: string,
@@ -85,10 +89,11 @@ export async function retrieveCandidates(
   // Embed the query
   const { vector: qvec, dim: qdim } = await embedOne(claim);
 
-  // Scan all rows for the current model, optionally same-language only.
-  const lang = options.lang?.toLowerCase().slice(0, 2);
-  const rows = (lang
-    ? target.prepare(SELECT_INDEXED_LANG).all(cfg.EMBEDDING_MODEL, lang)
+  // Scan all rows for the current model, optionally restricted to one or
+  // more accepted languages plus the universal lang IS NULL bucket.
+  const langs = normaliseLangs(options.lang);
+  const rows = (langs.length > 0
+    ? target.prepare(selectIndexedLang(langs.length)).all(cfg.EMBEDDING_MODEL, ...langs)
     : target.prepare(SELECT_INDEXED).all(cfg.EMBEDDING_MODEL)) as Array<{
     id: number;
     source_url: string;
@@ -103,11 +108,11 @@ export async function retrieveCandidates(
     embedding_dim: number;
   }>;
 
-  logger.debug({ langFilter: lang ?? '<none>', scanned: rows.length }, 'retrieve: scan');
+  logger.debug({ langs, scanned: rows.length }, 'retrieve: scan');
 
   if (!rows.length) {
     logger.warn(
-      { model: cfg.EMBEDDING_MODEL, langFilter: lang ?? '<none>' },
+      { model: cfg.EMBEDDING_MODEL, langs },
       'retrieve: no rows match — run pnpm cli:embed-rebuild, or the lang filter is too strict',
     );
     return { candidates: [], scanned: 0 };
@@ -135,4 +140,17 @@ export async function retrieveCandidates(
 
   scored.sort((a, b) => b.cosine - a.cosine);
   return { candidates: scored.slice(0, topK), scanned: rows.length };
+}
+
+/** Normalise the lang option: lowercase, 2-letter, dedup, drop empties. */
+function normaliseLangs(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  const arr = Array.isArray(value) ? value : [value];
+  const out = new Set<string>();
+  for (const v of arr) {
+    if (!v) continue;
+    const norm = v.toLowerCase().slice(0, 2);
+    if (norm.length === 2) out.add(norm);
+  }
+  return [...out];
 }

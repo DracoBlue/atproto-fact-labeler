@@ -90,6 +90,33 @@ against every other library on the cases they all answered.
 [`experiment/language/report.md`](../experiment/language/report.md) has
 the row-by-row data; `experiment/language/compare.ts` is the script.
 
+## Mis-tagged posts — declared ∪ detected
+
+Bluesky posts carry an optional `langs` facet that the user (or their
+client) sets. In practice this is unreliable:
+
+- Many clients leave the system locale (often `en`) regardless of body.
+- Power-users sometimes set `langs` deliberately to a different
+  language for visibility / niche-feed reasons.
+- Composer drafts in one language can be sent without an updated tag.
+
+If retrieval honoured only the *declared* lang, a German post tagged
+`en` would search the English fact-check pool and miss the actual
+German verdicts (and vice versa). So `src/pipeline/matching.ts`
+**unions** the declared lang with `detectLang(claim_text)` and passes
+both to the SQL filter:
+
+```ts
+const langs = [...new Set([declared, detectLang(claim)].filter(Boolean))];
+// SQL: AND (lang IN (?, ?) OR lang IS NULL)
+```
+
+When they agree it's a no-op (one effective lang). When they disagree
+the candidate pool grows by one language — still narrow enough to keep
+cross-lingual NLI errors at bay, wide enough that mis-tagged posts
+still find their real verdicts. NULL-tagged rows stay reachable from
+every claim so a single under-confidence detection never blocks them.
+
 ## Operator workflow
 
 ### New ingest — automatic
