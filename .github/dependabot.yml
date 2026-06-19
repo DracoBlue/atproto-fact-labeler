@@ -9,6 +9,13 @@ updates:
       timezone: Europe/Berlin
     open-pull-requests-limit: 5
     versioning-strategy: increase
+    ignore:
+      # @types/node tracks the Node runtime major. Block major bumps so
+      # Dependabot doesn't pull us onto a Node version we aren't actually
+      # running (e.g. 26 while the Dockerfile is still on 24). When the
+      # Dockerfile moves to the next LTS, bump this manually in the same PR.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # Bundle all non-major upgrades into one weekly PR per group to keep
       # the queue manageable. Majors still land as individual PRs so they
