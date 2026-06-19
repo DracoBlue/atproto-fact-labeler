@@ -87,7 +87,10 @@ export function registerReportRoutes(
           plcUrl: opts.plcUrl,
         });
         if (!result.ok) {
-          logger.warn({ reason: result.error }, 'report JWT rejected');
+          logger.warn(
+            { reason: result.error, jwt: result.details, expectedAud: opts.labelerDid, expectedLxm: LXM },
+            'report JWT rejected',
+          );
           reply.code(401);
           return { error: 'BadJwt', message: result.error };
         }

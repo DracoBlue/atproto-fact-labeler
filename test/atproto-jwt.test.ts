@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { secp256k1 as k256 } from '@noble/curves/secp256k1.js';
 import { p256 } from '@noble/curves/nist.js';
-import { sha256 } from '@noble/hashes/sha2.js';
 import * as ui8 from 'uint8arrays';
 
 import {
@@ -40,11 +39,12 @@ function makeJwt({
   const headerB64 = ui8.toString(ui8.fromString(JSON.stringify(header), 'utf8'), 'base64url');
   const payloadB64 = ui8.toString(ui8.fromString(JSON.stringify(payload), 'utf8'), 'base64url');
   const signingInput = ui8.fromString(`${headerB64}.${payloadB64}`, 'utf8');
-  const hash = sha256(signingInput);
 
   const curve = alg === 'ES256K' ? k256 : p256;
+  // noble/curves 2.x defaults to prehash:true, i.e. it does sha256 internally —
+  // pass the raw signing input. Matches what real PDSes produce for JWS ES256K.
   // noble/curves 2.x: sign() returns a 64-byte Uint8Array (raw r||s) directly.
-  const sig = curve.sign(hash, privateKey) as Uint8Array;
+  const sig = curve.sign(signingInput, privateKey) as Uint8Array;
   const sigB64 = ui8.toString(sig, 'base64url');
 
   const pubkey = curve.getPublicKey(privateKey);

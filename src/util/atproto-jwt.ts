@@ -20,7 +20,6 @@
  */
 import { secp256k1 as k256 } from '@noble/curves/secp256k1.js';
 import { p256 } from '@noble/curves/nist.js';
-import { sha256 } from '@noble/hashes/sha2.js';
 import * as ui8 from 'uint8arrays';
 
 const SECP256K1_MULTICODEC = new Uint8Array([0xe7, 0x01]);
@@ -45,9 +44,19 @@ export interface VerifyOptions {
   clockSkewSec?: number;
 }
 
+export interface VerifyDebug {
+  alg?: string;
+  iss?: string;
+  aud?: string;
+  lxm?: string;
+  expiresInSec?: number;
+  sigLen?: number;
+  keyAlg?: string;
+}
+
 export type VerifyResult =
   | { ok: true; iss: string; payload: AtprotoJwtPayload }
-  | { ok: false; error: string };
+  | { ok: false; error: string; details?: VerifyDebug };
 
 export async function verifyAtprotoServiceJwt(
   jwt: string,
@@ -70,41 +79,58 @@ export async function verifyAtprotoServiceJwt(
     return { ok: false, error: 'invalid JWT encoding' };
   }
 
+  const debug: VerifyDebug = {
+    alg: header.alg,
+    iss: payload.iss,
+    aud: payload.aud,
+    lxm: payload.lxm,
+  };
+
   if (header.alg !== 'ES256K' && header.alg !== 'ES256') {
-    return { ok: false, error: `unsupported alg: ${header.alg ?? 'missing'}` };
+    return { ok: false, error: `unsupported alg: ${header.alg ?? 'missing'}`, details: debug };
   }
   if (payload.aud !== opts.expectedAud) {
-    return { ok: false, error: `wrong audience: ${payload.aud}` };
+    return { ok: false, error: `wrong audience: ${payload.aud}`, details: debug };
   }
   if (payload.lxm !== opts.expectedLxm) {
-    return { ok: false, error: `wrong lxm: ${payload.lxm}` };
+    return { ok: false, error: `wrong lxm: ${payload.lxm}`, details: debug };
   }
   const now = Math.floor(Date.now() / 1000);
+  debug.expiresInSec = payload.exp - now;
   if (payload.exp + skew < now) {
-    return { ok: false, error: 'expired' };
+    return { ok: false, error: 'expired', details: debug };
   }
   if (typeof payload.iss !== 'string' || !payload.iss.startsWith('did:')) {
-    return { ok: false, error: 'invalid iss' };
+    return { ok: false, error: 'invalid iss', details: debug };
   }
 
   const key = await resolveSigningKey(payload.iss, plcUrl, fetchImpl);
   if (!key) {
-    return { ok: false, error: `could not resolve signing key for ${payload.iss}` };
+    return { ok: false, error: `could not resolve signing key for ${payload.iss}`, details: debug };
   }
+  debug.keyAlg = key.alg;
   if (key.alg !== header.alg) {
-    return { ok: false, error: `key/alg mismatch: key=${key.alg}, jwt=${header.alg}` };
+    return {
+      ok: false,
+      error: `key/alg mismatch: key=${key.alg}, jwt=${header.alg}`,
+      details: debug,
+    };
   }
 
   const signedBytes = ui8.fromString(`${headerB64}.${payloadB64}`, 'utf8');
-  const msgHash = sha256(signedBytes);
   const sig = ui8.fromString(sigB64, 'base64url');
+  debug.sigLen = sig.length;
   if (sig.length !== 64) {
-    return { ok: false, error: `unexpected signature length: ${sig.length}` };
+    return { ok: false, error: `unexpected signature length: ${sig.length}`, details: debug };
   }
   const curve = header.alg === 'ES256K' ? k256 : p256;
-  const valid = curve.verify(sig, msgHash, key.bytes);
+  // @noble/curves@2 default is prehash:true (hashes message internally), so we
+  // pass the raw signing input — otherwise we'd verify against sha256(sha256(msg))
+  // and every real PDS-signed JWT would look invalid. lowS:false because the
+  // atproto spec asks for low-S but not every PDS strictly enforces it.
+  const valid = curve.verify(sig, signedBytes, key.bytes, { lowS: false });
   if (!valid) {
-    return { ok: false, error: 'signature invalid' };
+    return { ok: false, error: 'signature invalid', details: debug };
   }
   return { ok: true, iss: payload.iss, payload };
 }
