@@ -229,6 +229,12 @@ hosts that prominently link to junk, regardless of whether the link is
 clickable or `rel="nofollow"`). Hiding the retired verdict is the
 safest default.
 
+The detail page additionally only shows verdicts whose `status =
+'accepted'` — anything still in `proposed` is in-flight pipeline state
+that may yet be rejected by HITL or superseded, and a public URL is
+the wrong place to surface it. Use `pnpm lifecycle:status` (or direct
+SQL on `verdict`) to inspect proposed state.
+
 The original verdict row is **not** deleted. `retired_at` is just a
 timestamp column; you can `SELECT * FROM verdict WHERE retired_at IS
 NOT NULL` to inspect the audit trail. Likewise the `label_emit` table

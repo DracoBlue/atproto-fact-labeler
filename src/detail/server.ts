@@ -36,6 +36,13 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
     .prepare('SELECT text FROM post_cache WHERE uri = ?')
     .get(postUri) as { text: string } | undefined;
 
+  // Public detail view only surfaces verdicts that actually went on-wire:
+  // status='accepted' AND retired_at IS NULL. Proposed verdicts are
+  // operator-internal (visible via `pnpm lifecycle:status` and SQL); they
+  // may still pass HITL or be rejected, and a public URL is not the place
+  // to show in-flight pipeline state. Retired verdicts are hidden because
+  // they were taken off the wire — exposing them again here would
+  // re-publish text we already chose to retract.
   const rows = db
     .prepare(
       `SELECT c.id              AS claim_id,
@@ -50,7 +57,7 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
          FROM claim c
          JOIN verdict v ON v.claim_id = c.id
         WHERE c.post_uri = ?
-          AND v.status IN ('proposed','accepted')
+          AND v.status = 'accepted'
           AND v.retired_at IS NULL
         ORDER BY v.id DESC`,
     )
