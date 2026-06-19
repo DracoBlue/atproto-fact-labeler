@@ -15,8 +15,14 @@ first, then LIFECYCLE.md Phase 1.
 
 To make the labels visible to real Bluesky users:
 
-1. Create a dedicated Bluesky **service account** at `bsky.app`. This is
-   distinct from your personal account.
+1. Create a dedicated Bluesky **service account** at `bsky.app` (or your
+   chosen PDS — Eurosky, a self-hosted PDS, etc.). This is distinct from
+   your personal account. Set `LABELER_BSKY_SERVICE` in `.env` to the
+   account's actual PDS URL (e.g. `https://bsky.social`,
+   `https://eurosky.social`). You can verify by resolving the account's
+   handle to a DID, then fetching the DID document from
+   `https://plc.directory/did:plc:...` and reading the
+   `service[type='AtprotoPersonalDataServer'].serviceEndpoint` field.
 2. Register the labeler endpoint + signing key in the account's DID
    document:
    ```bash
@@ -25,11 +31,110 @@ To make the labels visible to real Bluesky users:
    Skyware asks for the service-account credentials and a PLC token
    (mailed to the account's address) and either generates a signing key
    or uses the one in `.env`. Persist the signing key.
-3. Declare every label value in `app.bsky.labeler.service`:
+3. Declare every label value in `app.bsky.labeler.service`.
+   `@skyware/labeler` exposes this as `label edit` which expects the
+   full label-array on stdin (not one-at-a-time interactive prompts).
+   The labeler ships a canonical six-label JSON for our `fact-*`
+   vocabulary — paste it into the editor that opens:
    ```bash
-   pnpm dlx @skyware/labeler label add
-   # Repeat for each fact-* value: severity, blur, defaultSetting, locales
+   pnpm dlx @skyware/labeler label edit
+   # On the prompt, paste the array from labels.json (see below) and save.
    ```
+
+   <details>
+   <summary>labels.json (paste this array into `label edit`)</summary>
+
+   ```json
+   [
+     {
+       "identifier": "fact-supported",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "inform",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-supported", "description": "Independent fact-checkers have supported this claim." },
+         { "lang": "de", "name": "Faktencheck: bestätigt", "description": "Unabhängige Faktenchecker haben diese Aussage bestätigt." }
+       ]
+     },
+     {
+       "identifier": "fact-refuted",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "warn",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-refuted", "description": "Independent fact-checkers have refuted this claim." },
+         { "lang": "de", "name": "Faktencheck: widerlegt", "description": "Unabhängige Faktenchecker haben diese Aussage widerlegt." }
+       ]
+     },
+     {
+       "identifier": "fact-disputed",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "warn",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-disputed", "description": "Fact-checkers disagree about this claim." },
+         { "lang": "de", "name": "Faktencheck: umstritten", "description": "Faktenchecker sind sich uneinig über diese Aussage." }
+       ]
+     },
+     {
+       "identifier": "fact-mixed",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "warn",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-mixed", "description": "Independent fact-checkers found this claim partially true and partially false." },
+         { "lang": "de", "name": "Faktencheck: teils-teils", "description": "Unabhängige Faktenchecker fanden diese Aussage teils richtig, teils falsch." }
+       ]
+     },
+     {
+       "identifier": "fact-outdated",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "warn",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-outdated", "description": "This claim was accurate at the time it was reviewed but is no longer current." },
+         { "lang": "de", "name": "Faktencheck: veraltet", "description": "Diese Aussage war zum Prüfzeitpunkt korrekt, ist aber inzwischen veraltet." }
+       ]
+     },
+     {
+       "identifier": "fact-unknown",
+       "severity": "inform",
+       "blurs": "none",
+       "defaultSetting": "inform",
+       "adultOnly": false,
+       "locales": [
+         { "lang": "en", "name": "Fact-unknown", "description": "Fact-checkers could not establish whether this claim is true or false." },
+         { "lang": "de", "name": "Faktencheck: unbekannt", "description": "Faktenchecker konnten nicht feststellen, ob diese Aussage wahr oder falsch ist." }
+       ]
+     }
+   ]
+   ```
+
+   The same JSON is checked in at
+   [`config/labels.json`](../config/labels.json) for re-use during
+   upgrades.
+
+   </details>
+
+   Per-field meaning, condensed from
+   [atproto.com/specs/label](https://atproto.com/specs/label):
+
+   - `severity: inform` — informational label, not moderation. The
+     client may surface a small badge or footnote.
+   - `blurs: none` — never hide the post or media; we only annotate.
+   - `defaultSetting` — per label. `inform` for the positive /
+     uncertain cases (`fact-supported`, `fact-unknown`), `warn` for the
+     four that flag a problem (`fact-refuted`, `fact-disputed`,
+     `fact-mixed`, `fact-outdated`).
+   - `adultOnly: false` — not an adult-content label.
+   - `locales` — at minimum `en`. We also ship `de` because the
+     replier (mention-reply) already speaks both languages; add more
+     locales as the labeler picks up additional reply translations.
 4. Start the service:
    ```bash
    pnpm run start

@@ -1,0 +1,116 @@
+[
+  {
+    "identifier": "fact-supported",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "inform",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-supported",
+        "description": "Independent fact-checkers have supported this claim."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: bestätigt",
+        "description": "Unabhängige Faktenchecker haben diese Aussage bestätigt."
+      }
+    ]
+  },
+  {
+    "identifier": "fact-refuted",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "warn",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-refuted",
+        "description": "Independent fact-checkers have refuted this claim."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: widerlegt",
+        "description": "Unabhängige Faktenchecker haben diese Aussage widerlegt."
+      }
+    ]
+  },
+  {
+    "identifier": "fact-disputed",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "warn",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-disputed",
+        "description": "Fact-checkers disagree about this claim."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: umstritten",
+        "description": "Faktenchecker sind sich uneinig über diese Aussage."
+      }
+    ]
+  },
+  {
+    "identifier": "fact-mixed",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "warn",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-mixed",
+        "description": "Independent fact-checkers found this claim partially true and partially false."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: teils-teils",
+        "description": "Unabhängige Faktenchecker fanden diese Aussage teils richtig, teils falsch."
+      }
+    ]
+  },
+  {
+    "identifier": "fact-outdated",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "warn",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-outdated",
+        "description": "This claim was accurate at the time it was reviewed but is no longer current."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: veraltet",
+        "description": "Diese Aussage war zum Prüfzeitpunkt korrekt, ist aber inzwischen veraltet."
+      }
+    ]
+  },
+  {
+    "identifier": "fact-unknown",
+    "severity": "inform",
+    "blurs": "none",
+    "defaultSetting": "inform",
+    "adultOnly": false,
+    "locales": [
+      {
+        "lang": "en",
+        "name": "Fact-unknown",
+        "description": "Fact-checkers could not establish whether this claim is true or false."
+      },
+      {
+        "lang": "de",
+        "name": "Faktencheck: unbekannt",
+        "description": "Faktenchecker konnten nicht feststellen, ob diese Aussage wahr oder falsch ist."
+      }
+    ]
+  }
+]
