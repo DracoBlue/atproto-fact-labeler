@@ -142,6 +142,12 @@ const Schema = z.object({
   HITL_MODE: z.enum(['stdin', 'telegram', 'auto']).default('stdin'),
   TG_BOT_TOKEN: z.string().optional(),
   TG_REVIEWER_CHAT_ID: z.string().optional(),
+  // Auto-HITL policy. After cleanup:claims pruned the spam publishers the
+  // realistic confidence band on legitimate matches sits around 0.6–0.8;
+  // the previous default of 0.8 produced a lot of false negatives. Tune
+  // per-deployment via env.
+  HITL_AUTO_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
+  HITL_AUTO_MIN_VOTES: z.coerce.number().int().min(1).default(2),
 
   // Storage
   SQLITE_PATH: z.string().default('data/labeler.sqlite'),

@@ -421,7 +421,10 @@ async function main(): Promise<void> {
     cfg.HITL_MODE === 'telegram'
       ? new TelegramHitl(onDecision)
       : cfg.HITL_MODE === 'auto'
-        ? new AutoHitl(onDecision)
+        ? new AutoHitl(onDecision, {
+            minConfidence: cfg.HITL_AUTO_MIN_CONFIDENCE,
+            minVotes: cfg.HITL_AUTO_MIN_VOTES,
+          })
         : new StdinHitl(onDecision);
 
   await surface.start?.(abort.signal);
