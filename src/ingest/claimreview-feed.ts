@@ -10,7 +10,11 @@
  */
 import { createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
-import { createRequire } from 'node:module';
+
+import chain from 'stream-chain';
+import { parser as jsonParser } from 'stream-json';
+import { pick } from 'stream-json/filters/pick.js';
+import { streamArray } from 'stream-json/streamers/stream-array.js';
 
 import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
@@ -18,20 +22,6 @@ import type { DbLike } from '../store/runtime-sqlite.ts';
 import { logger } from '../util/logger.ts';
 import { detectLang } from './detect-lang.ts';
 import { PublisherAllowlist } from './publisher-allowlist.ts';
-
-// stream-chain / stream-json are CommonJS without an "exports" field, so we
-// reach into them via createRequire to keep Node-ESM happy.
-const require = createRequire(import.meta.url);
-const { chain } = require('stream-chain') as { chain: (parts: unknown[]) => NodeJS.ReadableStream };
-const { parser: jsonParser } = require('stream-json') as {
-  parser: () => NodeJS.ReadWriteStream;
-};
-const { pick } = require('stream-json/filters/Pick.js') as {
-  pick: (opts: { filter: string }) => NodeJS.ReadWriteStream;
-};
-const StreamArray = require('stream-json/streamers/StreamArray.js') as {
-  streamArray: () => NodeJS.ReadWriteStream;
-};
 
 /** schema.org ClaimReview as it appears in the Data Commons feed. */
 interface ClaimReview {
@@ -173,7 +163,7 @@ export async function ingestClaimReviewFeed(feedPath: string, db?: DbLike): Prom
     createReadStream(fullPath),
     jsonParser(),
     pick({ filter: 'dataFeedElement' }),
-    StreamArray.streamArray(),
+    streamArray(),
   ]) as unknown as NodeJS.ReadableStream;
 
   return new Promise<IngestStats>((resolveFn, reject) => {
