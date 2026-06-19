@@ -39,3 +39,12 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/Berlin
+    ignore:
+      # Dependabot has no notion of "LTS only". Block major bumps on Node so
+      # we don't get auto-PRs to the current-but-not-yet-LTS line (odd
+      # majors never go LTS; even majors only become LTS in October of
+      # their release year). When a new LTS lands we edit the Dockerfile
+      # by hand. Patch + minor updates of the pinned major still come
+      # through this rule.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
