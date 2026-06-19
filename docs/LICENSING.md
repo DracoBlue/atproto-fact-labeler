@@ -20,3 +20,11 @@
   redistributable.
 
 The labeler code itself is MIT — see [`LICENSE`](../LICENSE).
+
+## What we *don't* ingest, and why
+
+The Google Data Commons feed is open-submission and ships SEO spam,
+blogspot blogs and other junk alongside real fact-checkers. We filter
+at ingest with a curated publisher allowlist — an editorial decision,
+not a licensing one. See [`PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md)
+for the criteria, the trade-offs, and how to add a publisher.

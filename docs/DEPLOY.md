@@ -88,6 +88,14 @@ You'll want to refresh this periodically — a cron or weekly CI job
 that re-downloads, re-ingests, and re-embeds is the standard pattern.
 See § "Periodic re-ingest" below.
 
+**Editorial note:** the feed is open-submission and ships a lot of spam
+alongside real fact-checkers. The ingester only inserts rows whose
+publisher is on a curated allowlist
+(`config/claimreview-publishers-allowlist.txt`). Read
+[`docs/PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md) before going
+live — that file decides which fact-checkers' verdicts your service
+propagates onto Bluesky.
+
 ## 4. Container env — production values
 
 Copy `.env.example` to a per-deploy env file and override the values
@@ -130,8 +138,17 @@ LABELER_PORT=14831                            # internal port; reverse proxy map
 LABELER_DETAIL_BASE_URL=https://facts.example.org
 
 # ---- Bluesky service-account credentials (for replies + AppView fallback) ----
+# LABELER_BSKY_SERVICE must point at the PDS that actually hosts the
+# service account. atproto is federated: each PDS authenticates its own
+# users. If you signed up at bsky.app the PDS is bsky.social; if you
+# signed up at Eurosky it is eurosky.social; if you self-host it is
+# whatever URL your PDS runs at.
+# Verify by resolving your handle to a DID and reading the
+# `service[type='AtprotoPersonalDataServer'].serviceEndpoint` field
+# from https://plc.directory/<your-DID>.
+LABELER_BSKY_SERVICE=https://bsky.social
 LABELER_BSKY_IDENTIFIER=facts.example.org
-LABELER_BSKY_APP_PASSWORD=<app-password-from-bsky.app>
+LABELER_BSKY_APP_PASSWORD=<app-password-from-your-PDS>
 REPLY_TO_MENTIONS=true
 
 # ---- Triggers ----
@@ -285,6 +302,13 @@ docker compose run --rm fact-labeler pnpm ingest
 docker compose run --rm fact-labeler pnpm cli:embed-rebuild
 ```
 
+If you edited `config/claimreview-publishers-allowlist.txt` since the
+last refresh — for example to drop a previously-trusted publisher —
+also run `pnpm cleanup:claims` to delete the now-disallowed rows from
+the existing index. New ingests honour the allowlist, but already-
+ingested rows linger until removed. See
+[`PUBLISHER_SELECTION.md`](PUBLISHER_SELECTION.md).
+
 The `cli:embed-rebuild` is model-aware: only newly-ingested rows or
 rows tagged with an outdated `EMBEDDING_MODEL` get re-embedded. Refresh
 is cheap once the initial index is built.
@@ -342,7 +366,14 @@ Phase 1 to register with Bluesky:
 - [ ] `LABELER_SIGNING_KEY` is persisted somewhere outside the container
 - [ ] `LABELER_DID`, `LABELER_HANDLE`, `LABELER_HOSTNAME`,
       `LABELER_DETAIL_BASE_URL` all point at the public production URL
+- [ ] `LABELER_BSKY_SERVICE` points at **the PDS that hosts the service
+      account** (e.g. `https://bsky.social`, `https://eurosky.social`,
+      or your self-hosted PDS) — *not* assumed to be bsky.social
 - [ ] Bluesky service-account credentials in `LABELER_BSKY_IDENTIFIER`
       + `LABELER_BSKY_APP_PASSWORD` are valid (test by sending one
-      `pnpm cli:label --reply`)
+      `pnpm cli:label --reply`). Common 401 cause is `LABELER_BSKY_SERVICE`
+      pointing at the wrong PDS.
+- [ ] `config/labels.json` is on disk — needed by `pnpm dlx @skyware/labeler
+      label edit` to declare the six `fact-*` label values in your
+      labeler service record (see [`LIFECYCLE.md` Phase 1](./LIFECYCLE.md))
 - [ ] Backup of `/data` is automated

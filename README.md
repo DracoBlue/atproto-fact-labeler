@@ -84,7 +84,10 @@ post) and watchlist (named accounts) are opt-in. See
     -o data.json
   ```
   (Compilation is CC BY 4.0; per-entry text remains under each publisher's
-  copyright — see [docs/LICENSING.md](./docs/LICENSING.md).)
+  copyright — see [docs/LICENSING.md](./docs/LICENSING.md). The feed is
+  open-submission and ships SEO/blog spam alongside real fact-checkers;
+  we only ingest entries from publishers on a curated allowlist — see
+  [docs/PUBLISHER_SELECTION.md](./docs/PUBLISHER_SELECTION.md).)
 
 ## Quick Start
 
