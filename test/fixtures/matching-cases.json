@@ -81,9 +81,17 @@
     "notes": "topically near death-hoax claims (Jackie Chan, Mugabe) — NLI must say neutral because the entity differs"
   },
   {
-    "claim": "Germany unemployment rate is at 15 percent",
+    "claim": "Impfstoffe enthalten Mikrochips",
+    "lang": "de",
     "expected_verdict": "uncovered",
-    "category": "uncovered-number-disambiguation",
-    "notes": "topically near Philippines/Italy unemployment claims — NLI must say neutral because country + figure differ"
+    "category": "classic-conspiracy-de-thin-pool",
+    "notes": "German equivalent of #5 (vaccines + microchips). Despite the conspiracy being well-known, the German half of the Google FCT feed has no entries that frame it this way — closest matches are about side-effects, not microchips. Pipeline correctly returns 'uncovered' instead of forcing a verdict from off-topic sources. Documents that the DE pool is thin for some classic conspiracies; English coverage is richer (see #5)."
+  },
+  {
+    "claim": "5G-Antennen verbreiten das Coronavirus",
+    "lang": "de",
+    "expected_verdict": "unknown",
+    "category": "classic-conspiracy-de-thin-pool",
+    "notes": "German equivalent of #6 (5G causes COVID). One on-topic dpa-Faktencheck exists in the pool ('Es gibt einen Zusammenhang zwischen 5G und Corona' → debunked) so retrieval + rerank work and one entail vote lands. Verdict is honest 'unknown' because a single vote isn't enough quorum; this test catches that the German path runs end-to-end without crashing, and that the verdict stays cautious when evidence is sparse. English coverage on #6 is richer."
   }
 ]
