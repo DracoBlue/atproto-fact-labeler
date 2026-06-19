@@ -16,6 +16,7 @@ import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
 import type { DbLike } from '../store/runtime-sqlite.ts';
 import { logger } from '../util/logger.ts';
+import { detectLang } from './detect-lang.ts';
 import { PublisherAllowlist } from './publisher-allowlist.ts';
 
 // stream-chain / stream-json are CommonJS without an "exports" field, so we
@@ -61,18 +62,22 @@ interface DataFeedItem {
   url?: string;
 }
 
-/** Best-effort language guess when the entry has no `inLanguage`. */
+/**
+ * Best-effort language for an entry.
+ *
+ * Order:
+ *   1. The publisher's explicit `inLanguage` tag (BCP-47 → first 2 chars).
+ *   2. On-device text detection (`eld`) over the claim text itself —
+ *      handles the long tail of publishers that don't set inLanguage.
+ *   3. NULL if the text is too short / detector isn't confident.
+ *
+ * The URL/TLD heuristic this replaced was buggy on multiple fronts —
+ * see `docs/LANGUAGE_DETECTION.md` for the history.
+ */
 function guessLanguage(entry: ClaimReview): string | undefined {
-  if (entry.inLanguage) return entry.inLanguage.toLowerCase();
-  const url = entry.url ?? '';
-  // /fa/, /es/, /de/, ... path heuristic
-  const pathLang = url.match(/\/(?:fa|de|en|es|fr|pt|it|nl|pl|tr|ar|ru|uk|ja|zh|ko|hi|id|sv|da|fi|no|cs|hu|ro|el|he|th|vi)\//i);
-  if (pathLang?.[1]) return pathLang[1].toLowerCase();
-  // .de, .fr, .es publisher TLD
-  const publisher = entry.author?.url ?? '';
-  const tld = publisher.match(/\.(de|fr|es|it|nl|pl|ru|jp|kr|cn|br|ar|in|au)(?:\/|$)/i);
-  if (tld?.[1]) return tld[1].toLowerCase();
-  return undefined;
+  if (entry.inLanguage) return entry.inLanguage.toLowerCase().slice(0, 2);
+  const detected = detectLang(entry.claimReviewed);
+  return detected ?? undefined;
 }
 
 /** Verbatim attribution string we persist with every entry (CC BY 4.0 requirement). */

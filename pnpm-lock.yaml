@@ -23,6 +23,9 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
+      eld:
+        specifier: ^2.0.3
+        version: 2.0.3
       grammy:
         specifier: ^1.32.0
         version: 1.44.0
@@ -63,9 +66,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2.1.9
         version: 2.1.9(vitest@2.1.9(@types/node@22.19.21))
-      eld:
-        specifier: ^2.0.3
-        version: 2.0.3
       franc:
         specifier: ^6.2.0
         version: 6.2.0

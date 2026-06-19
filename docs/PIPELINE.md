@@ -155,6 +155,15 @@ to make the rerank LLM call itself the bottleneck.
 of token overlap kills the "earth* matches earthquake" class of false
 positives.
 
+**Same-language by default.** The query also filters
+`claim_review.lang = ? OR lang IS NULL`. Cross-lingual NLI judges flip
+polarity more often than they should — same-language candidates produce
+markedly more reliable verdicts. Untagged rows (`lang IS NULL`) stay
+reachable from every language so they aren't silently lost when the
+detector can't make a confident call. The detection pipeline and
+operator rebuild flow live in
+[`docs/LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md).
+
 **Model (deployed)**:
 [`text-embedding-granite-embedding-278m-multilingual`](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual)
 — IBM Granite, Apache-2.0, 303 MB, 768 dims, multilingual primary focus.

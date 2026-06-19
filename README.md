@@ -389,6 +389,24 @@ Throughput against LM Studio + granite-278m on M3 Max is ~130 emb/s
 (~12 min for a 92k-row corpus). The CLI is model-aware: rows tagged with
 a stale `embedding_model` get re-embedded on the next run.
 
+### Stamping languages — `cli:lang-rebuild`
+
+Stage 1 retrieval restricts to same-language candidates. The original
+ingester used URL/TLD heuristics that left ~70 % of rows untagged and
+mis-labeled the rest. After upgrading from an older index, walk every
+row with the on-device detector:
+
+```bash
+pnpm cli:lang-rebuild --dry-run     # preview the new distribution
+pnpm cli:lang-rebuild --null-only   # touch only rows where lang IS NULL
+pnpm cli:lang-rebuild               # rewrite every row (default)
+```
+
+Idempotent. New ingests already use the detector — `lang-rebuild` is
+only needed once per pre-existing index. Full rationale, library
+comparison, and operator workflow:
+[docs/LANGUAGE_DETECTION.md](./docs/LANGUAGE_DETECTION.md).
+
 ### One-shot labeling — `cli:label`
 
 Label a single Bluesky post manually, without standing up the Jetstream
