@@ -158,6 +158,15 @@ const Schema = z.object({
     .string()
     .default('config/claimreview-publishers-allowlist.txt'),
 
+  // Google Fact Check Tools API (claims:search). Optional. When set, the
+  // matching pipeline issues a live query per claim and merges the hits
+  // into the candidate pool — closes the coverage gap where Lead Stories,
+  // USA Today, AAP etc. publish ClaimReview on their own pages but don't
+  // show up in the bulk Data Commons feed. See docs/FACTCHECK_API.md.
+  FACTCHECK_API_KEY: z.string().optional(),
+  FACTCHECK_API_PAGE_SIZE: z.coerce.number().int().min(1).max(50).default(10),
+  FACTCHECK_API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+
   // Log level
   LOG_LEVEL: z.string().default('info'),
 });

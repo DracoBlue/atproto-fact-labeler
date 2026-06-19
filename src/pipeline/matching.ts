@@ -18,6 +18,8 @@ import { getConfig } from '../config/index.ts';
 import { logger } from '../util/logger.ts';
 import { retrieveCandidates, type RetrieveCandidate } from './retrieve.ts';
 import { detectLang } from '../ingest/detect-lang.ts';
+import { populateLiveCandidates } from '../ingest/factcheck-live.ts';
+import { getDb } from '../store/db.ts';
 import { rerankCandidates } from './rerank.ts';
 import { judgeNli, type NliLabel } from './entail.ts';
 import {
@@ -99,6 +101,26 @@ export async function matchClaim(
   const declared = options.lang ?? null;
   const detected = detectLang(claim);
   const langs = [...new Set([declared, detected].filter(Boolean) as string[])];
+
+  // Optional live supplement via Google Fact Check Tools API. When the
+  // operator has set FACTCHECK_API_KEY, we issue a claims:search call per
+  // unique lang, filter through the publisher allowlist, persist new hits
+  // into claim_review, and inline-embed them — so Stage 1 retrieval below
+  // picks them up via the normal cosine path. Cached on subsequent runs;
+  // no-op when the key is unset. See docs/FACTCHECK_API.md.
+  if (cfg.FACTCHECK_API_KEY) {
+    try {
+      const live = await populateLiveCandidates(claim, langs, db ?? getDb());
+      if (live.embedded > 0) {
+        logger.debug(live, 'matching: live supplement added rows');
+      }
+    } catch (err) {
+      // Live supplement is best-effort. Local pool retrieval is the source of
+      // truth, so swallow errors and continue.
+      logger.warn({ err: (err as Error).message }, 'matching: live supplement failed, continuing with local pool');
+    }
+  }
+
   const retrieve = await retrieveCandidates(
     claim,
     { topK: options.topK ?? 10, minCosine: options.minCosine, lang: langs },

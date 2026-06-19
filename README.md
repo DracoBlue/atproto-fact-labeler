@@ -72,6 +72,18 @@ fixture in [`test/fixtures/matching-cases.json`](./test/fixtures/matching-cases.
 is the regression contract; `pnpm test:matching` reproduces every
 number cited.
 
+**Where the fact-checks come from.** Three sources, mix and match:
+- [`docs/OWN_FACT_CHECKS.md`](./docs/OWN_FACT_CHECKS.md) — host your
+  own ClaimReview-tagged articles and ingest them via a single-item
+  DataFeed.
+- The [Google Data Commons bulk feed](https://datacommons.org/factcheck/)
+  via `pnpm ingest data.json` — the standard backbone, refreshed daily.
+- [`docs/FACTCHECK_API.md`](./docs/FACTCHECK_API.md) — set
+  `FACTCHECK_API_KEY` to let the matcher also query the Google Fact
+  Check Tools API live per claim. Closes the coverage gap where
+  publishers ship ClaimReview on their pages but don't appear in the
+  bulk feed (Lead Stories, USA Today, Snopes, AAP, …).
+
 ## Requirements
 
 - **Node ≥ 24** and **pnpm ≥ 11** (or Docker, see below).
