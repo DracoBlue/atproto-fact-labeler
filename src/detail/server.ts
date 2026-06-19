@@ -51,6 +51,7 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
          JOIN verdict v ON v.claim_id = c.id
         WHERE c.post_uri = ?
           AND v.status IN ('proposed','accepted')
+          AND v.retired_at IS NULL
         ORDER BY v.id DESC`,
     )
     .all(postUri) as Array<Row & { verdict_id: number }>;
@@ -122,6 +123,7 @@ function renderHtml(postUri: string, postText: string | null, claims: Row[]): st
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>Fact-check detail · ${escapeHtml(postUri)}</title>
 <style>
  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 760px; margin: 2em auto; padding: 0 1em; color: #111; }
@@ -163,9 +165,23 @@ ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (ye
 export function registerDetailRoutes(app: LabelerApp): void {
   app.get('/healthz', async () => ({ ok: true }));
 
+  // Block every crawler at the document level. The detail pages quote
+  // attacker-controlled URLs (from posts being labeled and from third-party
+  // fact-check sources) — even as plain text these can drag the host's
+  // reputation in Search. We don't want this host in any index.
+  app.get('/robots.txt', async (_req, reply) => {
+    reply.header('content-type', 'text/plain; charset=utf-8');
+    reply.header('x-robots-tag', 'noindex, nofollow');
+    return 'User-agent: *\nDisallow: /\n';
+  });
+
   app.get<{ Querystring: { uri?: string; format?: string } }>(
     '/posts',
     async (req, reply) => {
+      // Belt and suspenders alongside the <meta name="robots"> tag in the HTML
+      // — the header reaches non-HTML formats (JSON) and is harder to strip
+      // by intermediate proxies.
+      reply.header('x-robots-tag', 'noindex, nofollow, noarchive, nosnippet');
       const uri = req.query.uri ?? '';
       if (!uri || !uri.startsWith('at://')) {
         reply.code(400);

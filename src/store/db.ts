@@ -275,6 +275,12 @@ function migrate(db: DbLike): void {
   addColumnIfMissing(db, 'claim_review', 'embedding', 'BLOB');
   addColumnIfMissing(db, 'claim_review', 'embedding_dim', 'INTEGER');
   addColumnIfMissing(db, 'claim_review', 'embedding_model', 'TEXT');
+
+  // Set when `pnpm retire` negates a label whose verdict is in this DB. The
+  // verdict.status CHECK constraint doesn't include 'retired' (would require
+  // a table rebuild), so we track the retraction with a timestamp column.
+  // The detail page filters retired verdicts out by default.
+  addColumnIfMissing(db, 'verdict', 'retired_at', 'TEXT');
 }
 
 /**

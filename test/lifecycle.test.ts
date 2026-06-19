@@ -30,6 +30,16 @@ function withFreshDb(
       neg       INTEGER NOT NULL DEFAULT 0,
       cts       TEXT NOT NULL
     );
+    -- retireLiveLabels also marks matching verdict rows as retired, so the
+    -- minimal schema here needs the columns the UPDATE touches. Real DB has
+    -- many more columns; only the ones the statement references matter.
+    CREATE TABLE verdict (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_uri    TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'proposed',
+      retired_at  TEXT
+    );
   `);
   const insert = raw.prepare(
     `INSERT INTO label_emit (post_uri, post_cid, val, neg, cts) VALUES (?, ?, ?, ?, ?)`,
@@ -97,7 +107,7 @@ describe('retireLiveLabels', () => {
       },
     });
 
-    expect(result).toEqual({ total: 2, negated: 2, dryRun: false });
+    expect(result).toEqual({ total: 2, negated: 2, verdictsRetired: 0, dryRun: false });
     expect(emitted).toEqual([
       { uri: 'at://a', val: 'fact-refuted', neg: true },
       { uri: 'at://b', val: 'fact-refuted', neg: true },
@@ -128,10 +138,31 @@ describe('retireLiveLabels', () => {
     const before = (raw.prepare('SELECT COUNT(*) AS n FROM label_emit').get() as { n: number }).n;
 
     const result = await retireLiveLabels(db, { dryRun: true });
-    expect(result).toEqual({ total: 1, negated: 0, dryRun: true });
+    expect(result).toEqual({ total: 1, negated: 0, verdictsRetired: 0, dryRun: true });
 
     const after = (raw.prepare('SELECT COUNT(*) AS n FROM label_emit').get() as { n: number }).n;
     expect(after).toBe(before);
+  });
+
+  it('marks the matching accepted verdict as retired when one exists', async () => {
+    const { db, raw } = withFreshDb([
+      { post_uri: 'at://a', post_cid: 'c1', val: 'fact-refuted', neg: 0, cts: '2026-01-01' },
+      { post_uri: 'at://b', post_cid: 'c2', val: 'fact-supported', neg: 0, cts: '2026-01-01' },
+    ]);
+    // 'at://a' has an accepted verdict (will be retired), 'at://b' has none.
+    raw.exec(`
+      INSERT INTO verdict (post_uri, label, status) VALUES
+        ('at://a', 'false', 'accepted'),
+        ('at://c', 'false', 'accepted');     -- unrelated post, must stay live
+    `);
+
+    const result = await retireLiveLabels(db, { emit: async () => {} });
+    expect(result.verdictsRetired).toBe(1);
+
+    const retired = raw
+      .prepare(`SELECT post_uri FROM verdict WHERE retired_at IS NOT NULL`)
+      .all() as Array<{ post_uri: string }>;
+    expect(retired).toEqual([{ post_uri: 'at://a' }]);
   });
 
   it('rejects accidentally calling without emit when not dry-run', async () => {

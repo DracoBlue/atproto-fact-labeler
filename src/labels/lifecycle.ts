@@ -5,6 +5,7 @@
  * actual on-wire `emitLabel` call is injected as `emit` so tests can stub it.
  */
 import type { DbLike } from '../store/runtime-sqlite.ts';
+import { labelToVerdict } from './vocabulary.ts';
 
 export interface LiveLabel {
   postUri: string;
@@ -126,6 +127,7 @@ export interface RetireOptions {
 export interface RetireResult {
   total: number;
   negated: number;
+  verdictsRetired: number;
   dryRun: boolean;
 }
 
@@ -144,8 +146,20 @@ export async function retireLiveLabels(
     `INSERT INTO label_emit (post_uri, post_cid, val, neg, cts)
      VALUES (?, ?, ?, 1, datetime('now'))`,
   );
+  // Hide the source verdict from the detail page once its label is negated.
+  // We match by (post_uri, internal verdict label) — multiple verdicts on the
+  // same post are independent and only the matching one gets retired.
+  const markVerdictRetired = db.prepare(
+    `UPDATE verdict
+        SET retired_at = datetime('now')
+      WHERE post_uri = ?
+        AND label = ?
+        AND status = 'accepted'
+        AND retired_at IS NULL`,
+  );
 
   let negated = 0;
+  let verdictsRetired = 0;
   for (let i = 0; i < targets.length; i++) {
     const t = targets[i]!;
     opts.onLabel?.(t, i, targets.length);
@@ -156,7 +170,13 @@ export async function retireLiveLabels(
     await opts.emit({ uri: t.postUri, cid: t.postCid, val: t.val, neg: true });
     insertNeg.run(t.postUri, t.postCid, t.val);
     negated++;
+
+    const internalLabel = labelToVerdict(t.val);
+    if (internalLabel) {
+      const res = markVerdictRetired.run(t.postUri, internalLabel);
+      verdictsRetired += Number(res.changes ?? 0);
+    }
   }
 
-  return { total: targets.length, negated, dryRun: !!opts.dryRun };
+  return { total: targets.length, negated, verdictsRetired, dryRun: !!opts.dryRun };
 }

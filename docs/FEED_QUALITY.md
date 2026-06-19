@@ -78,6 +78,14 @@ Already-emitted labels stay on the atproto network — labels are
 immutable once posted. The cleanup only affects what *future*
 verdicts you can cite.
 
+If you want the already-emitted labels off the wire too (e.g. the
+verdict was sourced from a publisher you've now removed from the
+allowlist), follow `pnpm cleanup:claims` with `pnpm retire` — that
+negates the live labels and hides the underlying verdict from the
+detail page. See
+[`LIFECYCLE.md § Phase 3`](LIFECYCLE.md#phase-3--retiring-content-variant-c--emit-negations)
+for the full retraction flow.
+
 ### Why allowlist and not blocklist
 
 A blocklist would need to chase every new spam blogspot URL and every

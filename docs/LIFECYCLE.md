@@ -202,6 +202,49 @@ overrides it on read. This matches the protocol: see
 The retire CLI is **idempotent**. Re-running after a partial crash skips
 already-negated labels.
 
+### Local side-effects of `retire`
+
+`retire` doesn't just emit on the wire. To keep the local detail page
+(`/posts?uri=...`) in sync with what users see in Bluesky, the CLI also
+**marks the matching `verdict` row as retired** by stamping
+`verdict.retired_at = datetime('now')`. The detail server then **omits**
+those verdicts entirely from both HTML and JSON output.
+
+That's intentional. The detail page surfaces post text, claim text and
+publisher URLs verbatim. If a verdict was emitted in error — e.g.
+sourced from a fact-checker we later distrust, or from an entry that
+turned out to be spam-injected — keeping the URL visible as plain text
+is a reputation risk on its own (Google's quality systems penalise
+hosts that prominently link to junk, regardless of whether the link is
+clickable or `rel="nofollow"`). Hiding the retired verdict is the
+safest default.
+
+The original verdict row is **not** deleted. `retired_at` is just a
+timestamp column; you can `SELECT * FROM verdict WHERE retired_at IS
+NOT NULL` to inspect the audit trail. Likewise the `label_emit` table
+keeps both the original positive row and the negation, so the on-wire
+history is preserved.
+
+The retire CLI prints both numbers:
+
+```
+retire complete  negated=12  verdictsRetired=12
+```
+
+`verdictsRetired` ≤ `negated`: a label can only be retired in the
+detail page if the underlying verdict still exists in this DB. Labels
+emitted by previous instances or rebuilt-from-scratch DBs may have
+`verdictsRetired = 0` even with a non-zero `negated`.
+
+### Detail page is not crawled
+
+The detail server sets `<meta name="robots" content="noindex, nofollow,
+noarchive, nosnippet">` in every HTML response and an `X-Robots-Tag`
+header on every `/posts` response (HTML + JSON). A `robots.txt` at the
+root disallows the entire host. This is belt-and-suspenders: detail
+pages quote attacker-controlled content (post text + third-party URLs)
+and we don't want any of them in any search index.
+
 ## Phase 4 — Clearing the labeler declaration (variant D — permanent)
 
 When you want to retire the labeler **permanently** — the account becomes

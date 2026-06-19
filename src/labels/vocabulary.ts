@@ -33,6 +33,19 @@ export function verdictToLabel(verdict: Verdict): FactLabelValue | null {
   return MAP[verdict];
 }
 
+const REVERSE_MAP: Record<FactLabelValue, Verdict> = {
+  'fact-supported': 'true',
+  'fact-refuted': 'false',
+  'fact-mixed': 'mixed',
+  'fact-disputed': 'disputed',
+  'fact-outdated': 'outdated',
+  'fact-unknown': 'unknown',
+};
+
+export function labelToVerdict(val: string): Verdict | null {
+  return (REVERSE_MAP as Record<string, Verdict>)[val] ?? null;
+}
+
 /** Verify that all defined labels match the spec regex (test-friendly). */
 const LABEL_REGEX = /^[a-z](?:[a-z-]*[a-z])?$/;
 export function isSpecCompliantLabel(val: string): boolean {
