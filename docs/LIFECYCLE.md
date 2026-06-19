@@ -261,6 +261,35 @@ root disallows the entire host. This is belt-and-suspenders: detail
 pages quote attacker-controlled content (post text + third-party URLs)
 and we don't want any of them in any search index.
 
+## Phase 3.5 — Manually accepting a deferred proposal
+
+`HITL_MODE=auto` defers any proposal whose aggregated confidence is below
+`minConfidence` (0.8) or whose vote count is below `minVotes` (1). The
+proposal sits in the DB with `decision='defer'`; nothing is emitted on
+the wire. For operators who want to ship the label anyway after a manual
+review, the `proposal:accept` CLI is the override:
+
+```bash
+# Show pending deferred proposals (read-only — server can stay up)
+docker compose exec fact-labeler pnpm proposal:accept --list
+
+# Stop the labeler so its port + labels.db are free, accept one, restart.
+docker compose stop fact-labeler
+docker compose run --rm fact-labeler pnpm proposal:accept --id=6
+docker compose start fact-labeler
+```
+
+The CLI runs the same accept path as the live decision handler — flips
+`proposal/claim/verdict` to `accepted`, calls `LabelerServer.emitLabel`
+to sign + push on the wire, records the emit in `label_emit`. AppViews
+pick up the label within seconds; the detail page (`/posts?uri=...`)
+starts showing the verdict on the next request.
+
+Use sparingly — every manual accept is a decision the auto-policy
+wanted to defer. If you find yourself doing it often, consider lowering
+`minConfidence` in `src/hitl/auto.ts` or moving to `HITL_MODE=telegram`
+for a human-in-the-loop review queue instead.
+
 ## Phase 4 — Clearing the labeler declaration (variant D — permanent)
 
 When you want to retire the labeler **permanently** — the account becomes
