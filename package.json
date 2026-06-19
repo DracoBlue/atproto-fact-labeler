@@ -35,7 +35,7 @@
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
     "@skyware/labeler": "^0.2.0",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "eld": "^2.0.3",
     "grammy": "^1.32.0",
