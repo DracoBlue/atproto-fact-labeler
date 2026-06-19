@@ -1,0 +1,67 @@
+name: Bug report
+description: Something the labeler does that it shouldn't, or fails to do that it should.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this. Please include enough
+        context that we can reproduce — pipelines that touch a live LLM
+        plus an external feed are hard to debug from a one-line report.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did the labeler do? Paste the relevant log lines (with secrets redacted) or screenshots.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Ideally a `pnpm cli:label <at-uri> --dry-run` invocation or a sequence of CLI calls that surfaces the bug.
+      placeholder: |
+        1. pnpm cli:label at://did:plc:.../app.bsky.feed.post/...
+        2. Observe verdict: ...
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: LLM model + endpoint
+      description: "e.g. `google/gemini-2.5-flash` via Vercel AI Gateway, or `qwen3.6-27b` on LM Studio."
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / version
+      description: Output of `git rev-parse HEAD` on your checkout, or release tag.
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Node version, OS, deployment shape (local, Docker, Coolify, ...).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I redacted secrets and personal data from the logs above.
+          required: true
+        - label: I confirmed this happens on the latest `main` (or noted otherwise).
+          required: true

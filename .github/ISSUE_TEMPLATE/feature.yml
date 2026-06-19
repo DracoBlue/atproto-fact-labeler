@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a capability the labeler doesn't have today.
+title: "feature: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening this — please skim
+        [CONTRIBUTING.md § Areas where contributions will probably be declined](../blob/main/CONTRIBUTING.md#areas-where-contributions-will-probably-be-declined)
+        to make sure the idea fits the project's scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem this would solve?
+      description: Describe the situation that made you want this, not the implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: How would this look from the operator's / user's perspective? CLI flag, env var, new label value, new trigger source, ...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing workarounds you tried, related projects that solve this differently.
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: How this stays inside the routing-not-judging promise
+      description: |
+        The labeler routes existing fact-check verdicts; it doesn't decide truth. If the feature touches verdict
+        production, explain how it still cites a third-party fact-checker (and doesn't introduce model-as-judge).

@@ -1,0 +1,63 @@
+name: Publisher removal — allowlist
+description: Flag a currently-allowed publisher that should be removed.
+title: "allowlist: remove "
+labels: ["allowlist", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when an already-allowed publisher has lost IFCN status,
+        stopped publishing, been compromised, or shouldn't have been on
+        the list in the first place. See
+        [`docs/FEED_QUALITY.md`](../blob/main/docs/FEED_QUALITY.md) for the
+        editorial bar.
+
+  - type: input
+    id: host
+    attributes:
+      label: Hostname to remove
+      description: The exact line as it appears in `config/claimreview-publishers-allowlist.txt`.
+      placeholder: example.com   or   *.example.com
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reason
+    attributes:
+      label: Reason for removal
+      options:
+        - "Lost IFCN signatory status"
+        - "Editorial standards collapse / known propagandist takeover"
+        - "Site offline or domain transferred"
+        - "Not actually a fact-checker — got onto the list by mistake"
+        - "Compromised content (XSS / SSTI / spam injected by attacker)"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: |
+        Link to the IFCN delisting notice, archive snapshots showing the editorial
+        change, the compromised entries in the feed, or whatever else supports
+        the claim. Reviewers will not act on assertion alone.
+    validations:
+      required: true
+
+  - type: input
+    id: sample-bad-entry
+    attributes:
+      label: Sample problematic ClaimReview URL (if relevant)
+      description: A `source_url` whose content demonstrates the issue (e.g. a compromised entry).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I have also reported this to `factcheck-support@datacommons.org` (so the upstream feed gets cleaned), or explained below why that's not appropriate here.
+          required: false
+        - label: I am not in a competing-publisher relationship with the host above (or I disclosed the conflict in "Evidence").
+          required: true

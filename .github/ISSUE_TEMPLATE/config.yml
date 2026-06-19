@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/DracoBlue/atproto-fact-labeler/blob/main/SECURITY.md
+    about: Please do NOT open a public issue for security problems — see SECURITY.md.
+  - name: Discussion / question
+    url: https://github.com/DracoBlue/atproto-fact-labeler/discussions
+    about: Open questions about deployment, integration, or design choices belong in Discussions.

@@ -1,0 +1,87 @@
+name: Publisher addition — allowlist
+description: Propose a fact-checker to add to config/claimreview-publishers-allowlist.txt.
+title: "allowlist: add "
+labels: ["allowlist", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The publisher allowlist is an editorial decision — read
+        [`docs/FEED_QUALITY.md`](../blob/main/docs/FEED_QUALITY.md) before
+        opening this. The form below collects the evidence reviewers need
+        to accept or reject the addition without back-and-forth.
+
+  - type: input
+    id: host
+    attributes:
+      label: Hostname to add
+      description: |
+        Bare host without `www.` and without scheme. Use `*.example.com` if the
+        publisher uses country/language subdomains and you want all of them allowed.
+      placeholder: "factly.in   or   *.factcrescendo.com"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which tier?
+      options:
+        - "1 — IFCN signatory"
+        - "2 — Established newsroom fact-check desk"
+        - "3 — Verified regional fact-checker"
+    validations:
+      required: true
+
+  - type: input
+    id: ifcn-url
+    attributes:
+      label: IFCN signatory page (if Tier 1)
+      description: "Link to the publisher's entry at https://www.ifcncodeofprinciples.poynter.org/signatories"
+      placeholder: https://www.ifcncodeofprinciples.poynter.org/signatories/...
+
+  - type: input
+    id: corrections-policy
+    attributes:
+      label: Corrections policy URL
+      description: A page on the publisher's site that describes how they handle corrections.
+    validations:
+      required: true
+
+  - type: input
+    id: editorial-team
+    attributes:
+      label: Editorial team / masthead URL
+      description: Page that names the human editors / fact-checkers responsible for the work.
+    validations:
+      required: true
+
+  - type: input
+    id: sample-claim-review
+    attributes:
+      label: Sample ClaimReview entry from the Data Commons feed
+      description: "A `source_url` from the feed where this publisher emits a real ClaimReview. Verifies they're actually in the upstream."
+      placeholder: https://factly.in/some-real-fact-check-article
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this publisher meets the bar
+      description: |
+        2–3 sentences: how long they've been operating, any awards / recognised
+        memberships beyond IFCN, scale of output, language coverage. Don't pad
+        this — concrete and short is better than long and aspirational.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I am not affiliated with this publisher (or I disclosed the affiliation in "Why" above).
+          required: true
+        - label: I verified the publisher is in the current Google Data Commons feed.
+          required: true
