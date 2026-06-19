@@ -36,7 +36,7 @@
     "@noble/hashes": "^2.2.0",
     "@skyware/labeler": "^0.2.0",
     "better-sqlite3": "^11.7.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.4.2",
     "eld": "^2.0.3",
     "grammy": "^1.32.0",
     "openai": "^4.79.0",
