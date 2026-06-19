@@ -34,6 +34,13 @@ export interface RetrieveOptions {
   topK?: number;
   /** Drop candidates below this cosine. Defaults to 0.55 — see file header. */
   minCosine?: number;
+  /**
+   * BCP-47 lang of the claim. When set, retrieval restricts to ClaimReview
+   * rows in the same language plus rows without a language tag (treated as
+   * universal). Cross-lingual NLI is brittle, so single-language matching
+   * is the safer default.
+   */
+  lang?: string;
 }
 
 export interface RetrieveResult {
@@ -49,6 +56,16 @@ const SELECT_INDEXED = `
   FROM claim_review
   WHERE embedding IS NOT NULL
     AND embedding_model = ?
+`;
+
+const SELECT_INDEXED_LANG = `
+  SELECT id, source_url, publisher, publisher_url, claim_reviewed,
+         rating_native, review_date, lang, attribution,
+         embedding, embedding_dim
+  FROM claim_review
+  WHERE embedding IS NOT NULL
+    AND embedding_model = ?
+    AND (lang = ? OR lang IS NULL)
 `;
 
 export async function retrieveCandidates(
@@ -68,8 +85,11 @@ export async function retrieveCandidates(
   // Embed the query
   const { vector: qvec, dim: qdim } = await embedOne(claim);
 
-  // Scan all rows for the current model
-  const rows = target.prepare(SELECT_INDEXED).all(cfg.EMBEDDING_MODEL) as Array<{
+  // Scan all rows for the current model, optionally same-language only.
+  const lang = options.lang?.toLowerCase().slice(0, 2);
+  const rows = (lang
+    ? target.prepare(SELECT_INDEXED_LANG).all(cfg.EMBEDDING_MODEL, lang)
+    : target.prepare(SELECT_INDEXED).all(cfg.EMBEDDING_MODEL)) as Array<{
     id: number;
     source_url: string;
     publisher: string;
@@ -83,10 +103,12 @@ export async function retrieveCandidates(
     embedding_dim: number;
   }>;
 
+  logger.debug({ langFilter: lang ?? '<none>', scanned: rows.length }, 'retrieve: scan');
+
   if (!rows.length) {
     logger.warn(
-      { model: cfg.EMBEDDING_MODEL },
-      'retrieve: no rows have embeddings for the current model — run pnpm cli:embed-rebuild',
+      { model: cfg.EMBEDDING_MODEL, langFilter: lang ?? '<none>' },
+      'retrieve: no rows match — run pnpm cli:embed-rebuild, or the lang filter is too strict',
     );
     return { candidates: [], scanned: 0 };
   }

@@ -91,7 +91,7 @@ export async function matchClaim(
   const cfg = getConfig();
   const retrieve = await retrieveCandidates(
     claim,
-    { topK: options.topK ?? 10, minCosine: options.minCosine },
+    { topK: options.topK ?? 10, minCosine: options.minCosine, lang: options.lang },
     db,
   );
 
