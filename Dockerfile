@@ -37,6 +37,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY src ./src
+COPY config ./config
 # /app must be writable by the runtime user (tsx writes its build cache;
 # pnpm writes scratch files for the deps check even with CI=true).
 # /data is the persistent volume mount point — chown it so the labeler can
