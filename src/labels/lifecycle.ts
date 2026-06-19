@@ -128,7 +128,47 @@ export interface RetireResult {
   total: number;
   negated: number;
   verdictsRetired: number;
+  verdictsReconciled: number;
   dryRun: boolean;
+}
+
+/**
+ * Catch-up pass — mark `verdict.retired_at` for any post whose on-wire label
+ * is currently negated but whose verdict row was emitted by a pre-`retired_at`
+ * build of the labeler. Runs on every retire invocation, no-ops on a fresh
+ * DB. Returns the number of verdict rows it updated.
+ *
+ * Exposed for tests; called automatically from `retireLiveLabels`.
+ */
+export function reconcileRetiredVerdicts(db: DbLike): number {
+  const sql = `
+    WITH ranked AS (
+      SELECT post_uri, val, neg,
+             ROW_NUMBER() OVER (PARTITION BY post_uri, val ORDER BY id DESC) AS rn
+        FROM label_emit
+    ),
+    currently_negated AS (
+      SELECT post_uri, val FROM ranked WHERE rn = 1 AND neg = 1
+    )
+    UPDATE verdict
+       SET retired_at = datetime('now')
+     WHERE retired_at IS NULL
+       AND status = 'accepted'
+       AND EXISTS (
+         SELECT 1 FROM currently_negated cn
+          WHERE cn.post_uri = verdict.post_uri
+            AND cn.val = CASE verdict.label
+                          WHEN 'true'     THEN 'fact-supported'
+                          WHEN 'false'    THEN 'fact-refuted'
+                          WHEN 'mixed'    THEN 'fact-mixed'
+                          WHEN 'disputed' THEN 'fact-disputed'
+                          WHEN 'outdated' THEN 'fact-outdated'
+                          WHEN 'unknown'  THEN 'fact-unknown'
+                        END
+       )
+  `;
+  const res = db.prepare(sql).run();
+  return Number(res.changes ?? 0);
 }
 
 /**
@@ -141,6 +181,11 @@ export async function retireLiveLabels(
   db: DbLike,
   opts: RetireOptions = {},
 ): Promise<RetireResult> {
+  // Catch up: any verdict whose on-wire label is already negated but whose
+  // retired_at is empty (because it was negated by a pre-retired_at build of
+  // the labeler) gets stamped now.
+  const verdictsReconciled = opts.dryRun ? 0 : reconcileRetiredVerdicts(db);
+
   const targets = selectLiveLabels(db, opts.filter ?? {});
   const insertNeg = db.prepare(
     `INSERT INTO label_emit (post_uri, post_cid, val, neg, cts)
@@ -178,5 +223,11 @@ export async function retireLiveLabels(
     }
   }
 
-  return { total: targets.length, negated, verdictsRetired, dryRun: !!opts.dryRun };
+  return {
+    total: targets.length,
+    negated,
+    verdictsRetired,
+    verdictsReconciled,
+    dryRun: !!opts.dryRun,
+  };
 }

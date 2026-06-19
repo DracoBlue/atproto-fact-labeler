@@ -107,7 +107,13 @@ describe('retireLiveLabels', () => {
       },
     });
 
-    expect(result).toEqual({ total: 2, negated: 2, verdictsRetired: 0, dryRun: false });
+    expect(result).toEqual({
+      total: 2,
+      negated: 2,
+      verdictsRetired: 0,
+      verdictsReconciled: 0,
+      dryRun: false,
+    });
     expect(emitted).toEqual([
       { uri: 'at://a', val: 'fact-refuted', neg: true },
       { uri: 'at://b', val: 'fact-refuted', neg: true },
@@ -138,10 +144,37 @@ describe('retireLiveLabels', () => {
     const before = (raw.prepare('SELECT COUNT(*) AS n FROM label_emit').get() as { n: number }).n;
 
     const result = await retireLiveLabels(db, { dryRun: true });
-    expect(result).toEqual({ total: 1, negated: 0, verdictsRetired: 0, dryRun: true });
+    expect(result).toEqual({
+      total: 1,
+      negated: 0,
+      verdictsRetired: 0,
+      verdictsReconciled: 0,
+      dryRun: true,
+    });
 
     const after = (raw.prepare('SELECT COUNT(*) AS n FROM label_emit').get() as { n: number }).n;
     expect(after).toBe(before);
+  });
+
+  it('catches up verdicts whose label was negated by a pre-retired_at build', async () => {
+    // 'at://old' has a positive emit and then a negation already on the wire
+    // (simulating a retire run before retired_at existed). Its verdict row
+    // still says retired_at IS NULL — we want the next retire run to fix that.
+    const { db, raw } = withFreshDb([
+      { post_uri: 'at://old', post_cid: 'c1', val: 'fact-refuted', neg: 0, cts: '2026-01-01' },
+      { post_uri: 'at://old', post_cid: 'c1', val: 'fact-refuted', neg: 1, cts: '2026-01-02' },
+    ]);
+    raw.exec(`INSERT INTO verdict (post_uri, label, status) VALUES ('at://old', 'false', 'accepted');`);
+
+    const result = await retireLiveLabels(db, { emit: async () => {} });
+
+    // Nothing live to negate, but the reconcile pass stamps the stale verdict.
+    expect(result.negated).toBe(0);
+    expect(result.verdictsReconciled).toBe(1);
+    const retired = raw
+      .prepare(`SELECT post_uri FROM verdict WHERE retired_at IS NOT NULL`)
+      .all() as Array<{ post_uri: string }>;
+    expect(retired).toEqual([{ post_uri: 'at://old' }]);
   });
 
   it('marks the matching accepted verdict as retired when one exists', async () => {
