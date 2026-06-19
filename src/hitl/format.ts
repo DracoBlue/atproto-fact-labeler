@@ -30,16 +30,20 @@ export function renderProposalText(p: Proposal): string {
 
 /** Telegram MarkdownV2-friendly version. */
 export function renderProposalMarkdown(p: Proposal): string {
+  // MarkdownV2 reserved chars per Telegram Bot API. Any literal occurrence
+  // (including inside our own static template) must be backslash-escaped.
   const escape = (s: string) => s.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
   const lines: string[] = [];
-  lines.push(`*Proposal #${p.proposalId}*`);
+  lines.push(`*Proposal \\#${p.proposalId}*`);
   lines.push(`Post: \`${escape(p.postUri)}\``);
   lines.push(`Text: ${escape(truncate(p.postText, 240))}`);
   lines.push('');
   lines.push(`*Claim:* ${escape(p.claimText)}`);
   lines.push(`*Verdict:* \`${escape(p.verdict)}\``);
-  lines.push(`(confidence=${escape(String(p.aggregated?.confidence ?? 0))}, ` +
-    `votes=${escape(String(p.aggregated?.votes ?? 0))})`);
+  lines.push(
+    `\\(confidence\\=${escape(String(p.aggregated?.confidence ?? 0))}, ` +
+      `votes\\=${escape(String(p.aggregated?.votes ?? 0))}\\)`,
+  );
   lines.push('');
   lines.push('*Evidence:*');
   p.evidence.slice(0, 5).forEach((e, i) => {

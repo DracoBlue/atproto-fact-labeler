@@ -44,3 +44,29 @@ describe('renderProposalText', () => {
     expect(text).toContain('https://correctiv.org/faktencheck/...');
   });
 });
+
+describe('renderProposalMarkdown', () => {
+  it('escapes every MarkdownV2 reserved character', async () => {
+    const { renderProposalMarkdown } = await import('../src/hitl/format.ts');
+    const out = renderProposalMarkdown(sample);
+    // Telegram's reserved set, minus the ones we intentionally use for markup
+    // (`*` for bold, ``` for code, `_` for italic). Every other reserved char
+    // anywhere in the output must be backslash-escaped.
+    const lines = out.split('\n');
+    for (const line of lines) {
+      // Strip our intentional markup spans before scanning for unescaped reserved chars.
+      const stripped = line
+        .replace(/\*[^*]*\*/g, '')   // bold runs
+        .replace(/`[^`]*`/g, '')      // inline code
+        .replace(/_[^_]*_/g, '');     // italics
+      // Now any of these chars must be preceded by a backslash.
+      const m = stripped.match(/(?<!\\)[\[\]()~>#+\-=|{}.!]/);
+      expect(m, `unescaped "${m?.[0]}" in line: ${line}`).toBeNull();
+    }
+  });
+
+  it('includes the proposal id', async () => {
+    const { renderProposalMarkdown } = await import('../src/hitl/format.ts');
+    expect(renderProposalMarkdown(sample)).toContain('Proposal \\#42');
+  });
+});
