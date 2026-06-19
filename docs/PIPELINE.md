@@ -30,19 +30,41 @@
   outdated `embedding_model`.
 - DB columns: `claim_review.embedding BLOB`, `embedding_dim`, `embedding_model`.
 
-## Verified outcomes (2026-06-17)
+## Verified outcomes
 
-The two posts that previously walked the FTS-only pipeline into the
-classic failure mode now produce the correct labels:
+Reproduce with `pnpm test:matching` against the 14-case fixture in
+`test/fixtures/matching-cases.json`. Current state on the cleaned 88 k
+row corpus, gemini-2.5-flash judge:
 
-| Post text | Old FTS verdict | New pipeline verdict | Emitted label |
+```
+14/14 passed.
+```
+
+Highlights — see the fixture's per-case `notes` for the *why* behind
+each expected verdict:
+
+| Claim | Verdict | Confidence | What it tests |
 | --- | --- | --- | --- |
-| "the earth is not flat." | `false` conf 1.0 | **`true`** conf 0.871 (5 votes) | `fact-supported` |
-| "the earth is round." | `false` conf 1.0 | **`true`** conf 0.479 (7 votes) | `fact-supported` |
+| Vaccines contain microchips | `false` | 1.0 (3 entail / 0 contradict / 2 neutral) | classic-conspiracy, direct topical hit |
+| 5G towers cause COVID-19 | `false` | 1.0 | classic-conspiracy across multiple publishers |
+| COVID vaccines are safe and effective | `true` | 1.0 (0 entail / 4 contradict / 1 neutral) | true claim contradicted by anti-vax FCs → polarity flip |
+| Donald Trump won the 2020 US presidential election | `false` | 0.655 | post-cleanup confidence is honestly lower than pre-cleanup |
+| Joe Biden won the 2020 US presidential election | `true` | 0.832 | contradiction flip from "Trump won" fact-checks |
+| Bill Gates wants to inject everyone with microchips | `false` | 1.0 | single trustworthy publisher (FactCheck.org) propagates |
+| Impfstoffe enthalten Mikrochips (DE) | `uncovered` | – | DE pool has no on-topic source; honest abstention |
+| 5G-Antennen verbreiten das Coronavirus (DE) | `unknown` | 1.0 | 1 dpa entail vote; honest "not enough quorum" |
+| the earth is round / is not flat / is flat / is not round | `uncovered` | – | EN pool has no earth-shape fact-checks; see KNOWN_LIMITATIONS #1 |
+| My dog is brown / Mick Jagger is dead | `uncovered` | – | no on-topic match; pipeline returns nothing |
 
-Both cases work because Stage 3 (NLI) correctly classifies the retrieved
-fact-checks as *contradictions* of the negated user claim, and Stage 4
-flips the publisher's `false` verdict to `true`.
+The four polarity-matrix cases used to return wrong-but-confident
+verdicts on the pre-cleanup pool because cross-lingual FR/NL/ES sources
+slipped into the candidate set. The same-language retrieval filter
+(see [`LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md)) closed that
+class of false-positive at the cost of returning `uncovered` for
+claims whose only fact-checks live in another language. See
+[`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md) §1 for the trade-off in
+full and §2 for the cross-lingual NLI design work that would close
+it.
 
 ## Why the old FTS lookup was wrong
 

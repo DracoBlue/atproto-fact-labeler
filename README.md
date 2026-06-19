@@ -62,6 +62,16 @@ the default trigger set is **mentions + reports**. Firehose mode (every
 post) and watchlist (named accounts) are opt-in. See
 [Triggers](#triggers).
 
+**What this does not do.** The labeler routes *existing* third-party
+verdicts; it does not generate verdicts of its own and it will return
+`uncovered` rather than guess when the publisher pool is thin for a
+claim. See [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md) for
+the measured edges — what the pipeline currently handles, what it
+doesn't, and what the evidence is for each statement. The 14-case
+fixture in [`test/fixtures/matching-cases.json`](./test/fixtures/matching-cases.json)
+is the regression contract; `pnpm test:matching` reproduces every
+number cited.
+
 ## Requirements
 
 - **Node ≥ 24** and **pnpm ≥ 11** (or Docker, see below).
