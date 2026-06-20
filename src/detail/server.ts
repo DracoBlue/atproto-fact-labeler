@@ -188,6 +188,13 @@ ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (ye
      (CC BY 4.0 compilation), the Google Fact Check Tools API, or fact-checks
      the labeler operator hosts directly. Each entry's <em>attribution</em>
      line above states which path it came from.</p>
+  <p>Who counts as a fact-checker, how the list is curated, and how to
+     report a bad entry —
+     <a href="https://github.com/DracoBlue/atproto-fact-labeler/blob/main/docs/FEED_QUALITY.md"
+        rel="noopener" target="_blank">docs/FEED_QUALITY.md</a>.
+     Full project documentation —
+     <a href="https://github.com/DracoBlue/atproto-fact-labeler"
+        rel="noopener" target="_blank">github.com/DracoBlue/atproto-fact-labeler</a>.</p>
 </footer>
 </body>
 </html>`;
