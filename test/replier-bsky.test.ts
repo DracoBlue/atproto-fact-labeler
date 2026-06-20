@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { BskyClient, buildReplyRecord } from '../src/replier/bsky.ts';
+import { BskyClient, buildQuoteRecord, buildReplyRecord } from '../src/replier/bsky.ts';
 
 describe('buildReplyRecord', () => {
   it('produces a well-formed app.bsky.feed.post record', () => {
@@ -133,5 +133,79 @@ describe('BskyClient', () => {
       fetchImpl,
     });
     await expect(client.login()).rejects.toThrow(/createSession 401/);
+  });
+});
+
+describe('buildQuoteRecord', () => {
+  it('produces a quote-post with embed.record', () => {
+    const rec = buildQuoteRecord({
+      text: 'Fact-supported. https://...',
+      embed: { uri: 'at://did:plc:alice/app.bsky.feed.post/3k', cid: 'bafy-target' },
+      createdAt: '2026-06-20T10:00:00.000Z',
+      langs: ['en'],
+    });
+    expect(rec).toEqual({
+      $type: 'app.bsky.feed.post',
+      text: 'Fact-supported. https://...',
+      createdAt: '2026-06-20T10:00:00.000Z',
+      langs: ['en'],
+      embed: {
+        $type: 'app.bsky.embed.record',
+        record: { uri: 'at://did:plc:alice/app.bsky.feed.post/3k', cid: 'bafy-target' },
+      },
+    });
+    // Make sure we didn't accidentally also attach a `reply` field —
+    // quote-posts go on the labeler's own feed, not in the target's thread.
+    expect(rec.reply).toBeUndefined();
+  });
+});
+
+describe('BskyClient.quotesAllowed', () => {
+  function clientWithFetch(impl: typeof fetch): BskyClient {
+    return new BskyClient({
+      serviceUrl: 'https://bsky.social',
+      identifier: 'x',
+      password: 'y',
+      fetchImpl: impl,
+    });
+  }
+
+  it('returns true when postgate does not exist (404)', async () => {
+    const c = clientWithFetch((async () => new Response('not found', { status: 404 })) as unknown as typeof fetch);
+    const ok = await c.quotesAllowed('at://did:plc:alice/app.bsky.feed.post/abc');
+    expect(ok).toBe(true);
+  });
+
+  it('returns false when postgate carries disableRule', async () => {
+    const c = clientWithFetch((async () =>
+      new Response(
+        JSON.stringify({ value: { embeddingRules: [{ $type: 'app.bsky.feed.postgate#disableRule' }] } }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )) as unknown as typeof fetch);
+    const ok = await c.quotesAllowed('at://did:plc:alice/app.bsky.feed.post/abc');
+    expect(ok).toBe(false);
+  });
+
+  it('returns true when postgate has unrelated rules (no disableRule)', async () => {
+    const c = clientWithFetch((async () =>
+      new Response(
+        JSON.stringify({ value: { embeddingRules: [{ $type: 'app.bsky.feed.postgate#allowOtherRule' }] } }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )) as unknown as typeof fetch);
+    const ok = await c.quotesAllowed('at://did:plc:alice/app.bsky.feed.post/abc');
+    expect(ok).toBe(true);
+  });
+
+  it('fails open on network error (treats absence of evidence as consent)', async () => {
+    const c = clientWithFetch((async () => {
+      throw new Error('ECONNRESET');
+    }) as unknown as typeof fetch);
+    const ok = await c.quotesAllowed('at://did:plc:alice/app.bsky.feed.post/abc');
+    expect(ok).toBe(true);
+  });
+
+  it('returns true for malformed URIs (no crash)', async () => {
+    const c = clientWithFetch((async () => new Response('', { status: 200 })) as unknown as typeof fetch);
+    expect(await c.quotesAllowed('not-an-at-uri')).toBe(true);
   });
 });

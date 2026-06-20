@@ -143,6 +143,8 @@ async function main(): Promise<void> {
 
     // Optional: reply to the mention post on Bluesky with the verdict.
     await maybeReplyToMention(proposalId);
+    // Optional: quote-post the reported post on the labeler's own feed.
+    await maybeQuoteForReport(proposalId, row.post_uri, row.post_cid);
   };
 
   /**
@@ -362,6 +364,89 @@ async function main(): Promise<void> {
       replyKind: 'verdict',
       proposalId,
     });
+  };
+
+  /**
+   * For report-triggered accepted proposals, quote-post the reported post on
+   * the labeler's own feed with the verdict text. Idempotent on the reported
+   * URI — re-reports of the same post don't re-post. Honours the author's
+   * postgate (`disableRule`); skip + log if quotes are disabled.
+   */
+  const maybeQuoteForReport = async (
+    proposalId: number,
+    postUri: string,
+    postCid: string,
+  ): Promise<void> => {
+    if (!bsky || !cfg.REPLY_TO_REPORTS) return;
+    const ctx = loadTriggerCtx(proposalId);
+    if (!ctx || ctx.reason !== 'report') return;
+    if (hasReplied(postUri)) {
+      logger.debug({ postUri, proposalId }, 'report-quote: already replied to this URI, skipping');
+      return;
+    }
+
+    const allowed = await bsky.quotesAllowed(postUri);
+    if (!allowed) {
+      logger.info({ postUri, proposalId }, 'report-quote: author disabled quotes (postgate), skipping');
+      return;
+    }
+
+    const publishers = (
+      db
+        .prepare(
+          `SELECT DISTINCT publisher FROM evidence
+             WHERE verdict_id = (SELECT verdict_id FROM proposal WHERE id = ?)
+             ORDER BY id LIMIT 5`,
+        )
+        .all(proposalId) as Array<{ publisher: string | null }>
+    )
+      .map((r) => r.publisher ?? '')
+      .filter(Boolean);
+
+    const topSource = db
+      .prepare(
+        `SELECT source_url FROM evidence
+           WHERE verdict_id = (SELECT verdict_id FROM proposal WHERE id = ?)
+           ORDER BY id LIMIT 1`,
+      )
+      .get(proposalId) as { source_url: string | null } | undefined;
+    const primarySourceUrl = topSource?.source_url ?? undefined;
+
+    const detailUrl =
+      (cfg.LABELER_DETAIL_BASE_URL ?? cfg.LABELER_HOSTNAME).replace(/\/$/, '') +
+      `/posts?uri=${encodeURIComponent(postUri)}`;
+
+    const text = buildReplyText({
+      verdict: ctx.verdict,
+      publishers,
+      detailUrl,
+      primarySourceUrl,
+      lang: ctx.source_lang ?? undefined,
+      defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
+    });
+
+    try {
+      const result = await bsky.postQuote({
+        text,
+        embed: { uri: postUri, cid: postCid },
+      });
+      db.prepare(
+        `INSERT INTO mention_reply (proposal_id, reply_kind, reply_uri, reply_cid, replied_to_uri)
+         VALUES (?, 'verdict', ?, ?, ?)`,
+      ).run(proposalId, result.uri, result.cid, postUri);
+      logger.info(
+        { proposalId, postUri, quoteUri: result.uri },
+        'report-quote: quote-post published',
+      );
+    } catch (err) {
+      // The label IS the primary public signal. Quote-post is best-effort —
+      // on transient failure we log and move on rather than queue for retry
+      // (the retry queue is keyed on parent_uri shared with mention replies).
+      logger.warn(
+        { err: (err as Error).message, postUri, proposalId },
+        'report-quote: quote-post failed, label still emitted',
+      );
+    }
   };
 
   /**

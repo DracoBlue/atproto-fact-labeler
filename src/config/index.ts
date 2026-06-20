@@ -124,6 +124,17 @@ const Schema = z.object({
   REPLY_TO_MENTIONS: z
     .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
     .default(false),
+  /**
+   * When true, the labeler quote-posts the reported post on its own feed
+   * with the verdict text after a report-triggered label is accepted.
+   * The author's postgate (`app.bsky.feed.postgate` with the
+   * `disableRule` embedding rule) is honoured — if quotes are disabled on
+   * the post, the labeler logs a skip and emits the label without a
+   * quote-post. Same Bluesky creds as REPLY_TO_MENTIONS.
+   */
+  REPLY_TO_REPORTS: z
+    .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
+    .default(false),
   /** PDS URL the labeler account lives on (bsky.social or self-hosted). */
   LABELER_BSKY_SERVICE: z.string().default('https://bsky.social'),
   /** Handle or DID of the labeler service account (writes posts as this account). */
@@ -186,14 +197,18 @@ export function getConfig(): AppConfig {
   }
   _config = parsed.data;
 
-  // Cross-field invariant: REPLY_TO_MENTIONS requires Bluesky credentials.
-  if (_config.REPLY_TO_MENTIONS) {
+  // Cross-field invariant: REPLY_TO_MENTIONS and REPLY_TO_REPORTS both need
+  // Bluesky credentials. Same identifier + app password, different surface.
+  if (_config.REPLY_TO_MENTIONS || _config.REPLY_TO_REPORTS) {
     const missing: string[] = [];
     if (!_config.LABELER_BSKY_IDENTIFIER) missing.push('LABELER_BSKY_IDENTIFIER');
     if (!_config.LABELER_BSKY_APP_PASSWORD) missing.push('LABELER_BSKY_APP_PASSWORD');
     if (missing.length) {
+      const which = _config.REPLY_TO_MENTIONS && _config.REPLY_TO_REPORTS
+        ? 'REPLY_TO_MENTIONS and REPLY_TO_REPORTS'
+        : _config.REPLY_TO_MENTIONS ? 'REPLY_TO_MENTIONS' : 'REPLY_TO_REPORTS';
       throw new Error(
-        `REPLY_TO_MENTIONS=true requires ${missing.join(' and ')} to be set.`,
+        `${which}=true requires ${missing.join(' and ')} to be set.`,
       );
     }
   }
