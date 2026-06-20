@@ -159,3 +159,27 @@ describe('recordFeedback + listFeedback', () => {
     expect(n).toBe(3);
   });
 });
+
+import { isAppealReason } from '../src/feedback/store.ts';
+
+describe('isAppealReason', () => {
+  it('recognises the legacy moderation defs appeal reason', () => {
+    expect(isAppealReason('com.atproto.moderation.defs#reasonAppeal')).toBe(true);
+  });
+
+  it('recognises the Ozone report defs appeal reason', () => {
+    expect(isAppealReason('tools.ozone.report.defs#reasonAppeal')).toBe(true);
+  });
+
+  it('rejects normal report reason types', () => {
+    expect(isAppealReason('com.atproto.moderation.defs#reasonOther')).toBe(false);
+    expect(isAppealReason('com.atproto.moderation.defs#reasonSpam')).toBe(false);
+    expect(isAppealReason('tools.ozone.report.defs#reasonOther')).toBe(false);
+  });
+
+  it('handles undefined / null / empty input', () => {
+    expect(isAppealReason(undefined)).toBe(false);
+    expect(isAppealReason(null)).toBe(false);
+    expect(isAppealReason('')).toBe(false);
+  });
+});

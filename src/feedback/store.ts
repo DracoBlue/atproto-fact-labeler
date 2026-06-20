@@ -110,3 +110,19 @@ export function listFeedback(db: DbLike, opts: ListFeedbackOptions = {}): Stored
 export function isLabelerOwnUri(uri: string, labelerDid: string): boolean {
   return uri.startsWith(`at://${labelerDid}/`);
 }
+
+/**
+ * Is this a label appeal? When a Bluesky user presses "Anfechten" / "Appeal"
+ * on a label one of our records emitted, the client wraps the request as a
+ * `createReport` with `reasonType` set to one of these constants.
+ *
+ * Two namespaces are in flight: the legacy moderation defs and the newer
+ * Ozone report defs. Honour both.
+ */
+export function isAppealReason(reasonType: string | undefined | null): boolean {
+  if (!reasonType) return false;
+  return (
+    reasonType === 'com.atproto.moderation.defs#reasonAppeal' ||
+    reasonType === 'tools.ozone.report.defs#reasonAppeal'
+  );
+}

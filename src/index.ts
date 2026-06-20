@@ -31,7 +31,7 @@ import {
   buildNoTargetReply,
   buildReplyText,
 } from './replier/format.ts';
-import { isLabelerOwnUri, recordFeedback } from './feedback/store.ts';
+import { isAppealReason, isLabelerOwnUri, recordFeedback } from './feedback/store.ts';
 import {
   clearQueueRow,
   enqueueReply,
@@ -646,6 +646,30 @@ async function main(): Promise<void> {
     registerReportRoutes(
       labelerServer.app,
       async (report) => {
+      // Appeals — a user pressing "Anfechten" / "Appeal" on a label the
+      // labeler emitted. The bsky client sends a createReport with reasonType
+      // set to *reasonAppeal* (two namespaces in flight; both seen in the
+      // wild). An appeal is NOT a fresh fact-check request — re-running the
+      // pipeline would land on the same verdict. Record it as feedback so an
+      // operator can review the existing label, and skip the dispatch.
+      if (isAppealReason(report.reasonType)) {
+        const id = recordFeedback(db, {
+          subjectUri: report.subjectUri,
+          subjectCid: report.subjectCid,
+          reasonType: report.reasonType,
+          reason: report.reason,
+        });
+        logger.warn(
+          {
+            feedbackId: id,
+            uri: report.subjectUri,
+            reasonType: report.reasonType,
+            reportedBy: report.reportedBy,
+          },
+          'label appeal received — recorded as feedback, pipeline NOT re-run. Operator review: pnpm feedback:list / pnpm retire --uri=...',
+        );
+        return;
+      }
       // A user reporting one of our own posts is signalling "you got something
       // wrong" — record it as operator feedback instead of running the pipeline
       // on our own work.

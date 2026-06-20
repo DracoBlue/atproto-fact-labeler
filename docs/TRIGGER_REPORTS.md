@@ -220,6 +220,49 @@ sqlite3 data/labeler.sqlite \
   "UPDATE feedback SET resolved_at = datetime('now'), resolution = 'retired verdict' WHERE id = 3;"
 ```
 
+## Label appeals → feedback channel, no re-dispatch
+
+When a Bluesky user taps **"Anfechten" / "Appeal"** on a label this
+labeler emitted, the client sends a `createReport` with `reasonType`
+set to one of:
+
+- `com.atproto.moderation.defs#reasonAppeal` (legacy)
+- `tools.ozone.report.defs#reasonAppeal` (Ozone)
+
+Both are recognised by
+[`isAppealReason()`](../src/feedback/store.ts). The dispatcher
+**short-circuits**: it does **not** re-run the pipeline (the same
+input would produce the same verdict and waste an LLM call), and
+instead records the appeal in the `feedback` table with the
+reporting DID, the reason string the user typed, and the subject
+URI of the label being contested.
+
+```
+{"level":40, "msg":"label appeal received — recorded as feedback,
+  pipeline NOT re-run. Operator review: pnpm feedback:list /
+  pnpm retire --uri=...",
+  "feedbackId":42, "uri":"at://…/3kx",
+  "reasonType":"tools.ozone.report.defs#reasonAppeal",
+  "reportedBy":"did:plc:alice"}
+```
+
+Operator review:
+
+```bash
+pnpm feedback:list --only-unresolved
+# decide per appeal: leave the label, or retire it
+pnpm retire --uri=at://did:plc:bob/app.bsky.feed.post/3kx
+# mark the feedback row resolved
+sqlite3 /data/labeler.sqlite \
+  "UPDATE feedback SET resolved_at = datetime('now'),
+   resolution = 'appeal upheld, label retired'
+   WHERE id = 42;"
+```
+
+The `feedback` dedup index on `(subject_uri, reason_type, reason)`
+absorbs repeated appeals against the same label — the `count`
+column reflects how many times the appeal has been raised.
+
 ## Edge cases
 
 - **Account-level report** (`subject = did:plc:bob…`): currently logged
