@@ -75,14 +75,21 @@ const Schema = z.object({
   /**
    * Where `GET /` redirects to. The labeler's HTTP root has no useful UI
    * (the only public surfaces are `/posts?uri=…`, `/healthz`, the xrpc
-   * label endpoints, and `/robots.txt`). A 302 to the project repository
-   * is the friendly default for anyone landing on `facts.example.org`
-   * with no path. Set to an empty string to disable the redirect (the
-   * root then returns 404).
+   * label endpoints, and `/robots.txt`).
+   *
+   * Three-tier resolution:
+   *   1. unset (var missing entirely) → derive from `LABELER_DID` →
+   *      `https://bsky.app/profile/<DID>`. The labeler's own Bluesky
+   *      profile shows every public verdict it has emitted; the friendliest
+   *      default for someone landing on `facts.example.org`.
+   *   2. set to an explicit URL → that URL.
+   *   3. set to an empty string → no redirect (root returns 404).
+   *
+   * When `LABELER_DID` is still the placeholder (pre-setup), the resolver
+   * falls back to the project repo so the route always points somewhere
+   * useful.
    */
-  LABELER_ROOT_REDIRECT: z
-    .string()
-    .default('https://github.com/DracoBlue/atproto-fact-labeler'),
+  LABELER_ROOT_REDIRECT: z.string().optional(),
 
   // Ingest
   JETSTREAM_URL: z

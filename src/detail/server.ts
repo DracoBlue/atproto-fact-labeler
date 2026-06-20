@@ -98,6 +98,32 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+const REPO_URL = 'https://github.com/DracoBlue/atproto-fact-labeler';
+const PLACEHOLDER_DID_PREFIX = 'did:plc:placeholder';
+
+/**
+ * Resolve where `GET /` should redirect to. Exported for tests.
+ *
+ *   - `override` is the raw `LABELER_ROOT_REDIRECT` env value.
+ *     `undefined` means the operator didn't set it; the empty string
+ *     means they explicitly set it to disable the redirect.
+ *   - `did` is `LABELER_DID`. When it's still the placeholder we fall
+ *     back to the repo URL so the route always lands somewhere useful.
+ *
+ * Returns `null` when the route should not be registered at all.
+ */
+export function resolveRootRedirect(
+  override: string | undefined,
+  did: string,
+): string | null {
+  if (override === '') return null;          // explicit disable
+  if (override !== undefined) return override; // explicit override
+  if (did && !did.startsWith(PLACEHOLDER_DID_PREFIX)) {
+    return `https://bsky.app/profile/${did}`;
+  }
+  return REPO_URL;
+}
+
 // Only http(s) URLs land in `href`. Anything else (`javascript:`, `data:`,
 // `vbscript:`, scheme-relative, …) is rendered as plain text. The detail page
 // echoes URLs from the Google Data Commons Fact Check feed, which has
@@ -205,13 +231,17 @@ export function registerDetailRoutes(app: LabelerApp): void {
 
   // `GET /` has no useful payload to return — the labeler's surfaces are
   // /posts, /healthz, /robots.txt, and the xrpc endpoints. Send anyone who
-  // lands on the root somewhere informative. Configurable per deployment;
-  // empty string disables the redirect (root returns 404 instead).
-  const rootRedirect = getConfig().LABELER_ROOT_REDIRECT;
+  // lands on the root somewhere informative.
+  //
+  // Resolution: explicit env override > derived from LABELER_DID > project
+  // repo as a last-resort. An *explicitly* empty `LABELER_ROOT_REDIRECT`
+  // (the string `""`) disables the route entirely so the root returns 404.
+  const cfg = getConfig();
+  const rootRedirect = resolveRootRedirect(cfg.LABELER_ROOT_REDIRECT, cfg.LABELER_DID);
   if (rootRedirect) {
     app.get('/', async (_req, reply) => {
-      // 302 (Found) — the redirect target is operator-configurable, may
-      // change per deployment, and shouldn't be cached by intermediaries.
+      // 302 (Found) — the redirect target may change per deployment and
+      // shouldn't be cached by intermediaries.
       reply.header('x-robots-tag', 'noindex, nofollow');
       reply.redirect(rootRedirect, 302);
     });
