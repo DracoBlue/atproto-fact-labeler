@@ -26,6 +26,7 @@
     "cli:label": "tsx src/cli/label-post.ts",
     "cli:embed-rebuild": "tsx src/cli/embed-rebuild.ts",
     "cli:lang-rebuild": "tsx src/cli/lang-rebuild.ts",
+    "lexicons:publish": "tsx src/cli/lexicons-publish.ts",
     "cleanup:claims": "tsx src/cli/cleanup-claims.ts",
     "proposal:accept": "tsx src/cli/proposal-accept.ts",
     "test:matching": "tsx src/cli/test-matching.ts",

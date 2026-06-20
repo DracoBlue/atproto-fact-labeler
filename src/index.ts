@@ -12,6 +12,7 @@ import { runFixture } from './ingest/fixture.ts';
 import { processPost } from './pipeline/orchestrator.ts';
 import { createLabelerServer } from './labels/server.ts';
 import { verdictToLabel } from './labels/vocabulary.ts';
+import { publishClaimVerdict } from './labels/publish-claim-verdict.ts';
 import { registerDetailRoutes } from './detail/server.ts';
 import { registerReportRoutes } from './ingest/reports.ts';
 import { AppViewClient } from './ingest/appview.ts';
@@ -101,6 +102,9 @@ async function main(): Promise<void> {
         db.prepare(`UPDATE verdict
                        SET status = 'rejected'
                       WHERE id = (SELECT verdict_id FROM proposal WHERE id = ?)`).run(proposalId);
+        // Drop the in-flight snapshot — the proposal won't publish, so the
+        // evidence list no longer needs to be kept warm for the publish step.
+        db.prepare('UPDATE proposal SET evidence_snapshot = NULL WHERE id = ?').run(proposalId);
       }
       return;
     }
@@ -140,6 +144,12 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err, proposalId }, 'failed to emit label');
     }
+
+    // Publish the canonical app.kiesel.facts.claimVerdict record to the
+    // labeler's PDS. The detail server reads this back via getRecord; other
+    // consumers discover it through Constellation. See
+    // docs/PROPOSAL_lexicons/LEXICON_DESIGN.md for the architecture.
+    await maybePublishClaimVerdict(proposalId);
 
     // Optional: reply to the mention post on Bluesky with the verdict.
     await maybeReplyToMention(proposalId);
@@ -307,6 +317,26 @@ async function main(): Promise<void> {
     // Kick once immediately so a restart picks up anything left behind.
     setTimeout(() => drainReplyQueue().catch(() => {}), 1000);
   }
+
+  /**
+   * Publish the canonical app.kiesel.facts.claimVerdict atproto record on
+   * the labeler's PDS. Detail server reads this back via getRecord;
+   * Constellation makes it discoverable to third-party clients.
+   *
+   * Best-effort: the on-wire label is the primary signal, so a publish
+   * failure logs at `error` and otherwise leaves the verdict intact. The
+   * retry path is `pnpm verdicts:backfill` (followup CLI).
+   */
+  const maybePublishClaimVerdict = async (proposalId: number): Promise<void> => {
+    if (!bsky) return;
+    const result = await publishClaimVerdict(db, bsky, proposalId);
+    if (result.status === 'failed') {
+      logger.error(
+        { proposalId, reason: result.reason },
+        'claimVerdict: publish failed — record will be re-tried via pnpm verdicts:backfill',
+      );
+    }
+  };
 
   /** Post a Bluesky reply with the verdict when conditions are met. */
   const maybeReplyToMention = async (proposalId: number): Promise<void> => {

@@ -1,0 +1,203 @@
+{
+  "lexicon": 1,
+  "id": "app.kiesel.facts.claimVerdict",
+  "description": "An aggregated verdict on a single atproto record, produced by a labeler that cites one or more existing fact-checks. The actor writing this record is a *labeler* (an automated or human-curated routing service), not the original fact-checker. Each verdict points back at the atproto record it covers (subject) AND at the evidence it relied on (fact-checks).",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A labeler's aggregated verdict on one specific atproto record (typically a Bluesky post). Each verdict represents the labeler's call given the evidence available at `verifiedAt`. Re-running the pipeline later may produce a superseding record; the most recent record for a given (labeler, subject) pair is authoritative.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "subject",
+          "claimText",
+          "verdict",
+          "evidence",
+          "verifiedAt"
+        ],
+        "properties": {
+          "subject": {
+            "type": "ref",
+            "ref": "com.atproto.repo.strongRef",
+            "description": "The atproto record the verdict is *about* (usually an app.bsky.feed.post). Constellation indexes this field, enabling 'which labelers have reviewed this post?' lookups."
+          },
+          "claimText": {
+            "type": "string",
+            "description": "The atomic claim extracted from the subject, as the labeler interpreted it. The actual sentence on which the verdict was computed.",
+            "minLength": 1,
+            "maxLength": 2000,
+            "maxGraphemes": 700
+          },
+          "decontextualizedText": {
+            "type": "string",
+            "description": "Standalone version of the claim — rewritten so the claim makes sense outside the original post's context. Used by the labeler internally to improve matching against ClaimReview entries that don't share the post's surrounding context.",
+            "maxLength": 2000,
+            "maxGraphemes": 700
+          },
+          "verdict": {
+            "type": "string",
+            "knownValues": [
+              "supported",
+              "refuted",
+              "disputed",
+              "mixed",
+              "outdated",
+              "unknown"
+            ],
+            "description": "The aggregated verdict. 'supported' = fact-checkers confirm the claim. 'refuted' = fact-checkers refute it. 'disputed' = fact-checkers disagree among themselves. 'mixed' = the claim is partially true. 'outdated' = was true when reviewed but no longer current. 'unknown' = reviewed but unresolved by the publisher."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Aggregated confidence in the verdict, in [0, 1]. Specific computation is labeler-internal; consumers should treat it as ordinal."
+          },
+          "voteBreakdown": {
+            "type": "ref",
+            "ref": "#voteBreakdown",
+            "description": "How the underlying judgements split. Useful for downstream consumers to apply stricter thresholds than the labeler did."
+          },
+          "evidence": {
+            "type": "array",
+            "minLength": 1,
+            "maxLength": 20,
+            "items": {
+              "type": "ref",
+              "ref": "#evidenceItem"
+            },
+            "description": "The fact-checks that informed the verdict. Each item either references an atproto claimReview record OR an external publisher URL (typical case today — most publishers don't yet write to atproto). At least one item is required: a verdict with no evidence is not a verdict."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Short human-readable explanation of how the verdict was reached. Optional but recommended.",
+            "maxLength": 1000,
+            "maxGraphemes": 350
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When the verdict was computed."
+          },
+          "validAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "Optional 'as-of' date the verdict reflects — useful when citing a fact-check published earlier than verifiedAt. For example: a fact-check from 2020 cited today carries a validAt of 2020."
+          },
+          "emittedLabel": {
+            "type": "string",
+            "description": "Optional reference to a Bluesky label value this verdict caused the labeler to emit on subject (e.g. 'fact-supported', 'fact-refuted'). Reflects what consumers see on Bluesky's wire, complementing the structured verdict here."
+          },
+          "labelUri": {
+            "type": "string",
+            "format": "at-uri",
+            "description": "Optional at-uri of the com.atproto.label record this verdict corresponds to, when the labeler also publishes a signed label."
+          },
+          "supersedes": {
+            "type": "string",
+            "format": "at-uri",
+            "description": "Optional at-uri of an earlier claimVerdict by this labeler on the same subject. When set, signals 'this record replaces the older one'."
+          }
+        }
+      }
+    },
+    "voteBreakdown": {
+      "type": "object",
+      "description": "Summary of the per-evidence judgements that fed the aggregated verdict.",
+      "required": ["entail", "contradict", "neutral"],
+      "properties": {
+        "entail": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of evidence items judged to entail the claim."
+        },
+        "contradict": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of evidence items judged to contradict the claim."
+        },
+        "neutral": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of evidence items judged neutral (dropped from aggregation)."
+        }
+      }
+    },
+    "evidenceItem": {
+      "type": "object",
+      "description": "A single fact-check cited as evidence. Provides EITHER a reference to an atproto claimReview record (preferred when the publisher operates on atproto) OR the publisher's own article URL and metadata. Both `claimReview` and `externalSource` may be set when an atproto record exists for an external publisher's web article.",
+      "properties": {
+        "claimReview": {
+          "type": "ref",
+          "ref": "com.atproto.repo.strongRef",
+          "description": "Reference to an atproto app.kiesel.facts.claimReview record. Set when the cited fact-check is hosted on atproto."
+        },
+        "externalSource": {
+          "type": "ref",
+          "ref": "#externalSource",
+          "description": "Publisher's web article URL + metadata. Set when the cited fact-check is *not* on atproto (typical case today — Lead Stories, USA Today, dpa-Faktencheck etc. publish on the web only)."
+        },
+        "polarity": {
+          "type": "string",
+          "knownValues": ["entail", "contradict", "neutral"],
+          "description": "How this evidence relates to the claim being verdicted. 'entail' = supports. 'contradict' = refutes. 'neutral' = not directly relevant; included for transparency about what was retrieved but dropped."
+        },
+        "intakePath": {
+          "type": "string",
+          "knownValues": ["self-published", "bulk-feed", "factcheck-api"],
+          "description": "How the labeler obtained this evidence. 'self-published' = an atproto claimReview record (claimReview field set). 'bulk-feed' = a ClaimReview JSON-LD compilation feed (e.g. Google Data Commons). 'factcheck-api' = a per-claim API lookup (e.g. Google Fact Check Tools)."
+        },
+        "attribution": {
+          "type": "string",
+          "description": "Verbatim attribution string the labeler stores with this evidence. Lets downstream consumers see the publisher + intake provenance per evidence item without inferring it.",
+          "maxLength": 500
+        }
+      }
+    },
+    "externalSource": {
+      "type": "object",
+      "description": "Metadata for a fact-check hosted on the web (not on atproto). Includes enough fields to render without fetching the article: publisher name, source URL, rating text, language.",
+      "required": ["publisherName", "sourceUrl"],
+      "properties": {
+        "publisherName": {
+          "type": "string",
+          "description": "Display name of the publisher (e.g. 'Full Fact', 'USA Today').",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "publisherSite": {
+          "type": "string",
+          "description": "Bare host of the publisher (e.g. 'fullfact.org', 'usatoday.com'). Lets consumers apply their own publisher allowlist."
+        },
+        "publisherUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Publisher's homepage URL."
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the publisher's fact-check article."
+        },
+        "claimReviewed": {
+          "type": "string",
+          "description": "The text of the claim as the publisher framed it (may differ slightly from the labeler's extracted claim).",
+          "maxLength": 2000
+        },
+        "ratingNative": {
+          "type": "string",
+          "description": "Publisher's verdict text, verbatim (e.g. 'False', 'Mostly False', 'Falsch', 'Pants on Fire')."
+        },
+        "reviewDate": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the publisher published the fact-check."
+        },
+        "lang": {
+          "type": "string",
+          "description": "BCP-47 language tag of the publisher's article."
+        }
+      }
+    }
+  }
+}

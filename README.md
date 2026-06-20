@@ -76,6 +76,13 @@ Per trigger:
 - **`subscribeLabels` / `queryLabels`** — the on-wire atproto labeler
   endpoints, served by
   [`@skyware/labeler`](https://github.com/skyware-js/labeler).
+- **`app.kiesel.facts.claimVerdict` atproto records** — every accepted
+  verdict is published as a canonical record on the labeler's own PDS
+  carrying the full evidence list, polarity breakdown, and per-source
+  attribution. Discoverable via
+  [Constellation](https://constellation.microcosm.blue/) backlinks on
+  the labeled post. Design + schema:
+  [docs/PROPOSAL_lexicons/LEXICON_DESIGN.md](./docs/PROPOSAL_lexicons/LEXICON_DESIGN.md).
 - **`GET /posts?uri=at://…`** — per-post detail page (HTML, or
   `?format=json`) with the verdict, the rationale, and every source
   with publisher attribution + link.

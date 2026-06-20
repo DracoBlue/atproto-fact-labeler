@@ -88,20 +88,68 @@ const INSERT_VERDICT = `
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
-const INSERT_EVIDENCE = `
-  INSERT INTO evidence
-    (verdict_id, source_url, publisher, rating_native, reviewed_at,
-     retrieval_method, license, attribution, claim_review_id)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-`;
+// The legacy `evidence` table is no longer written to. Evidence lives in
+// `proposal.evidence_snapshot` until the HITL decision, then becomes the
+// `evidence[]` array of the published claimVerdict atproto record. The
+// table schema stays (CREATE IF NOT EXISTS in src/store/db.ts) so existing
+// rows from pre-migration verdicts remain readable by the detail server's
+// dual-read fallback. New rows are not produced.
 
 const INSERT_PROPOSAL = `
   INSERT INTO proposal
     (post_uri, claim_id, verdict_id,
      trigger_reason, trigger_source_uri, trigger_source_cid,
-     trigger_root_uri, trigger_root_cid, trigger_source_lang)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     trigger_root_uri, trigger_root_cid, trigger_source_lang,
+     evidence_snapshot)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
+
+/**
+ * Snapshot shape stored on `proposal.evidence_snapshot`. On accept this
+ * becomes the `evidence[]` array of the published claimVerdict atproto
+ * record verbatim. Shape is intentionally close to the lexicon's
+ * `#evidenceItem` definition so the publish step is a near-no-op
+ * transformation. See lexicons/app/kiesel/facts/claimVerdict.json.
+ */
+export interface EvidenceSnapshot {
+  evidence: Array<{
+    polarity: 'entail' | 'contradict' | 'neutral';
+    intakePath: 'self-published' | 'bulk-feed' | 'factcheck-api';
+    attribution: string;
+    externalSource: {
+      publisherName: string;
+      publisherSite?: string;
+      publisherUrl?: string;
+      sourceUrl: string;
+      claimReviewed: string;
+      ratingNative?: string;
+      reviewDate?: string;
+      lang?: string;
+    };
+  }>;
+  voteBreakdown: { entail: number; contradict: number; neutral: number };
+}
+
+/** Extract the publisher site host from a URL ('https://www.dpa.com/x' → 'dpa.com'). */
+function hostOf(url: string | null): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Infer how this candidate entered the pool. Based on the `attribution`
+ * string the ingest paths embed (see src/ingest/{claimreview-feed,
+ * factcheck-live}.ts and docs/OWN_FACT_CHECKS.md).
+ */
+function inferIntakePath(attribution: string): EvidenceSnapshot['evidence'][number]['intakePath'] {
+  if (/Google Fact Check Tools API/i.test(attribution)) return 'factcheck-api';
+  if (/Google Data Commons/i.test(attribution)) return 'bulk-feed';
+  return 'self-published';
+}
 
 export async function processPost(
   post: IngestedPost,
@@ -200,20 +248,38 @@ export async function processPost(
     );
     const verdictId = Number(verdictResult.lastInsertRowid);
 
-    const evidenceStmt = db.prepare(INSERT_EVIDENCE);
-    for (const cand of survivingCandidates) {
-      evidenceStmt.run(
-        verdictId,
-        cand.sourceUrl,
-        cand.publisher,
-        cand.ratingNative,
-        cand.reviewDate,
-        `dense+nli:${cand.nliLabel}`,
-        'see sd_license',
-        cand.attribution,
-        cand.id,
-      );
-    }
+    // Build the evidence snapshot that will become the published
+    // claimVerdict.evidence[] array on accept. Shape mirrors the lexicon
+    // (lexicons/app/kiesel/facts/claimVerdict.json#evidenceItem). Persisted
+    // on the proposal row so it survives crashes between pipeline-run and
+    // HITL decision (see docs/PROPOSAL_lexicons/LEXICON_DESIGN.md § Option C).
+    const snapshot: EvidenceSnapshot = {
+      evidence: survivingCandidates.map((cand) => ({
+        polarity:
+          cand.nliLabel === 'entailment'
+            ? 'entail'
+            : cand.nliLabel === 'contradiction'
+              ? 'contradict'
+              : 'neutral',
+        intakePath: inferIntakePath(cand.attribution),
+        attribution: cand.attribution,
+        externalSource: {
+          publisherName: cand.publisher,
+          publisherSite: hostOf(cand.publisherUrl ?? cand.sourceUrl),
+          publisherUrl: cand.publisherUrl ?? undefined,
+          sourceUrl: cand.sourceUrl,
+          claimReviewed: cand.claimReviewed,
+          ratingNative: cand.ratingNative ?? undefined,
+          reviewDate: cand.reviewDate ?? undefined,
+          lang: cand.lang ?? undefined,
+        },
+      })),
+      voteBreakdown: {
+        entail: match.entailed,
+        contradict: match.contradicted,
+        neutral: match.neutral,
+      },
+    };
 
     const proposalResult = db.prepare(INSERT_PROPOSAL).run(
       post.uri,
@@ -225,6 +291,7 @@ export async function processPost(
       trigger.rootUri ?? null,
       trigger.rootCid ?? null,
       trigger.sourceLang ?? null,
+      JSON.stringify(snapshot),
     );
     const proposalId = Number(proposalResult.lastInsertRowid);
 

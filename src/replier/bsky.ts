@@ -183,43 +183,84 @@ export class BskyClient {
   }
 
   private async createRecord(record: Record<string, unknown>): Promise<PostReplyResult> {
+    return this.callRepoMethod('createRecord', {
+      collection: 'app.bsky.feed.post',
+      record,
+    });
+  }
+
+  /**
+   * Create or replace a record at a known `(collection, rkey)` location on
+   * the labeler's own repo. Idempotent for the lexicon-publication and
+   * verdict-publication paths — re-running with the same rkey overwrites.
+   */
+  async putRecord(
+    collection: string,
+    rkey: string,
+    record: Record<string, unknown>,
+  ): Promise<PostReplyResult> {
+    return this.callRepoMethod('putRecord', {
+      collection,
+      rkey,
+      record,
+    });
+  }
+
+  /**
+   * Create a record under an auto-generated rkey. Used by the verdict path
+   * (each accepted verdict becomes its own claimVerdict record with a
+   * fresh TID rkey).
+   */
+  async createRecordTyped(
+    collection: string,
+    record: Record<string, unknown>,
+  ): Promise<PostReplyResult> {
+    return this.callRepoMethod('createRecord', {
+      collection,
+      record,
+    });
+  }
+
+  /**
+   * Delete a record by rkey. Used on retire when the operator wants the
+   * claimVerdict record removed entirely (vs. tombstoned via putRecord).
+   */
+  async deleteRecord(collection: string, rkey: string): Promise<void> {
+    await this.callRepoMethod('deleteRecord', { collection, rkey });
+  }
+
+  private async callRepoMethod(
+    method: 'createRecord' | 'putRecord' | 'deleteRecord',
+    extraBody: Record<string, unknown>,
+  ): Promise<PostReplyResult> {
     if (!this.session) await this.login();
     if (!this.session) throw new Error('bsky session unavailable');
 
-    const body = {
-      repo: this.session.did,
-      collection: 'app.bsky.feed.post',
-      record,
-    };
-
-    let res = await this.fetchImpl(`${this.serviceUrl}/xrpc/com.atproto.repo.createRecord`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        authorization: `Bearer ${this.session.accessJwt}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (res.status === 401) {
-      // Access JWT expired — refresh and retry once.
-      await this.refresh();
-      if (!this.session) throw new Error('bsky re-auth failed');
-      res = await this.fetchImpl(`${this.serviceUrl}/xrpc/com.atproto.repo.createRecord`, {
+    const body = { repo: this.session.did, ...extraBody };
+    const url = `${this.serviceUrl}/xrpc/com.atproto.repo.${method}`;
+    const post = async (): Promise<Response> =>
+      this.fetchImpl(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           accept: 'application/json',
-          authorization: `Bearer ${this.session.accessJwt}`,
+          authorization: `Bearer ${this.session!.accessJwt}`,
         },
         body: JSON.stringify(body),
       });
-    }
 
-    if (!res.ok) {
-      throw new Error(`createRecord ${res.status}: ${await res.text().catch(() => '')}`);
+    let res = await post();
+    if (res.status === 401) {
+      await this.refresh();
+      if (!this.session) throw new Error('bsky re-auth failed');
+      res = await post();
     }
-    return (await res.json()) as PostReplyResult;
+    if (!res.ok) {
+      throw new Error(`${method} ${res.status}: ${await res.text().catch(() => '')}`);
+    }
+    // deleteRecord returns an empty body; parse-failure tolerated.
+    return (await res
+      .json()
+      .catch(() => ({ uri: '', cid: '' }))) as PostReplyResult;
   }
 }

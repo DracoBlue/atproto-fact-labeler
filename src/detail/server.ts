@@ -8,9 +8,18 @@
  *   GET /posts?uri=<at-uri>           HTML
  *   GET /posts?uri=<at-uri>&format=json   JSON
  *   GET /healthz                       liveness
+ *
+ * Architecture: when a verdict has been published as a canonical
+ * app.kiesel.facts.claimVerdict atproto record (`verdict.atproto_uri`
+ * is set), this server fetches that record and renders from it — the
+ * same path every other consumer of our labeler uses. Pre-migration
+ * verdicts fall back to the legacy SQL join with the local `evidence`
+ * table.
  */
 import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
+import { verdictToLabel } from '../labels/vocabulary.ts';
+import { logger } from '../util/logger.ts';
 import type { LabelerApp } from '../labels/server.ts';
 
 interface Row {
@@ -31,19 +40,121 @@ interface Row {
   }>;
 }
 
-function loadDetail(postUri: string): { postText: string | null; claims: Row[] } {
+interface ClaimVerdictRecord {
+  $type?: string;
+  subject?: { uri?: string; cid?: string };
+  claimText?: string;
+  decontextualizedText?: string;
+  verdict?: string;
+  confidence?: number;
+  rationale?: string;
+  verifiedAt?: string;
+  validAt?: string;
+  emittedLabel?: string;
+  evidence?: Array<{
+    polarity?: string;
+    intakePath?: string;
+    attribution?: string;
+    externalSource?: {
+      publisherName?: string;
+      publisherSite?: string;
+      publisherUrl?: string;
+      sourceUrl?: string;
+      claimReviewed?: string;
+      ratingNative?: string;
+      reviewDate?: string;
+      lang?: string;
+    };
+    claimReview?: { uri?: string; cid?: string };
+  }>;
+}
+
+const RECORD_VERDICT_TO_INTERNAL: Record<string, string> = {
+  supported: 'true',
+  refuted: 'false',
+  disputed: 'disputed',
+  mixed: 'mixed',
+  outdated: 'outdated',
+  unknown: 'unknown',
+};
+
+async function fetchClaimVerdict(
+  pdsBase: string,
+  atUri: string,
+): Promise<ClaimVerdictRecord | null> {
+  // at://<did>/<collection>/<rkey>
+  const m = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  const [, did, collection, rkey] = m;
+  const url =
+    `${pdsBase.replace(/\/$/, '')}/xrpc/com.atproto.repo.getRecord` +
+    `?repo=${encodeURIComponent(did!)}` +
+    `&collection=${encodeURIComponent(collection!)}` +
+    `&rkey=${encodeURIComponent(rkey!)}`;
+  try {
+    const res = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      logger.warn(
+        { status: res.status, atUri },
+        'detail: getRecord returned non-2xx for claimVerdict',
+      );
+      return null;
+    }
+    const body = (await res.json()) as { value?: ClaimVerdictRecord };
+    return body.value ?? null;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message, atUri }, 'detail: getRecord failed');
+    return null;
+  }
+}
+
+function renderRowFromRecord(
+  claimId: number,
+  record: ClaimVerdictRecord,
+  fallback: { verifiedAt: string | null; validAt: string | null; rationale: string | null },
+): Row {
+  const internalVerdict = record.verdict
+    ? RECORD_VERDICT_TO_INTERNAL[record.verdict] ?? record.verdict
+    : 'unknown';
+  const label = verdictToLabel(internalVerdict as Parameters<typeof verdictToLabel>[0]) ?? 'fact-unknown';
+  const evidence: Row['evidence'] = (record.evidence ?? []).map((e) => {
+    const src = e.externalSource ?? {};
+    return {
+      source_url: src.sourceUrl ?? e.claimReview?.uri ?? '',
+      publisher: src.publisherName ?? '',
+      rating_native: src.ratingNative ?? null,
+      reviewed_at: src.reviewDate ?? null,
+      attribution: e.attribution ?? '',
+    };
+  });
+  return {
+    claim_id: claimId,
+    atomic_text: record.claimText ?? '',
+    decontextualized_text: record.decontextualizedText ?? record.claimText ?? '',
+    verdict_label: label,
+    verdict_confidence: record.confidence ?? null,
+    verdict_rationale: record.rationale ?? fallback.rationale,
+    verified_at: record.verifiedAt ?? fallback.verifiedAt ?? '',
+    valid_at: record.validAt ?? fallback.validAt,
+    evidence,
+  };
+}
+
+async function loadDetail(postUri: string): Promise<{ postText: string | null; claims: Row[] }> {
   const db = getDb();
+  const cfg = getConfig();
   const post = db
     .prepare('SELECT text FROM post_cache WHERE uri = ?')
     .get(postUri) as { text: string } | undefined;
 
   // Public detail view only surfaces verdicts that actually went on-wire:
   // status='accepted' AND retired_at IS NULL. Proposed verdicts are
-  // operator-internal (visible via `pnpm lifecycle:status` and SQL); they
-  // may still pass HITL or be rejected, and a public URL is not the place
-  // to show in-flight pipeline state. Retired verdicts are hidden because
-  // they were taken off the wire — exposing them again here would
-  // re-publish text we already chose to retract.
+  // operator-internal; retired verdicts are hidden because they were taken
+  // off the wire — exposing them again here would re-publish text we
+  // already chose to retract.
   const rows = db
     .prepare(
       `SELECT c.id              AS claim_id,
@@ -54,7 +165,8 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
               v.confidence      AS verdict_confidence,
               v.rationale       AS verdict_rationale,
               v.verified_at,
-              v.valid_at
+              v.valid_at,
+              v.atproto_uri     AS atproto_uri
          FROM claim c
          JOIN verdict v ON v.claim_id = c.id
         WHERE c.post_uri = ?
@@ -62,7 +174,9 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
           AND v.retired_at IS NULL
         ORDER BY v.id DESC`,
     )
-    .all(postUri) as Array<Row & { verdict_id: number }>;
+    .all(postUri) as Array<
+      Row & { verdict_id: number; atproto_uri: string | null }
+    >;
 
   const evidenceStmt = db.prepare(
     `SELECT source_url, publisher, rating_native, reviewed_at, attribution
@@ -71,20 +185,42 @@ function loadDetail(postUri: string): { postText: string | null; claims: Row[] }
       ORDER BY id`,
   );
 
-  const claims = rows.map((r) => {
-    const evidence = evidenceStmt.all(r.verdict_id) as Row['evidence'];
-    return {
-      claim_id: r.claim_id,
-      atomic_text: r.atomic_text,
-      decontextualized_text: r.decontextualized_text,
-      verdict_label: r.verdict_label,
-      verdict_confidence: r.verdict_confidence,
-      verdict_rationale: r.verdict_rationale,
-      verified_at: r.verified_at,
-      valid_at: r.valid_at,
-      evidence,
-    };
-  });
+  const claims = await Promise.all(
+    rows.map(async (r): Promise<Row> => {
+      // Canonical path: verdict is published as an atproto record. Fetch it
+      // and render from there — same data path every other consumer of our
+      // labeler uses.
+      if (r.atproto_uri) {
+        const record = await fetchClaimVerdict(cfg.LABELER_BSKY_SERVICE, r.atproto_uri);
+        if (record) {
+          return renderRowFromRecord(r.claim_id, record, {
+            verifiedAt: r.verified_at,
+            validAt: r.valid_at,
+            rationale: r.verdict_rationale,
+          });
+        }
+        logger.warn(
+          { atUri: r.atproto_uri, claimId: r.claim_id },
+          'detail: atproto fetch failed, falling back to legacy SQL render',
+        );
+      }
+      // Legacy fallback: read the evidence rows from SQLite. Used for
+      // pre-migration verdicts and as a degradation path if the PDS is
+      // momentarily unreachable.
+      const evidence = evidenceStmt.all(r.verdict_id) as Row['evidence'];
+      return {
+        claim_id: r.claim_id,
+        atomic_text: r.atomic_text,
+        decontextualized_text: r.decontextualized_text,
+        verdict_label: r.verdict_label,
+        verdict_confidence: r.verdict_confidence,
+        verdict_rationale: r.verdict_rationale,
+        verified_at: r.verified_at,
+        valid_at: r.valid_at,
+        evidence,
+      };
+    }),
+  );
 
   return { postText: post?.text ?? null, claims };
 }
@@ -269,7 +405,7 @@ export function registerDetailRoutes(app: LabelerApp): void {
         reply.code(400);
         return { error: 'missing or invalid uri (must start with at://)' };
       }
-      const data = loadDetail(uri);
+      const data = await loadDetail(uri);
       const wantsJson =
         req.query.format === 'json' || (req.headers.accept ?? '').includes('application/json');
       if (wantsJson) {

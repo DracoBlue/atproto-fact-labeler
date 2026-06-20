@@ -281,6 +281,23 @@ function migrate(db: DbLike): void {
   // a table rebuild), so we track the retraction with a timestamp column.
   // The detail page filters retired verdicts out by default.
   addColumnIfMissing(db, 'verdict', 'retired_at', 'TEXT');
+
+  // Atproto-canonical record reference. When the verdict was published as an
+  // app.kiesel.facts.claimVerdict record on the labeler's PDS, these hold the
+  // resulting at-uri and cid. Detail server uses these to fetch + render the
+  // canonical record instead of joining verdict + evidence locally. NULL for
+  // pre-migration verdicts; the detail server falls back to the legacy join
+  // path in that case.
+  addColumnIfMissing(db, 'verdict', 'atproto_uri', 'TEXT');
+  addColumnIfMissing(db, 'verdict', 'atproto_cid', 'TEXT');
+
+  // In-flight evidence snapshot. The pipeline persists the evidence list (as
+  // it will appear in the published claimVerdict record's evidence[] array)
+  // here, on the proposal row, instead of populating the legacy `evidence`
+  // table. Survives crashes between pipeline-run and HITL decision. Dropped
+  // (set to NULL) once the decision lands and the snapshot has either been
+  // materialised into an atproto record (accept) or discarded (reject).
+  addColumnIfMissing(db, 'proposal', 'evidence_snapshot', 'TEXT');
 }
 
 /**

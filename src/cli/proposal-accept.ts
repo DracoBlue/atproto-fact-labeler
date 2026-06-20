@@ -14,7 +14,9 @@
 import { getConfig } from '../config/index.ts';
 import { getDb, getDbAsync, closeDb } from '../store/db.ts';
 import { createLabelerServer } from '../labels/server.ts';
+import { publishClaimVerdict } from '../labels/publish-claim-verdict.ts';
 import { verdictToLabel } from '../labels/vocabulary.ts';
+import { BskyClient } from '../replier/bsky.ts';
 import { logger } from '../util/logger.ts';
 import type { Verdict } from '../pipeline/normalise-rating.ts';
 
@@ -91,6 +93,7 @@ function listDeferred(): DeferredRow[] {
 
 async function acceptOne(id: number, dryRun: boolean): Promise<void> {
   const db = getDb();
+  const cfg = getConfig();
   const row = db
     .prepare(
       `SELECT p.id          AS proposal_id,
@@ -195,6 +198,23 @@ async function acceptOne(id: number, dryRun: boolean): Promise<void> {
       'proposal accepted and label emitted',
     );
     process.stderr.write(`\n  Accepted. Label '${val}' emitted on ${row.post_uri}.\n`);
+
+    // Publish the canonical claimVerdict atproto record (best-effort).
+    // Requires LABELER_BSKY_* creds; without them we just skip — the wire
+    // label is already out.
+    if (cfg.LABELER_BSKY_IDENTIFIER && cfg.LABELER_BSKY_APP_PASSWORD) {
+      const bsky = new BskyClient({
+        serviceUrl: cfg.LABELER_BSKY_SERVICE,
+        identifier: cfg.LABELER_BSKY_IDENTIFIER,
+        password: cfg.LABELER_BSKY_APP_PASSWORD,
+      });
+      const publishResult = await publishClaimVerdict(db, bsky, id);
+      if (publishResult.status === 'published') {
+        process.stderr.write(`  Published atproto record: ${publishResult.atprotoUri}\n`);
+      } else if (publishResult.status === 'failed') {
+        process.stderr.write(`  ⚠ atproto record publish failed: ${publishResult.reason}\n`);
+      }
+    }
   } finally {
     await labeler.stop();
   }

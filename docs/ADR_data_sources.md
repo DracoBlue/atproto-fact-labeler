@@ -35,7 +35,10 @@ Plus two practical constraints:
 **Decision**
 
 Three independent intake paths, configurable per deployment, each
-filling a gap the others have. All routed through the same
+filling a gap the others have. A fourth path is in flight as the
+project moves to atproto-native records (see
+[`PROPOSAL_lexicons/LEXICON_DESIGN.md`](PROPOSAL_lexicons/LEXICON_DESIGN.md)).
+All paths route through the same
 [`config/claimreview-publishers-allowlist.txt`](../config/claimreview-publishers-allowlist.txt)
 so the editorial bar stays identical regardless of intake.
 
@@ -44,6 +47,7 @@ so the editorial bar stays identical regardless of intake.
 | **1. Own ClaimReviews** | Single-item or N-item schema.org DataFeed JSON, ingested via `pnpm ingest` | The operator runs a newsroom / NGO that already publishes ClaimReview-tagged articles | unbounded by operator | Operator's choice |
 | **2. Google Data Commons bulk feed** | Daily ~60 MB public JSON dump, ingested via `pnpm ingest data.json` | Default; strong on non-English (dpa, AFP, Univision, factly.in, …) | ~88 k after allowlist, refreshed daily | CC BY 4.0 compilation, per-entry publisher copyright |
 | **3. Google Fact Check Tools API (`claims:search`)** | Live per-claim HTTP query, activated by `FACTCHECK_API_KEY` | Recommended; closes the English-publisher gap (Lead Stories, USA Today, Snopes, AAP all here) | the full Google Fact Check Explorer index | Google API ToS, accepted by the operator's GCP project |
+| **4. Atproto-native ClaimReview records** *(in progress)* | Publishers writing `app.kiesel.facts.claimReview` records to their own PDS; consumers discover them via Constellation backlinks. Same shape as schema.org/ClaimReview. | When fact-checkers move onto atproto themselves; gives publishers full control over their entries (correctable, supersedeable) without a JSON-LD-on-website round-trip. | grows as adopters appear | Publisher's choice on per-record `sdLicense`. |
 
 Per-path setup, caching, and ToS implications:
 
