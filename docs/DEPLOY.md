@@ -451,6 +451,7 @@ candidates above threshold survive into NLI.
 | `LABELER_SIGNING_KEY` | *(auto on first run)* | secp256k1 signing key for label records. Auto-generated and persisted to `.env` on first run. **Back it up** — losing it invalidates every emitted label. |
 | `LABELER_PORT` | `14831` | Internal port serving `subscribeLabels` / `queryLabels` **and** the detail page. |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public HTTPS URL the reverse proxy terminates at. |
+| `LABELER_ROOT_REDIRECT` | `https://github.com/DracoBlue/atproto-fact-labeler` | `GET /` 302-redirects here. Set to empty string to disable (root returns 404). Useful so anyone landing on `facts.example.org` with no path gets pointed at the project repo or your own about page. |
 | `LABELER_DETAIL_BASE_URL` | *(falls back to `LABELER_HOSTNAME`)* | Public URL of the detail page. Used as a deep-link in mention replies and quote-posts. |
 
 ### Triggers

@@ -9,6 +9,7 @@
  *   GET /posts?uri=<at-uri>&format=json   JSON
  *   GET /healthz                       liveness
  */
+import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
 import type { LabelerApp } from '../labels/server.ts';
 
@@ -194,6 +195,20 @@ ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (ye
 
 export function registerDetailRoutes(app: LabelerApp): void {
   app.get('/healthz', async () => ({ ok: true }));
+
+  // `GET /` has no useful payload to return — the labeler's surfaces are
+  // /posts, /healthz, /robots.txt, and the xrpc endpoints. Send anyone who
+  // lands on the root somewhere informative. Configurable per deployment;
+  // empty string disables the redirect (root returns 404 instead).
+  const rootRedirect = getConfig().LABELER_ROOT_REDIRECT;
+  if (rootRedirect) {
+    app.get('/', async (_req, reply) => {
+      // 302 (Found) — the redirect target is operator-configurable, may
+      // change per deployment, and shouldn't be cached by intermediaries.
+      reply.header('x-robots-tag', 'noindex, nofollow');
+      reply.redirect(rootRedirect, 302);
+    });
+  }
 
   // Block every crawler at the document level. The detail pages quote
   // attacker-controlled URLs (from posts being labeled and from third-party

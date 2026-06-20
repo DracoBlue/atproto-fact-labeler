@@ -72,6 +72,17 @@ const Schema = z.object({
   LABELER_SIGNING_KEY: z.string().default(''),
   LABELER_PORT: z.coerce.number().int().positive().default(14831),
   LABELER_HOSTNAME: z.string().default('http://localhost:14831'),
+  /**
+   * Where `GET /` redirects to. The labeler's HTTP root has no useful UI
+   * (the only public surfaces are `/posts?uri=…`, `/healthz`, the xrpc
+   * label endpoints, and `/robots.txt`). A 302 to the project repository
+   * is the friendly default for anyone landing on `facts.example.org`
+   * with no path. Set to an empty string to disable the redirect (the
+   * root then returns 404).
+   */
+  LABELER_ROOT_REDIRECT: z
+    .string()
+    .default('https://github.com/DracoBlue/atproto-fact-labeler'),
 
   // Ingest
   JETSTREAM_URL: z
