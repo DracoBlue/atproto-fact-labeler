@@ -177,11 +177,16 @@ function renderHtml(postUri: string, postText: string | null, claims: Row[]): st
 </header>
 ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (yet).</em></p>'}
 <footer>
-  <p>This labeler does not decide what is true. It surfaces the verdicts that
-     third-party fact-checkers (CORRECTIV, dpa, AFP, Snopes, PolitiFact, ...)
-     have already published. Click each source above for the original article.</p>
-  <p>Compiled via Google Data Commons Fact Check feed (CC BY 4.0).
-     Per-entry text remains under the publisher's own copyright.</p>
+  <p>This labeler does not decide what is true. It surfaces verdicts that
+     independent fact-checkers have already published, matches them against the
+     post, and shows you the evidence. Click each source above for the original
+     article — per-entry text remains under the publisher's own copyright; the
+     attribution line under each source names the publisher and how we obtained
+     the entry.</p>
+  <p>Sources may come from the Google Data Commons Fact Check bulk feed
+     (CC BY 4.0 compilation), the Google Fact Check Tools API, or fact-checks
+     the labeler operator hosts directly. Each entry's <em>attribution</em>
+     line above states which path it came from.</p>
 </footer>
 </body>
 </html>`;
