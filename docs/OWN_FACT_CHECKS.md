@@ -151,6 +151,7 @@ The JSON inside the `<script>` tag and the `item` object in
 
 ## See also
 
+- [`docs/LICENSING.md § Path 1`](LICENSING.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
 - [`docs/FEED_QUALITY.md`](FEED_QUALITY.md) — the allowlist that
   filters every ingest, including yours.
 - [`docs/FACTCHECK_API.md`](FACTCHECK_API.md) — using the Google live
