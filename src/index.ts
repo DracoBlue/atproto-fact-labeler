@@ -371,6 +371,10 @@ async function main(): Promise<void> {
    * the labeler's own feed with the verdict text. Idempotent on the reported
    * URI — re-reports of the same post don't re-post. Honours the author's
    * postgate (`disableRule`); skip + log if quotes are disabled.
+   *
+   * Doesn't use `loadTriggerCtx` because the report trigger has no
+   * `source_uri / source_cid` (the subject IS the post being labeled). Instead
+   * we load verdict + post-lang directly here.
    */
   const maybeQuoteForReport = async (
     proposalId: number,
@@ -378,8 +382,20 @@ async function main(): Promise<void> {
     postCid: string,
   ): Promise<void> => {
     if (!bsky || !cfg.REPLY_TO_REPORTS) return;
-    const ctx = loadTriggerCtx(proposalId);
-    if (!ctx || ctx.reason !== 'report') return;
+    const row = db
+      .prepare(
+        `SELECT p.trigger_reason AS reason,
+                v.label          AS verdict,
+                pc.lang          AS post_lang
+           FROM proposal p
+           JOIN verdict v   ON v.id = p.verdict_id
+           JOIN post_cache pc ON pc.uri = p.post_uri
+          WHERE p.id = ?`,
+      )
+      .get(proposalId) as
+      | { reason: string | null; verdict: string; post_lang: string | null }
+      | undefined;
+    if (!row || row.reason !== 'report') return;
     if (hasReplied(postUri)) {
       logger.debug({ postUri, proposalId }, 'report-quote: already replied to this URI, skipping');
       return;
@@ -417,11 +433,11 @@ async function main(): Promise<void> {
       `/posts?uri=${encodeURIComponent(postUri)}`;
 
     const text = buildReplyText({
-      verdict: ctx.verdict,
+      verdict: row.verdict,
       publishers,
       detailUrl,
       primarySourceUrl,
-      lang: ctx.source_lang ?? undefined,
+      lang: row.post_lang ?? undefined,
       defaultLang: cfg.LABELER_REPLY_DEFAULT_LANG,
     });
 
