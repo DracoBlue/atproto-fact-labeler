@@ -38,7 +38,8 @@ function withFreshDb(
       post_uri    TEXT NOT NULL,
       label       TEXT NOT NULL,
       status      TEXT NOT NULL DEFAULT 'proposed',
-      retired_at  TEXT
+      retired_at  TEXT,
+      atproto_uri TEXT
     );
   `);
   const insert = raw.prepare(
@@ -112,6 +113,7 @@ describe('retireLiveLabels', () => {
       negated: 2,
       verdictsRetired: 0,
       verdictsReconciled: 0,
+      retiredAtprotoUris: [],
       dryRun: false,
     });
     expect(emitted).toEqual([
@@ -149,6 +151,7 @@ describe('retireLiveLabels', () => {
       negated: 0,
       verdictsRetired: 0,
       verdictsReconciled: 0,
+      retiredAtprotoUris: [],
       dryRun: true,
     });
 

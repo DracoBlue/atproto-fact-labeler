@@ -143,7 +143,9 @@ function renderRowFromRecord(
   };
 }
 
-async function loadDetail(postUri: string): Promise<{ postText: string | null; claims: Row[] }> {
+async function loadDetail(
+  postUri: string,
+): Promise<{ postText: string | null; claims: Row[]; federated: FederatedReview[] }> {
   const db = getDb();
   const cfg = getConfig();
   const post = db
@@ -185,6 +187,10 @@ async function loadDetail(postUri: string): Promise<{ postText: string | null; c
       ORDER BY id`,
   );
 
+  // Constellation backlinks query fires in parallel with the per-claim
+  // record fetches so it doesn't add to wall-clock latency.
+  const federatedPromise = fetchFederatedReviews(postUri, cfg.LABELER_DID);
+
   const claims = await Promise.all(
     rows.map(async (r): Promise<Row> => {
       // Canonical path: verdict is published as an atproto record. Fetch it
@@ -222,7 +228,8 @@ async function loadDetail(postUri: string): Promise<{ postText: string | null; c
     }),
   );
 
-  return { postText: post?.text ?? null, claims };
+  const federated = await federatedPromise;
+  return { postText: post?.text ?? null, claims, federated };
 }
 
 function escapeHtml(s: string): string {
@@ -235,6 +242,57 @@ function escapeHtml(s: string): string {
 }
 
 const REPO_URL = 'https://github.com/DracoBlue/atproto-fact-labeler';
+const CONSTELLATION_BASE = 'https://constellation.microcosm.blue';
+const CLAIM_VERDICT_COLLECTION = 'app.kiesel.facts.claimVerdict';
+
+interface FederatedReview {
+  /** at-uri of the other labeler's claimVerdict record. */
+  atUri: string;
+  /** DID of the publisher (extracted from the at-uri). */
+  did: string;
+}
+
+/**
+ * Constellation backlinks for `subject.uri = postUri` across the
+ * claimVerdict collection. Returns the list excluding any record owned by
+ * the operator-configured labeler DID (those are already shown as the
+ * primary verdict). Fail-open on network errors — federated reviews are a
+ * nice-to-have, not a primary signal.
+ */
+async function fetchFederatedReviews(
+  postUri: string,
+  ownDid: string,
+): Promise<FederatedReview[]> {
+  const url =
+    `${CONSTELLATION_BASE}/links` +
+    `?target=${encodeURIComponent(postUri)}` +
+    `&collection=${encodeURIComponent(CLAIM_VERDICT_COLLECTION)}` +
+    `&path=.subject.uri`;
+  try {
+    const res = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+      links?: Array<{ source?: { uri?: string } }>;
+      linkingRecords?: Array<{ uri?: string }>;
+    };
+    // Constellation has had two response shapes in the wild. Honour either.
+    const raw: string[] = [];
+    for (const l of body.links ?? []) if (l.source?.uri) raw.push(l.source.uri);
+    for (const l of body.linkingRecords ?? []) if (l.uri) raw.push(l.uri);
+    return raw
+      .map((atUri) => {
+        const m = atUri.match(/^at:\/\/([^/]+)\//);
+        return m ? { atUri, did: m[1]! } : null;
+      })
+      .filter((r): r is FederatedReview => r !== null)
+      .filter((r) => r.did !== ownDid);
+  } catch {
+    return [];
+  }
+}
 const PLACEHOLDER_DID_PREFIX = 'did:plc:placeholder';
 
 /**
@@ -274,7 +332,36 @@ function isSafeHttpUrl(s: string): boolean {
   }
 }
 
-function renderHtml(postUri: string, postText: string | null, claims: Row[]): string {
+function renderFederatedReviews(reviews: FederatedReview[]): string {
+  if (reviews.length === 0) return '';
+  const items = reviews
+    .map(
+      (r) => `
+        <li>
+          <code>${escapeHtml(r.did)}</code>
+          <br>
+          <a href="${escapeHtml(`https://bsky.app/profile/${r.did}`)}" rel="noopener" target="_blank">profile</a>
+          ·
+          <span class="atUri">${escapeHtml(r.atUri)}</span>
+        </li>`,
+    )
+    .join('');
+  return `
+    <section class="federated">
+      <h2>Federated reviews</h2>
+      <p><small>Other labelers that have also published an
+         <code>${escapeHtml(CLAIM_VERDICT_COLLECTION)}</code> record about this post,
+         discovered via <a href="${escapeHtml(CONSTELLATION_BASE)}" rel="noopener" target="_blank">Constellation</a>.</small></p>
+      <ul>${items}</ul>
+    </section>`;
+}
+
+function renderHtml(
+  postUri: string,
+  postText: string | null,
+  claims: Row[],
+  federated: FederatedReview[],
+): string {
   const claimsHtml = claims
     .map((c) => {
       const evHtml = c.evidence
@@ -339,6 +426,7 @@ function renderHtml(postUri: string, postText: string | null, claims: Row[]): st
   ${postText ? `<div class="post">${escapeHtml(postText)}</div>` : '<p><em>Post text not cached locally.</em></p>'}
 </header>
 ${claims.length ? claimsHtml : '<p><em>No fact-check entries match this post (yet).</em></p>'}
+${renderFederatedReviews(federated)}
 <footer>
   <p>This labeler does not decide what is true. It surfaces verdicts that
      independent fact-checkers have already published, matches them against the
@@ -413,7 +501,7 @@ export function registerDetailRoutes(app: LabelerApp): void {
         return { uri, ...data };
       }
       reply.header('content-type', 'text/html; charset=utf-8');
-      return renderHtml(uri, data.postText, data.claims);
+      return renderHtml(uri, data.postText, data.claims, data.federated);
     },
   );
 }

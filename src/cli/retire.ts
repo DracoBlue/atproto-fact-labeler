@@ -21,6 +21,13 @@ import { getDb, getDbAsync, closeDb } from '../store/db.ts';
 import { logger } from '../util/logger.ts';
 import { createLabelerServer } from '../labels/server.ts';
 import { retireLiveLabels, type RetireFilter } from '../labels/lifecycle.ts';
+import { BskyClient } from '../replier/bsky.ts';
+import {
+  deleteClaimVerdict,
+  tombstoneClaimVerdict,
+  summariseRetireResults,
+  type RetireResultItem,
+} from '../labels/retire-claim-verdict.ts';
 
 interface CliArgs {
   dryRun: boolean;
@@ -118,9 +125,86 @@ async function main(): Promise<void> {
           `  Existing subscribers receive the negations via subscribeLabels in real time.\n`,
       );
     }
+
+    // After the wire-label negation, drop / tombstone the corresponding
+    // app.kiesel.facts.claimVerdict records on the labeler PDS. The labeler
+    // server's own DID + creds are reused; if not configured, skip silently.
+    if (!args.dryRun && result.retiredAtprotoUris.length > 0) {
+      await retireClaimVerdictRecords(result.retiredAtprotoUris);
+    }
   } finally {
     if (!args.dryRun) await labeler.stop();
     closeDb();
+  }
+}
+
+/**
+ * Drop or tombstone the listed claimVerdict records on the labeler PDS.
+ * Mode is the operator-configured ATPROTO_RETIRE_MODE. Best-effort: a
+ * failure here does NOT roll back the wire-label retraction — the label
+ * is already off the wire and the record will be picked up by a future
+ * verdicts:backfill run if needed.
+ */
+async function retireClaimVerdictRecords(atUris: string[]): Promise<void> {
+  const cfg = getConfig();
+  if (!cfg.LABELER_BSKY_IDENTIFIER || !cfg.LABELER_BSKY_APP_PASSWORD) {
+    process.stderr.write(
+      `\n  Skipped atproto-side retire — LABELER_BSKY_* creds not set.\n` +
+        `  Run with creds present to delete/tombstone ${atUris.length} record(s).\n`,
+    );
+    return;
+  }
+  const bsky = new BskyClient({
+    serviceUrl: cfg.LABELER_BSKY_SERVICE,
+    identifier: cfg.LABELER_BSKY_IDENTIFIER,
+    password: cfg.LABELER_BSKY_APP_PASSWORD,
+  });
+  await bsky.login();
+
+  const mode = cfg.ATPROTO_RETIRE_MODE;
+  const now = new Date().toISOString();
+  const results: RetireResultItem[] = [];
+  for (const atUri of atUris) {
+    if (mode === 'delete') {
+      results.push(await deleteClaimVerdict(bsky, atUri));
+      continue;
+    }
+    // tombstone: fetch the existing record, splice in retiredAt, putRecord.
+    const m = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
+    if (!m) {
+      results.push({ atUri, status: 'skipped-no-rkey' });
+      continue;
+    }
+    const [, did, collection, rkey] = m;
+    let current: Record<string, unknown> | null = null;
+    try {
+      const res = await fetch(
+        `${cfg.LABELER_BSKY_SERVICE.replace(/\/$/, '')}/xrpc/com.atproto.repo.getRecord` +
+          `?repo=${encodeURIComponent(did!)}&collection=${encodeURIComponent(
+            collection!,
+          )}&rkey=${encodeURIComponent(rkey!)}`,
+      );
+      if (res.ok) {
+        const body = (await res.json()) as { value?: Record<string, unknown> };
+        current = body.value ?? null;
+      }
+    } catch {
+      // fall through with current = null
+    }
+    if (!current) {
+      results.push({ atUri, status: 'failed', reason: 'tombstone: getRecord failed' });
+      continue;
+    }
+    results.push(await tombstoneClaimVerdict(bsky, atUri, current, now));
+  }
+
+  process.stderr.write(
+    `\n  atproto retire (${mode}): ${summariseRetireResults(results)}\n`,
+  );
+  for (const r of results) {
+    if (r.status === 'failed') {
+      logger.warn({ atUri: r.atUri, reason: r.reason }, 'atproto retire: failure');
+    }
   }
 }
 

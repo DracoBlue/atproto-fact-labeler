@@ -452,6 +452,7 @@ candidates above threshold survive into NLI.
 | `LABELER_PORT` | `14831` | Internal port serving `subscribeLabels` / `queryLabels` **and** the detail page. |
 | `LABELER_HOSTNAME` | `http://localhost:14831` | Public HTTPS URL the reverse proxy terminates at. |
 | `LABELER_ROOT_REDIRECT` | *(derived)* | Where `GET /` 302-redirects to. **Unset** → derived from `LABELER_DID`: `https://bsky.app/profile/<DID>` (the labeler's own Bluesky profile, where every emitted verdict is visible). **Explicit URL** → that URL. **Empty string** → no redirect (root returns 404). When `LABELER_DID` is still the placeholder, the derived value falls back to the project repo. |
+| `ATPROTO_RETIRE_MODE` | `delete` | What happens to the atproto `claimVerdict` record when `pnpm retire` retracts a verdict. `delete` removes the record from the PDS entirely (matches the user-facing retract intent). `tombstone` keeps the record visible but stamps a top-level `retiredAt` timestamp (preserves a public audit trail). The on-wire bsky label is always negated regardless. |
 | `LABELER_DETAIL_BASE_URL` | *(falls back to `LABELER_HOSTNAME`)* | Public URL of the detail page. Used as a deep-link in mention replies and quote-posts. |
 
 ### Triggers

@@ -90,6 +90,21 @@ const Schema = z.object({
    * useful.
    */
   LABELER_ROOT_REDIRECT: z.string().optional(),
+  /**
+   * What happens to an `app.kiesel.facts.claimVerdict` atproto record when
+   * the operator runs `pnpm retire` on the underlying verdict.
+   *
+   *   "delete"    → `deleteRecord` removes the record from the PDS entirely.
+   *                 Constellation eventually drops the backlink. Matches the
+   *                 user-facing intent of *retract*. Default.
+   *   "tombstone" → `putRecord` keeps the record in place but stamps a
+   *                 top-level `retiredAt` timestamp. Consumers can filter
+   *                 it out; the audit trail stays public.
+   *
+   * The on-wire bsky label is always negated regardless; this flag only
+   * controls the atproto-side record behaviour.
+   */
+  ATPROTO_RETIRE_MODE: z.enum(['delete', 'tombstone']).default('delete'),
 
   // Ingest
   JETSTREAM_URL: z

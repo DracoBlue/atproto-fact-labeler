@@ -129,6 +129,14 @@ export interface RetireResult {
   negated: number;
   verdictsRetired: number;
   verdictsReconciled: number;
+  /**
+   * atproto at-uris of `app.kiesel.facts.claimVerdict` records that
+   * correspond to verdicts whose `retired_at` column was stamped in this
+   * call. The caller (the retire CLI) hands these to deleteClaimVerdict /
+   * tombstoneClaimVerdict to retract the record on the PDS too. Empty in
+   * `dryRun` mode.
+   */
+  retiredAtprotoUris: string[];
   dryRun: boolean;
 }
 
@@ -202,9 +210,20 @@ export async function retireLiveLabels(
         AND status = 'accepted'
         AND retired_at IS NULL`,
   );
+  // After stamping retired_at we look up which atproto records the operator
+  // should now delete or tombstone — only for verdicts that actually had a
+  // record published.
+  const selectAtprotoUris = db.prepare(
+    `SELECT atproto_uri FROM verdict
+      WHERE post_uri = ?
+        AND label = ?
+        AND retired_at IS NOT NULL
+        AND atproto_uri IS NOT NULL`,
+  );
 
   let negated = 0;
   let verdictsRetired = 0;
+  const retiredAtprotoUris: string[] = [];
   for (let i = 0; i < targets.length; i++) {
     const t = targets[i]!;
     opts.onLabel?.(t, i, targets.length);
@@ -220,6 +239,11 @@ export async function retireLiveLabels(
     if (internalLabel) {
       const res = markVerdictRetired.run(t.postUri, internalLabel);
       verdictsRetired += Number(res.changes ?? 0);
+      // Capture the atproto uri(s) so the CLI can drop/tombstone the record.
+      const rows = selectAtprotoUris.all(t.postUri, internalLabel) as Array<{
+        atproto_uri: string | null;
+      }>;
+      for (const r of rows) if (r.atproto_uri) retiredAtprotoUris.push(r.atproto_uri);
     }
   }
 
@@ -228,6 +252,7 @@ export async function retireLiveLabels(
     negated,
     verdictsRetired,
     verdictsReconciled,
+    retiredAtprotoUris,
     dryRun: !!opts.dryRun,
   };
 }
