@@ -51,4 +51,9 @@ export class AutoTelegramHitl implements HitlSurface {
   async stop(): Promise<void> {
     await this.telegram.stop();
   }
+
+  /** Delegate to the wrapped Telegram surface. */
+  async notifyAppeal(input: Parameters<TelegramHitl['notifyAppeal']>[0]): Promise<void> {
+    await this.telegram.notifyAppeal(input);
+  }
 }

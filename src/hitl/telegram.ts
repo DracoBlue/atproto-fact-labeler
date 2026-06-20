@@ -71,6 +71,43 @@ export class TelegramHitl implements HitlSurface {
     }
   }
 
+  /**
+   * Fire-and-forget notification when a label appeal lands. No buttons —
+   * retiring a label requires stopping the labeler service (port + DB share
+   * with the retire CLI), so inline-button automation isn't appropriate.
+   * The operator gets the URIs and a pointer to the retire CLI.
+   *
+   * The message is plain text (no MarkdownV2 parse mode) — the at:// URIs and
+   * DIDs are full of reserved characters and escaping them all is fragile.
+   * Plain text is unambiguous, copy-pasteable, and won't 400 on weird input.
+   */
+  async notifyAppeal(input: {
+    subjectUri: string;
+    reportedBy: string;
+    reason?: string | null;
+    detailUrl?: string;
+  }): Promise<void> {
+    const lines: string[] = [];
+    lines.push('🛎️ Label appeal received');
+    lines.push('');
+    lines.push(`Subject: ${input.subjectUri}`);
+    lines.push(`By: ${input.reportedBy}`);
+    if (input.reason) lines.push(`Reason: ${input.reason.slice(0, 240)}`);
+    if (input.detailUrl) lines.push(`Detail: ${input.detailUrl}`);
+    lines.push('');
+    lines.push('Pipeline was NOT re-run (same input → same verdict).');
+    lines.push('Review:  pnpm feedback:list --only-unresolved');
+    lines.push(`Retire:  pnpm retire --uri=${input.subjectUri}`);
+    lines.push('(see docs/TRIGGER_REPORTS.md § Label appeals)');
+    try {
+      await this.bot.api.sendMessage(this.chatId, lines.join('\n'), {
+        link_preview_options: { is_disabled: true },
+      });
+    } catch (err) {
+      logger.error({ err, subjectUri: input.subjectUri }, 'telegram appeal notification failed');
+    }
+  }
+
   async start(signal: AbortSignal): Promise<void> {
     if (this.started) return;
     this.started = true;

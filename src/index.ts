@@ -668,6 +668,28 @@ async function main(): Promise<void> {
           },
           'label appeal received — recorded as feedback, pipeline NOT re-run. Operator review: pnpm feedback:list / pnpm retire --uri=...',
         );
+        // Push a Telegram notification when the operator has wired one up.
+        // The surface object exposes `notifyAppeal` on `telegram` and
+        // `auto-telegram` modes; on `stdin` / `auto` it's a no-op.
+        const maybeAppealNotifier = surface as unknown as {
+          notifyAppeal?: (input: {
+            subjectUri: string;
+            reportedBy: string;
+            reason?: string | null;
+            detailUrl?: string;
+          }) => Promise<void>;
+        };
+        if (typeof maybeAppealNotifier.notifyAppeal === 'function') {
+          const detailUrl =
+            (cfg.LABELER_DETAIL_BASE_URL ?? cfg.LABELER_HOSTNAME).replace(/\/$/, '') +
+            `/posts?uri=${encodeURIComponent(report.subjectUri)}`;
+          await maybeAppealNotifier.notifyAppeal({
+            subjectUri: report.subjectUri,
+            reportedBy: report.reportedBy,
+            reason: report.reason,
+            detailUrl,
+          });
+        }
         return;
       }
       // A user reporting one of our own posts is signalling "you got something

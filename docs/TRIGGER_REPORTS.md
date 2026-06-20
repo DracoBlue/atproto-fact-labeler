@@ -237,6 +237,13 @@ instead records the appeal in the `feedback` table with the
 reporting DID, the reason string the user typed, and the subject
 URI of the label being contested.
 
+When `HITL_MODE=telegram` or `HITL_MODE=auto-telegram`, the operator
+also receives a plain-text Telegram message naming the contested URI,
+the reporting DID, the reason text, a deep link to the detail page,
+and the exact `pnpm retire` command to use if the appeal is upheld.
+On `stdin` / `auto` modes the Telegram push is a no-op — operators
+on those modes review via `pnpm feedback:list`.
+
 ```
 {"level":40, "msg":"label appeal received — recorded as feedback,
   pipeline NOT re-run. Operator review: pnpm feedback:list /
