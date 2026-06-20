@@ -15,182 +15,182 @@ License: MIT.
 
 ---
 
-## Where the verdicts come from
+## What it is
 
-The labeler can pull fact-checks from three independent sources — use
-any one, or combine them. Each entry in the local index keeps its
-provenance so the detail page can show "Sourced via …" alongside the
-publisher name.
+The labeler ingests fact-checks from up to three independent sources,
+embeds them, and matches every targeted Bluesky post against the
+local index. When the LLM judge classifies a candidate fact-check as
+entailing or contradicting the post's claim, the publisher's verdict
+is surfaced as a signed atproto label on the wire.
 
-1. **Your own ClaimReview articles**
-   Self-hosting a newsroom or NGO that already publishes
-   ClaimReview-tagged fact-checks? Drop a single-item
-   [schema.org `DataFeed`](https://schema.org/DataFeed) JSON into
-   `pnpm ingest` and your fact-checks become labels. See
-   [docs/OWN_FACT_CHECKS.md](./docs/OWN_FACT_CHECKS.md).
+Three intake paths, mix and match:
 
-2. **The Google Data Commons bulk feed** — the daily 60 MB
+1. **Your own ClaimReview articles** — a newsroom or NGO that
+   publishes ClaimReview-tagged fact-checks drops a single-item
+   [`DataFeed`](https://schema.org/DataFeed) JSON into `pnpm ingest`.
+   Details: [docs/OWN_FACT_CHECKS.md](./docs/OWN_FACT_CHECKS.md).
+2. **The Google Data Commons bulk feed** — a daily ~60 MB
    [public dump](https://datacommons.org/factcheck/). Strong on
-   non-English fact-checks (dpa, AFP, Univision El Detector, factly.in,
-   …); thin on Lead Stories, USA Today, Snopes, AAP. Filtered through
-   a [curated publisher allowlist](./docs/FEED_QUALITY.md) to drop
+   non-English fact-checks (dpa, AFP, Univision, factly.in, …);
+   thin on Lead Stories, USA Today, Snopes, AAP. Filtered through a
+   [curated publisher allowlist](./docs/FEED_QUALITY.md) to drop
    the SEO spam and injection attempts the open feed ships alongside
    real fact-checkers.
-
 3. **Google Fact Check Tools API (live)** — query
    [`claims:search`](https://developers.google.com/fact-check/tools/api)
-   per claim. Closes the bulk-feed gap: Lead Stories, USA Today,
-   Snopes, AAP and similar publishers ship ClaimReview on their own
-   pages without submitting to the bulk feed. Setup is one API key.
-   See [docs/FACTCHECK_API.md](./docs/FACTCHECK_API.md).
+   per claim. Closes the bulk-feed gap above. One API key in `.env`,
+   no extra infra. Details:
+   [docs/FACTCHECK_API.md](./docs/FACTCHECK_API.md).
+
+The pipeline (extract → retrieve → rerank → NLI → aggregate → HITL →
+sign) is documented stage-by-stage in
+[docs/PIPELINE.md](./docs/PIPELINE.md). What it currently doesn't
+handle, with evidence:
+[docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md). Regression
+contract: 14 cases in
+[`test/fixtures/matching-cases.json`](./test/fixtures/matching-cases.json),
+reproducible via `pnpm test:matching`.
 
 ---
 
-## Should I self-host this?
+## How to use it
 
-You need:
-
-- **A server** with ~1 GB RAM, ~1 GB disk for the SQLite index, and a
-  domain you control (`facts.example.org`). Coolify / Caddy / Traefik
-  / a tiny VPS — all fine.
-- **An OpenAI-compatible LLM endpoint** for extraction, rerank, and
-  NLI judgement. Works with OpenAI itself, the
-  [Vercel AI Gateway](https://vercel.com/ai-gateway) (recommended),
-  [LM Studio](https://lmstudio.ai/) (all-local), Ollama, vLLM,
-  Together, Groq, Mistral, etc.
-- **A Bluesky service account** for signing labels — distinct from
-  your personal account. See [docs/LIFECYCLE.md](./docs/LIFECYCLE.md).
-
-You probably also want:
-
-- **A Google Cloud API key** for the live Fact Check Tools lookup.
-  Free at this volume, three `gcloud` commands.
-- **Telegram bot creds** if you want
-  Defer-to-human review on uncertain verdicts
-  (`HITL_MODE=auto-telegram`).
-
----
-
-## Quick start (Docker, recommended path)
-
-```bash
-# 1. Get the bulk ClaimReview feed
-curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json \
-  -o data.json
-
-# 2. Configure
-cp .env.example .env
-$EDITOR .env   # at minimum: OPENAI_API_KEY, LABELER_HOSTNAME
-
-# 3. One-off: import + embed
-docker compose run --rm fact-labeler pnpm ingest
-docker compose run --rm fact-labeler pnpm cli:lang-rebuild
-docker compose run --rm fact-labeler pnpm cli:embed-rebuild
-
-# 4. Start
-docker compose up -d
-
-# Liveness:  curl http://localhost:14831/healthz   →  ok
-# Detail UI: http://localhost:14831/posts?uri=at://...
-```
-
-The published image is `ghcr.io/dracoblue/atproto-fact-labeler:latest`.
-Going-live walkthrough (DNS, reverse proxy, persistent volumes,
-PLC/Bluesky registration) in [docs/DEPLOY.md](./docs/DEPLOY.md) and
-[docs/LIFECYCLE.md](./docs/LIFECYCLE.md).
-
-For all-local / no-Docker setup, see [`pnpm` Quick start in
-docs/DEPLOY.md § Bare-metal](./docs/DEPLOY.md).
-
----
-
-## How a label gets emitted
-
-```
-post → extract atomic claim → retrieve candidates → rerank → NLI judge →
-       aggregate → HITL → signed label
-```
-
-Each stage is a small file under `src/pipeline/`. The full architecture
-including the polarity-flip logic ("the earth is *not* flat" inheriting
-from `Earth is flat → False`), the same-language retrieval filter, and
-the publisher-rating normaliser lives in
-[docs/PIPELINE.md](./docs/PIPELINE.md). The research it was built on:
-[docs/RESEARCH-MATCHING.md](./docs/RESEARCH-MATCHING.md).
-
-What the labeler currently does **not** handle is documented with
-evidence in [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md).
-The regression contract is the 14-case fixture in
-[`test/fixtures/matching-cases.json`](./test/fixtures/matching-cases.json);
-`pnpm test:matching` reproduces every number cited in the docs.
-
----
-
-## When does the labeler run?
-
-Four trigger sources, freely combined. Defaults are conservative so a
-single local LLM endpoint isn't overwhelmed:
+Four trigger sources control which posts get checked. Defaults are
+conservative so a single LLM endpoint isn't overwhelmed:
 
 | Trigger | Default | Source |
 | --- | --- | --- |
 | **Mentions** | on | A user `@mentions` the labeler. The parent / quoted post is fact-checked. |
 | **Reports** | on | A Bluesky client calls `com.atproto.moderation.createReport` against the labeler. |
-| **Watchlist** | off | The post's author DID is on an operator-curated list (politicians, repeat spreaders, …). |
+| **Watchlist** | off | The post's author DID is on an operator-curated list. |
 | **Firehose** | off | Every Bluesky post. Realistic only with a high-throughput LLM endpoint. |
 
-Per-trigger docs:
-[mentions](./docs/TRIGGER_MENTIONS.md),
-[reports](./docs/TRIGGER_REPORTS.md),
-[watchlist](./docs/TRIGGER_WATCHLIST.md),
+Per trigger:
+[mentions](./docs/TRIGGER_MENTIONS.md) ·
+[reports](./docs/TRIGGER_REPORTS.md) ·
+[watchlist](./docs/TRIGGER_WATCHLIST.md) ·
 [firehose](./docs/TRIGGER_FIREHOSE.md).
 
----
-
-## Public surface
+### Public endpoints
 
 - **`subscribeLabels` / `queryLabels`** — the on-wire atproto labeler
-  endpoints. Signed records served by
+  endpoints, served by
   [`@skyware/labeler`](https://github.com/skyware-js/labeler).
-- **`/posts?uri=at://…`** — a per-post detail page (HTML or
-  `?format=json`) showing the verdict, the rationale, and every
-  source with its publisher attribution and link.
-- **`/healthz`** — liveness probe.
-- **`com.atproto.moderation.createReport`** — when
-  `TRIGGER_REPORTS=true`, the labeler accepts atproto-signed reports
-  and dispatches them through the pipeline.
-- **Optional: a Bluesky reply or quote-post on accepted verdicts.**
-  Set `REPLY_TO_MENTIONS=true` for a threaded reply under mentions,
-  `REPLY_TO_REPORTS=true` for a quote-post on the labeler's own feed
+- **`GET /posts?uri=at://…`** — per-post detail page (HTML, or
+  `?format=json`) with the verdict, the rationale, and every source
+  with publisher attribution + link.
+- **`GET /healthz`** — liveness probe.
+- **`POST /xrpc/com.atproto.moderation.createReport`** — when
+  `TRIGGER_REPORTS=true`, accepts atproto-signed reports.
+
+### Optional Bluesky replies on accepted verdicts
+
+- `REPLY_TO_MENTIONS=true` → a threaded reply under the mention post.
+- `REPLY_TO_REPORTS=true` → a **quote-post on the labeler's own feed**
   embedding the reported post. The author's
-  [postgate](https://docs.bsky.app/blog/postgate) is honoured.
+  [postgate](https://docs.bsky.app/blog/postgate) is honoured —
+  authors who disable quote-posts on a post will not be quoted.
+
+### Decision review (HITL)
+
+- **`stdin`** — interactive terminal review (default; useful while
+  bootstrapping).
+- **`telegram`** — every proposal lands in your chat with
+  accept/reject/defer buttons.
+- **`auto`** — accept iff confidence ≥ `HITL_AUTO_MIN_CONFIDENCE` and
+  votes ≥ `HITL_AUTO_MIN_VOTES`, else defer.
+- **`auto-telegram`** — auto-accept above the bar, push the rest to
+  Telegram for manual review.
 
 ---
 
-## Configuration
+## How to host it
 
-Every knob lives in `src/config/index.ts` with a corresponding line
-in [`.env.example`](./.env.example) — the env file is the canonical
-reference, with the rationale for each non-obvious default written
-out as a comment.
+You need:
 
-Key choices:
-- **LLM endpoint** — `OPENAI_BASE_URL` + `OPENAI_API_KEY` +
-  `OPENAI_MODEL`. Default is the Vercel AI Gateway. ADR with the
-  benchmark and per-deployment-shape trade-offs:
-  [docs/ADR_model_choices.md](./docs/ADR_model_choices.md).
-- **Embedding endpoint** — same shape, separate `EMBEDDING_*` vars
-  so an operator can serve embeddings locally and chat via Vercel.
-- **HITL** — `stdin` (default, interactive), `telegram`,
-  `auto` (unattended, decides per
-  `HITL_AUTO_MIN_CONFIDENCE` / `HITL_AUTO_MIN_VOTES`),
-  `auto-telegram` (auto-accept above the bar, push the rest to
-  Telegram for manual review).
-- **Live Fact Check API** — `FACTCHECK_API_KEY`. See
-  [docs/FACTCHECK_API.md](./docs/FACTCHECK_API.md).
+- A server with ~1 GB RAM, ~1 GB disk for the SQLite index, and a
+  domain you control (`facts.example.org`). Coolify, Caddy, Traefik,
+  a small VPS — all fine.
+- An **OpenAI-compatible LLM endpoint** — the
+  [Vercel AI Gateway](https://vercel.com/ai-gateway) is the default;
+  [LM Studio](https://lmstudio.ai/), Ollama, vLLM, Together, Groq,
+  OpenAI itself all work. Same shape, different `OPENAI_BASE_URL`.
+- A **Bluesky service account** (distinct from your personal
+  account) — used to sign labels and, optionally, post replies.
+
+Optional:
+
+- A **Google Cloud API key** for the live Fact Check Tools lookup
+  (free at this volume; three `gcloud` commands).
+- **Telegram bot creds** for `HITL_MODE=auto-telegram`.
+
+### Quick start
+
+Clone the repo, configure, run. The repo carries the
+`docker-compose.yml` that points at the published image
+`ghcr.io/dracoblue/atproto-fact-labeler:latest` — no source build
+needed.
+
+```bash
+git clone https://github.com/DracoBlue/atproto-fact-labeler.git
+cd atproto-fact-labeler
+
+# Configure (.env carries OPENAI_API_KEY, LABELER_HOSTNAME, etc.)
+cp .env.example .env
+$EDITOR .env
+
+# Get the bulk ClaimReview feed (~60 MB)
+curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json \
+  -o data.json
+
+# One-off: import + language-tag + embed
+docker compose run --rm fact-labeler pnpm ingest
+docker compose run --rm fact-labeler pnpm cli:lang-rebuild
+docker compose run --rm fact-labeler pnpm cli:embed-rebuild
+
+# Start the service
+docker compose up -d
+```
+
+Verify it's up:
+
+```bash
+curl http://localhost:14831/healthz             # → ok
+docker compose logs -f fact-labeler
+```
+
+Production walkthrough (DNS, reverse proxy, persistent volumes,
+Bluesky service-account registration in PLC) lives in
+[docs/DEPLOY.md](./docs/DEPLOY.md) and
+[docs/LIFECYCLE.md](./docs/LIFECYCLE.md).
+
+### Configuration
+
+[`.env.example`](./.env.example) is the canonical reference — every
+knob is listed with the rationale for each non-obvious default
+written out as a comment. `src/config/index.ts` is the runtime
+validation layer (zod schema).
+
+Model and deployment-shape benchmark (all-local, hybrid,
+pure-Vercel): [docs/ADR_model_choices.md](./docs/ADR_model_choices.md).
+
+### One-shot operator commands
+
+After deployment, the same compose file works for ops:
+
+```bash
+docker compose run --rm fact-labeler pnpm ingest                # re-import
+docker compose run --rm fact-labeler pnpm cli:embed-rebuild     # re-embed
+docker compose run --rm fact-labeler pnpm cleanup:claims        # drop disallowed publishers
+docker compose run --rm fact-labeler pnpm retire                # negate live labels
+docker compose run --rm fact-labeler pnpm proposal:accept --list  # show deferred
+docker compose run --rm fact-labeler pnpm lifecycle:status      # identity + on-wire counts
+docker compose run --rm fact-labeler pnpm cli:label at://...    # label a single post
+```
 
 ---
 
-## Should I contribute?
+## How to contribute
 
 Welcome. Areas where help is especially valuable:
 
@@ -207,7 +207,7 @@ Welcome. Areas where help is especially valuable:
 - **NLI / rerank prompt tuning** — `pnpm test:matching` is the
   regression harness.
 
-[CONTRIBUTING.md](./CONTRIBUTING.md) covers the local setup, PR
+[CONTRIBUTING.md](./CONTRIBUTING.md) covers local setup, PR
 conventions, and the scope of what gets accepted vs. declined.
 
 Security reports go to the maintainer privately, **not** as public
