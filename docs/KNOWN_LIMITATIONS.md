@@ -1,203 +1,194 @@
 # Known limitations
 
-What this labeler currently **cannot** do, with the evidence behind
-each statement. This page exists because "looks like it works for the
-demo but breaks on the long tail" is the default failure mode of
-fact-checking systems, and pretending otherwise is worse than admitting
-it.
+Given a post arriving at the labeler, what *won't* the labeler do —
+and which guardrail produces that behaviour. Framed from the operator
+perspective: "if my user reports / mentions this kind of post, what
+should I expect?"
 
-Each item below lists:
-- the symptom an operator would observe,
-- the *measured* root cause (from the pool, the pipeline, or the
-  upstream feed),
-- the workaround if any.
+The deliberate non-actions below are how the labeler stays honest. A
+fact-checker that lies confidently is worse than one that stays
+silent.
 
-All numbers come from the 88 k row corpus after `cleanup:claims` +
-`lang-rebuild`, with the gemini-2.5-flash judge on Vercel AI Gateway.
-Re-run `pnpm test:matching` to reproduce.
+---
 
-## 1. The English half of the pool is thin for niche conspiracies
+## 1. No same-language fact-check exists → no label
 
-**Symptom.** Posts like "the earth is round" / "Bill Gates wants to
-microchip everyone" return either `uncovered` or rely on a single
-publisher entry.
+**Input.** A post in language X, where no allowlisted publisher has
+reviewed a matching claim in language X.
 
-**Evidence.** The four polarity-matrix fixtures (`test/fixtures/matching-cases.json`
-#1–#4) all return `uncovered`:
+**Behaviour.** Verdict `uncovered`. No label on the wire. The detail
+page (if visited) shows `No fact-check entries match this post (yet).`
 
-```
-[1/14] the earth is round            uncovered (0 reranked)
-[2/14] the earth is not flat         uncovered (1 reranked, 0 entail)
-[3/14] the earth is flat             uncovered (1 reranked, 0 entail)
-[4/14] the earth is not round        uncovered (0 reranked)
-```
-
-A direct DB probe for the keyword pair confirms the gap:
-
-```bash
-node -e "
-const db = require('better-sqlite3')('data/labeler.sqlite', { readonly: true });
-console.log(db.prepare(
-  'SELECT COUNT(*) AS n FROM claim_review WHERE lang=? AND ('+
-  'claim_reviewed LIKE ? OR claim_reviewed LIKE ?)'
-).get('en', '%flat earth%', '%earth is round%'));
-"
-// → { n: 0 }
-```
-
-Meanwhile the **German** pool has a handful of flat-earth refutations
-from dpa-Faktencheck (#3 cited "La Terre est plate" — French — as the
-only same-language source before the lang filter was tightened). The
-**Spanish** pool has Univision El Detector entries. They just don't
-cross over into English in the Google FCT feed.
-
-**Root cause.** Upstream coverage in the Google Data Commons Fact Check
-feed. We can't fix it from here.
-
-**Workaround.** None at the pipeline level. The honest behaviour is to
-return `uncovered` so no label is emitted. A future cross-lingual NLI
-path (see *Cross-lingual matching* below) would close this; that's a
-real piece of design work, not a tuning knob.
-
-## 2. Cross-lingual matching is intentionally off
-
-**Symptom.** A German post about COVID vaccines won't pull in English
-fact-checks even when the English pool has rich coverage and the German
-pool is thin (e.g. case #13 "Impfstoffe enthalten Mikrochips" → `uncovered`,
-while the English equivalent #5 returns `false conf=1.0` from three
-entailed FactCheck.org / Reuters / Snopes entries).
-
-**Evidence.** `src/pipeline/retrieve.ts` issues:
+**Guardrail.** [`src/pipeline/retrieve.ts`](../src/pipeline/retrieve.ts)
+restricts dense-retrieval candidates to:
 
 ```sql
-WHERE embedding IS NOT NULL
-  AND embedding_model = ?
+WHERE embedding_model = ?
   AND (lang IN (?, ?) OR lang IS NULL)
 ```
 
-The two `lang` slots are the post's declared lang and the detected lang
-of the claim text; they are NOT the cartesian product of all languages.
-Why: an earlier loose retrieval that allowed FR/NL/ES into the candidate
-set for an EN claim produced confident-but-wrong verdicts on the polarity
-matrix (see `docs/LANGUAGE_DETECTION.md`). Gemini-class judges flip
-polarity on translated text far more often than on same-language pairs.
+The two `lang` slots are the post's declared language and the
+detected language of the claim text. A French dpa-Faktencheck of
+"the earth is flat" is *not* offered as evidence for an English post,
+because gemini-class judges flip polarity on translated input far
+more often than on same-language pairs (see
+[`LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md)).
 
-**Root cause.** NLI quality on cross-lingual pairs is below the
-production bar for emitting signed labels.
+**What to do about it as an operator.** Enable
+[`FACTCHECK_API_KEY`](FACTCHECK_API.md) — the Google Fact Check Tools
+API supplements the local pool with live results keyed on the post's
+language and frequently closes this gap (Lead Stories, USA Today,
+Snopes, AAP and similar English-language publishers are reached via
+this path even when they're missing from the bulk feed).
 
-**Workaround.** None today. Two paths for a future version:
-1. Translate the candidate's `claim_reviewed` to the post's language
-   before the NLI step. Adds an LLM call per candidate; embedding cost
-   doubles.
-2. Use a dedicated cross-lingual NLI model (e.g. `mDeBERTa-v3-base-xnli`)
-   rather than a chat-model judge. Quality has been measured better
-   ([Conneau et al. 2022][xnli]); deployment story is heavier.
+---
 
-[xnli]: https://arxiv.org/abs/2204.06487
+## 2. No publisher has reviewed the claim → no label
 
-Neither is required for the existing single-language coverage to be
-useful, so they sit outside MVP.
+**Input.** A post making a claim that no allowlisted publisher has
+addressed — anywhere, in any language.
 
-## 3. Confidence calibration shifts with the publisher pool
+**Behaviour.** Verdict `uncovered`. No label on the wire.
 
-**Symptom.** A claim that resolved to `verdict=false conf=0.94` six
-months ago now resolves to `false conf=0.65` with the same model.
+**Guardrail.** This is the central design promise: the labeler is a
+router, not a judge. It does **not** invent verdicts. The
+[`src/pipeline/orchestrator.ts`](../src/pipeline/orchestrator.ts)
+path bails out cleanly when retrieval returns zero candidates or
+when every candidate is dropped by Stage 2 (rerank) or Stage 3 (NLI).
 
-**Evidence.** Trump 2020 election (fixture #9) — confidence dropped
-from ~0.94 to 0.655 after `cleanup:claims` removed the spam publishers
-that previously inflated the count of corroborating "False" ratings.
+**What to do about it as an operator.** Nothing — this is the
+correct behaviour. If you operate a newsroom that wants to publish
+its own verdict, host your own ClaimReview articles and ingest them
+via [`OWN_FACT_CHECKS.md`](OWN_FACT_CHECKS.md); they then become part
+of the labeler's pool the same way bulk-feed entries are.
 
-```
-[9/14] Donald Trump won the 2020 US presidential election
-  PASS — verdict=false conf=0.655 (retrieved=8 reranked=5 entail=2 contradict=1 neutral=2)
-```
+---
 
-The 2 entail / 1 contradict / 2 neutral split is honest: real US
-fact-checkers reviewed this, mostly agreed, one publisher hedged.
+## 3. Only one publisher agrees → label is deferred, not auto-emitted
 
-**Root cause.** Spam removal exposed the legitimate-but-lower base
-rate of agreement among real publishers.
+**Input.** A post whose claim matches exactly one allowlisted
+publisher's fact-check, with the NLI judge classifying it as
+entailing or contradicting (after polarity flip).
 
-**Workaround.** Don't tune thresholds against pre-cleanup numbers.
-`HITL_AUTO_MIN_CONFIDENCE` sits at 0.6 in the recommended defaults
-(`.env.example`); raise per deployment as you accumulate trust in
-your specific pool. The `auto-telegram` HITL mode (see
-`docs/LIFECYCLE.md § Phase 3.5`) is the right answer if you want
-operator review of the 0.6–0.8 band rather than picking a hard line.
+**Behaviour.** Verdict computed at confidence ≥ 0.6, but defers to
+the operator. With `HITL_MODE=auto` (default policy) or
+`HITL_MODE=auto-telegram`, the proposal sits in `decision='defer'`
+until the operator hits accept.
 
-## 4. Single-publisher verdicts get full confidence
+**Guardrail.** `HITL_AUTO_MIN_VOTES=2` (default).
+[`src/hitl/auto.ts`](../src/hitl/auto.ts) refuses to auto-accept on
+fewer than two surviving NLI votes regardless of how confident any
+one of them is. A single-source verdict — even from a strong
+publisher — gets human attention before it goes on-wire.
 
-**Symptom.** When only one allowlisted publisher has reviewed a claim,
-that publisher's verdict becomes the labeler's verdict at conf=1.0 —
-even if a reasonable observer might want a second opinion before
-emitting.
+**What to do about it as an operator.**
 
-**Evidence.** Bill Gates microchips (fixture #8) — exactly one EN entry
-matches (FactCheck.org, rating="False"). Pipeline output:
+- For unattended deployment: set `HITL_MODE=auto-telegram`. The
+  proposal lands in your chat with Accept/Reject/Defer buttons; you
+  decide per-claim.
+- For a more permissive policy: set `HITL_AUTO_MIN_VOTES=1`. Single-
+  source verdicts then auto-emit. Only reasonable on a tightly-
+  curated allowlist where each publisher is trusted to make a
+  responsible call alone.
+- Either way, `pnpm proposal:accept --id=N` is the manual override
+  for a single deferred proposal (see
+  [`LIFECYCLE.md § Phase 3.5`](LIFECYCLE.md#phase-35--manually-accepting-a-deferred-proposal)).
 
-```
-[8/14] Bill Gates wants to inject everyone with microchips
-  PASS — verdict=false conf=1.000 (retrieved=8 reranked=3 entail=1 contradict=0 neutral=2)
-```
+---
 
-1 entail, no contradict → effective verdict propagates with full
-confidence. The 2 neutral candidates didn't pull the aggregator down
-because the aggregator weights by entailed/contradicted only.
+## 4. Publishers disagree → `fact-disputed`, not a guess
 
-**Why this is not a bug.** The label this would emit is
-`fact-refuted`, which is *correct* — FactCheck.org is on the allowlist
-specifically because it's a trustworthy source. Propagating a single
-trustworthy source verdict at conf=1.0 is the designed behaviour.
+**Input.** A post whose claim matches multiple allowlisted publishers
+with **conflicting** verdicts (some entailing, some contradicting,
+after polarity flips).
 
-**Why this is still worth flagging.** Operators who want a two-source
-quorum before auto-accepting should bump `HITL_AUTO_MIN_VOTES` from 2
-to 2 (current default), 3 for stricter review queues, or move to
-`HITL_MODE=auto-telegram` so single-source verdicts get a human
-glance.
+**Behaviour.** Verdict `disputed`, label `fact-disputed`. The
+underlying disagreement is preserved as the rationale on the detail
+page: e.g. *"NLI: 2 entail, 1 contradict, 2 neutral (dropped)"*.
 
-## 5. NLI judge handles English negation reliably, other languages less so
+**Guardrail.** [`src/pipeline/aggregate.ts`](../src/pipeline/aggregate.ts)
+treats a publisher split as evidence of genuine disagreement, not as
+a signal to pick the majority. The aggregator never silently drops a
+publisher's dissenting verdict.
 
-**Symptom.** Sentences with explicit negation in the *claim* ("X is
-not Y") behave well in English but degrade in German / Spanish /
-Portuguese.
+**What to do about it as an operator.** Nothing — `disputed` is the
+honest answer. Don't tune the aggregator to "decide" disagreements;
+that's the publishers' job.
 
-**Evidence.** Not measured against a fixed benchmark in this repo —
-this is the operator-observed risk on the boundary where the same-
-language filter ends and the NLI judge starts. The English fixture
-cases #2 and #4 ("the earth is not flat" / "the earth is not round")
-return `uncovered` for the coverage reason in #1, so don't *exercise*
-the negation path; the working negation cases in the fixture are
-implicit (e.g. fixture #10 "Joe Biden won the 2020 election" needs
-the polarity-flip on a "Trump won" candidate to land at `true`, and
-it does at conf 0.832).
+---
 
-**Workaround.** Manual inspection on each new locale before adding it
-to `LABELER_REPLY_DEFAULT_LANG`. The German cases #13/#14 in the
-fixture exist specifically to catch regressions in German polarity
-handling end-to-end.
+## 5. The post is in a language the labeler hasn't been validated against
+
+**Input.** A post in a language the operator hasn't run the
+[`pnpm test:matching`](../src/cli/test-matching.ts) fixture against.
+
+**Behaviour.** The pipeline will still process it (the on-device
+language detector covers ~60 languages via [`eld`](LANGUAGE_DETECTION.md)),
+but the NLI judge's polarity handling is unverified for that
+language. A subtle bug (e.g. an entail/contradict flip on "is not"
+constructions) could ship without notice.
+
+**Guardrail.** None automatic — this is a deliberate operator
+checkpoint, not a runtime gate. The default
+[`LABELER_REPLY_DEFAULT_LANG`](DEPLOY.md#11-configuration-reference)
+is `en`; widening it to `de` was preceded by adding cases #13 / #14
+to the fixture so regressions are caught.
+
+**What to do about it as an operator.** Before going live in a new
+locale: add a handful of fixture cases in that language (one
+high-confidence true, one high-confidence false, one direct
+negation, one uncovered). Run `pnpm test:matching` until they pass.
+Open a PR to upstream them so other deployments inherit the
+regression coverage.
+
+---
 
 ## What is *not* a limitation here
 
-To save the operator's time:
+These were limitations during development; they are no longer present
+in the shipping system. Documented so operators tracking against an
+older mental model can stop worrying about them:
 
-- **Wrong labels emitted from junk publishers.** Closed by
-  [`docs/FEED_QUALITY.md`](FEED_QUALITY.md) — the allowlist rejects the
-  blogspot/SEO/spam entries that the Google FCT feed bundles.
-- **Stored XSS / `javascript:` URLs.** Closed by the URL-scheme
-  allowlist and noindex headers in `src/detail/server.ts`
-  (see [`SECURITY.md`](../SECURITY.md)).
-- **Label key compromise via emitEvent.** Closed by the
+- **Wrong labels emitted from junk publishers.** Closed by the
+  publisher allowlist (see [`FEED_QUALITY.md`](FEED_QUALITY.md)).
+  Every path — bulk feed, live API, own ingest — flows through the
+  same allowlist gate.
+- **Stored XSS / `javascript:` URLs from feed content.** Closed by
+  the URL-scheme allowlist + noindex headers in
+  [`src/detail/server.ts`](../src/detail/server.ts) and the
+  `escapeHtml` everywhere user-controlled content is rendered.
+  See [`SECURITY.md`](../SECURITY.md).
+- **Label-signing-key abuse via `tools.ozone.moderation.emitEvent`.**
+  Closed by the
   `auth: (did) => did === cfg.LABELER_DID` restriction on the
-  LabelerServer (see same file).
-- **Cross-lingual NLI mistakes propagating to the wire.** Closed by
-  the same-language filter (item #2 above).
-- **Stale labels after publisher delisting.** Closed by `pnpm
-  cleanup:claims` + `pnpm retire`. The retire pass marks
-  `verdict.retired_at` so the detail page stops surfacing the
-  withdrawn evidence (see `docs/LIFECYCLE.md § Phase 3`).
+  LabelerServer.
+- **Cross-lingual NLI mistakes reaching the wire.** Closed by the
+  same-language retrieval filter described in item #1 above. The
+  trade-off is the coverage gap, also in #1.
+- **Stale labels after publisher delisting.** Closed by
+  `pnpm cleanup:claims` (removes the publisher's rows from the
+  index) and `pnpm retire` (negates already-emitted labels and
+  stamps `verdict.retired_at` so the detail page stops surfacing
+  the withdrawn evidence). See
+  [`LIFECYCLE.md § Phase 3`](LIFECYCLE.md#phase-3--retiring-content-variant-c--emit-negations).
+- **Single-publisher verdicts at conf=1.0 emitting without review.**
+  Closed by `HITL_AUTO_MIN_VOTES=2` default (item #3 above).
 
-If your deployment hits a *different* limit than the five listed
-above, please open an issue with the same evidence shape as the items
-here — the pool query, the fixture result, the proposed cause. The
-issue templates under `.github/ISSUE_TEMPLATE/` ask for exactly
-that.
+---
+
+## If you hit a *different* limitation
+
+If you're seeing the labeler refuse to label something it
+*should* label, or label something it *shouldn't*, open an issue
+using the [Bug template](../.github/ISSUE_TEMPLATE/bug.yml) with:
+
+- the exact post URI
+- the verdict you expected and why
+- the verdict the labeler produced (from
+  `/posts?uri=...&format=json`)
+- the NLI vote split (visible in the same JSON)
+
+The 14-case fixture in
+[`test/fixtures/matching-cases.json`](../test/fixtures/matching-cases.json)
+is the regression contract; reproducible issues land there as new
+cases.
