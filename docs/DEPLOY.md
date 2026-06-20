@@ -101,6 +101,12 @@ onto Bluesky, and tells you how to report the spam back to Google.
 Copy `.env.example` to a per-deploy env file and override the values
 below. The keys not listed here keep their `.env.example` defaults.
 
+> **Looking for the full list of available env vars?**
+> Section [§ 11 Configuration reference](#11-configuration-reference)
+> below is the complete table — every knob, grouped by purpose, with
+> default + meaning. This § 4 only walks through the values you
+> typically need to *change* for a real production deploy.
+
 ### Required
 
 ```ini
@@ -385,3 +391,125 @@ Phase 1 to register with Bluesky:
       label edit` to declare the six `fact-*` label values in your
       labeler service record (see [`LIFECYCLE.md` Phase 1](./LIFECYCLE.md))
 - [ ] Backup of `/data` is automated
+
+## 11. Configuration reference
+
+Every env var the labeler honours, grouped by purpose. Source of
+truth: `src/config/index.ts` (zod schema) and
+[`.env.example`](../.env.example) (the canonical commented file).
+This section is the table form for browsing.
+
+### LLM endpoint (Stages 1–3)
+
+The chat-completions endpoint. Used for claim extraction, the rerank
+pass, and the NLI judge. Anything OpenAI-compatible works: OpenAI,
+Vercel AI Gateway (default), LM Studio, Ollama, vLLM, llama.cpp,
+Together, Groq, Mistral, …
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | — *(required)* | API key for the chat endpoint. Any non-empty value if the server doesn't check. |
+| `OPENAI_BASE_URL` | `https://ai-gateway.vercel.sh/v1` | Chat-completions base URL. |
+| `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [docs/ADR_model_choices.md](ADR_model_choices.md). |
+| `OPENAI_MAX_TOKENS` | `8192` | Per-request `max_tokens`. Reasoning models burn tokens on internal thinking — too small a budget truncates the JSON. `0` lets the server pick. |
+
+### Embedding endpoint (Stage 1)
+
+Separate slot so embeddings can live on a different server from the
+LLM. Leaving `_API_KEY` / `_BASE_URL` blank falls back to the
+`OPENAI_*` slot.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `EMBEDDING_API_KEY` | *(falls back to `OPENAI_API_KEY`)* | API key for the embedding endpoint. |
+| `EMBEDDING_BASE_URL` | *(falls back to `OPENAI_BASE_URL`)* | `/v1/embeddings` base URL. |
+| `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embedding model. All-local recommendation: `text-embedding-granite-embedding-278m-multilingual`. |
+
+### Rerank (Stage 2)
+
+Single batched LLM call rating retrieved candidates 0–1; only
+candidates above threshold survive into NLI.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `RERANK_MODE` | `llm` | `llm` runs the rerank call; `off` skips Stage 2. |
+| `RERANK_KEEP` | `5` | Max candidates kept after rerank. |
+| `RERANK_THRESHOLD` | `0.5` | Drop candidates below this rerank score. |
+
+### NLI (Stage 3)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NLI_MODE` | `llm-judge` | `llm-judge` reuses `OPENAI_MODEL` as a 3-class entailment judge. `dedicated` is reserved for a future dedicated NLI server (not implemented). |
+
+### Labeler identity
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LABELER_DID` | `did:plc:placeholder-…` | The labeler service DID. Stays placeholder until you register a Bluesky service account — see [LIFECYCLE.md Phase 1](LIFECYCLE.md). |
+| `LABELER_HANDLE` | *(empty)* | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. |
+| `LABELER_SIGNING_KEY` | *(auto on first run)* | secp256k1 signing key for label records. Auto-generated and persisted to `.env` on first run. **Back it up** — losing it invalidates every emitted label. |
+| `LABELER_PORT` | `14831` | Internal port serving `subscribeLabels` / `queryLabels` **and** the detail page. |
+| `LABELER_HOSTNAME` | `http://localhost:14831` | Public HTTPS URL the reverse proxy terminates at. |
+| `LABELER_DETAIL_BASE_URL` | *(falls back to `LABELER_HOSTNAME`)* | Public URL of the detail page. Used as a deep-link in mention replies and quote-posts. |
+
+### Triggers
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply, quoted record on quote-post). See [TRIGGER_MENTIONS.md](TRIGGER_MENTIONS.md). |
+| `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post. See [TRIGGER_REPORTS.md](TRIGGER_REPORTS.md). |
+| `TRIGGER_FIREHOSE` | `false` | Fact-check **every** post on the firehose. Volume-heavy; only enable with a high-throughput LLM. See [TRIGGER_FIREHOSE.md](TRIGGER_FIREHOSE.md). |
+| `TRIGGER_WATCHLIST` | *(empty)* | Comma-separated DIDs **or handles** whose posts are always checked. Handles resolve at startup; resolution failure aborts startup. See [TRIGGER_WATCHLIST.md](TRIGGER_WATCHLIST.md). |
+| `JETSTREAM_URL` | `wss://jetstream2.us-east.bsky.network/subscribe` | Bluesky live firehose. US-east is fine from EU. |
+| `JETSTREAM_FIXTURE` | *(empty)* | Path to a JSONL fixture for offline replay (development). |
+| `APPVIEW_URL` | `https://public.api.bsky.app` | Bluesky read-only AppView; used to fetch post text by URI. Unauthenticated. |
+| `APPVIEW_AUTHED_URL` | `https://api.bsky.app` | Authed fallback used when the public AppView returns 429/5xx and `REPLY_TO_MENTIONS=true`. Reuses the labeler's access token. |
+| `REQUIRE_REPORT_AUTH` | `true` | Validate an atproto service JWT on the `createReport` endpoint. Real Bluesky clients always sign; flip to `false` only for local `curl` testing. |
+| `PLC_DIRECTORY_URL` | `https://plc.directory` | DID directory used to resolve report-issuer signing keys. |
+
+### Bluesky service account (replies + posting)
+
+Required when **either** `REPLY_TO_MENTIONS` **or** `REPLY_TO_REPORTS`
+is `true`. Same creds, two surfaces.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LABELER_BSKY_SERVICE` | `https://bsky.social` | PDS URL the service account lives on. Verify via PLC: `service[type='AtprotoPersonalDataServer'].serviceEndpoint`. Eurosky, self-hosted PDSes etc. need the explicit URL. |
+| `LABELER_BSKY_IDENTIFIER` | *(empty)* | Handle or DID of the labeler account. |
+| `LABELER_BSKY_APP_PASSWORD` | *(empty)* | App password from your PDS — *never* the main account password. |
+| `REPLY_TO_MENTIONS` | `false` | Post a threaded reply under the mention post after a mention-triggered label is accepted. |
+| `REPLY_TO_REPORTS` | `false` | Quote-post the reported post on the labeler's own feed after a report-triggered label is accepted. Author's `app.bsky.feed.postgate#disableRule` is honoured — if quotes are disabled, the labeler logs a skip and emits only the label. |
+| `LABELER_REPLY_DEFAULT_LANG` | `en` | Fallback reply language when the post has no `langs` field or uses an unsupported language. Currently `en` or `de`. |
+
+### HITL (decision review)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HITL_MODE` | `stdin` | `stdin` (interactive terminal) · `telegram` (every proposal to a chat with buttons) · `auto` (unattended; see policy below) · `auto-telegram` (auto-accept above the bar, push the rest to Telegram). |
+| `TG_BOT_TOKEN` | *(empty)* | Required for `telegram` / `auto-telegram`. From `@BotFather`. |
+| `TG_REVIEWER_CHAT_ID` | *(empty)* | Required for `telegram` / `auto-telegram`. Numeric chat ID (see `@userinfobot`). |
+| `HITL_AUTO_MIN_CONFIDENCE` | `0.6` | Auto-accept when aggregated confidence ≥ this. Otherwise defer (or push to Telegram). |
+| `HITL_AUTO_MIN_VOTES` | `2` | Auto-accept when vote count ≥ this. |
+
+### Fact-check sources
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLAIMREVIEW_FEED_PATH` | `data.json` | Path to a Google Data Commons (or own single-item) `DataFeed` JSON. See [OWN_FACT_CHECKS.md](OWN_FACT_CHECKS.md). |
+| `CLAIMREVIEW_PUBLISHER_ALLOWLIST` | `config/claimreview-publishers-allowlist.txt` | Allowlist filtering both bulk ingest and live API responses. See [FEED_QUALITY.md](FEED_QUALITY.md). |
+| `FACTCHECK_API_KEY` | *(empty)* | Google Fact Check Tools API key. When set, every `matchClaim()` also queries `claims:search` live and merges hits into the candidate pool. Setup: [FACTCHECK_API.md](FACTCHECK_API.md). |
+| `FACTCHECK_API_PAGE_SIZE` | `10` | Results per `claims:search` call. |
+| `FACTCHECK_API_TIMEOUT_MS` | `5000` | Per-call timeout for the live API. On timeout, the pipeline falls back to the local pool. |
+
+### Storage
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SQLITE_PATH` | `data/labeler.sqlite` | Index + verdict state DB. Set to `/data/labeler.sqlite` in Docker so it lands on the persistent volume. Companion `*-labels.db` (skyware) and `*-feedback.db` files live next to it. |
+
+### Logging
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LOG_LEVEL` | `info` | `trace` · `debug` · `info` · `warn` · `error` · `fatal`. |

@@ -166,10 +166,11 @@ Bluesky service-account registration in PLC) lives in
 
 ### Configuration
 
-[`.env.example`](./.env.example) is the canonical reference — every
-knob is listed with the rationale for each non-obvious default
-written out as a comment. `src/config/index.ts` is the runtime
-validation layer (zod schema).
+[`docs/DEPLOY.md § 11 Configuration reference`](./docs/DEPLOY.md#11-configuration-reference)
+is the full table — every env var the labeler honours, grouped by
+purpose, with default + meaning. `.env.example` is the same content
+as inline comments next to live defaults; `src/config/index.ts` is
+the runtime validation layer (zod schema).
 
 Model and deployment-shape benchmark (all-local, hybrid,
 pure-Vercel): [docs/ADR_model_choices.md](./docs/ADR_model_choices.md).
