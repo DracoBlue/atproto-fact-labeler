@@ -99,21 +99,29 @@ appears on the post within ~30 s.
    name and description from `config/labels.json` and tells you
    *who* labeled it. (Bluesky does not link out to external pages
    from a label badge — that's a protocol thing.)
-4. The labeler's detail page at
-   `https://<your-host>/posts?uri=<at-uri>` carries the rich
-   reasoning: extracted claim, NLI vote breakdown, every cited
-   publisher's article URL. Get there by:
-   - **Letting the labeler reply.** With `REPLY_TO_MENTIONS=true`
-     the labeler posts a threaded reply under your mention with a
-     `Details: https://...` link to the detail page.
-   - **Visiting the labeler's profile feed.** With
-     `REPLY_TO_REPORTS=true`, every report-triggered label also
-     becomes a quote-post of the reported post on the labeler's
-     own Bluesky feed, carrying the verdict text + `Details: ...`
-     URL. Browse the labeler's profile to see them all in one
+4. The labeler also posts a short, human-readable verdict next to
+   the badge, naming the source publishers:
+   - **Threaded reply** under your mention, when
+     `REPLY_TO_MENTIONS=true`.
+   - **Quote-post** of the reported post on the labeler's own
+     profile feed, when `REPLY_TO_REPORTS=true`. Browse the
+     labeler's profile to see every report-triggered label in one
      place.
-   - **Typing the URL.** `LABELER_DETAIL_BASE_URL` + `/posts?uri=`
-     + URL-encoded at-uri of the labeled post.
+   The reply text carries a `Details: https://...` link. By policy,
+   for clean verdicts (`supported`, `refuted`, `mixed`, `outdated`,
+   `unknown`) it points at the **top publisher's own fact-check
+   article** — the journalism that did the actual verification
+   work. Only when the verdict is `disputed` (publishers disagree)
+   does the link point at the **labeler's own detail page**, since
+   no single publisher's URL captures the full disagreement. See
+   [`triggers/replies.md § Where the Details link points`](./triggers/replies.md#where-the-details-link-points).
+5. The labeler's detail page at
+   `https://<your-host>/posts?uri=<at-uri>` carries the rich
+   reasoning regardless of the link policy above — extracted claim,
+   NLI vote breakdown, every cited publisher's article URL. Build
+   the URL by hand if you want to look at any specific verdict:
+   `LABELER_DETAIL_BASE_URL` + `/posts?uri=` + URL-encoded at-uri
+   of the labeled post.
 
 If nothing shows up after a minute, check `pnpm run lifecycle:status`
 and the labeler logs. The `pnpm cli:label <url>` CLI runs the same
