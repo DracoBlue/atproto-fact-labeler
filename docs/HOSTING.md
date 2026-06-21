@@ -94,18 +94,26 @@ appears on the post within ~30 s.
    earth is flat", "vaccines contain microchips" — pick whatever
    you'd actually want a fact-check on). Reply to it and mention
    `@<your-labeler-handle>` in the reply.
-3. Within ~30 seconds the post should sprout a `fact-*` badge in
-   your Bluesky timeline.
-4. Click the badge → the labeler's detail page opens at
-   `https://<your-host>/posts?uri=<at-uri>` and shows the extracted
-   claim, the NLI vote breakdown, and every cited publisher's
-   article URL.
+3. Within ~30 seconds the labeled post sprouts a `fact-*` badge in
+   your Bluesky timeline. Tap the badge → Bluesky shows the label's
+   name and description from `config/labels.json` and tells you
+   *who* labeled it. (Bluesky does not link out to external pages
+   from a label badge — that's a protocol thing.)
+4. The labeler's detail page at
+   `https://<your-host>/posts?uri=<at-uri>` carries the rich
+   reasoning: extracted claim, NLI vote breakdown, every cited
+   publisher's article URL. Get there by:
+   - **Letting the labeler reply.** With `REPLY_TO_MENTIONS=true`
+     the labeler posts a threaded reply under your mention with a
+     `Details: https://...` link to the detail page.
+   - **Typing the URL.** `LABELER_DETAIL_BASE_URL` + `/posts?uri=`
+     + URL-encoded at-uri of the labeled post.
 
 If nothing shows up after a minute, check `pnpm run lifecycle:status`
 and the labeler logs. The `pnpm cli:label <url>` CLI runs the same
-pipeline directly and is useful when the on-wire path isn't
-behaving — it prints the verdict and evidence to stdout without
-emitting on the wire.
+pipeline directly without going through Bluesky and is useful when
+the on-wire path isn't behaving — it prints the verdict and evidence
+to stdout.
 
 The 14-case fixture is the calibrated correctness gate:
 
