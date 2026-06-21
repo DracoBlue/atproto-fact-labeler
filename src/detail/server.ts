@@ -16,6 +16,11 @@
  * verdicts fall back to the legacy SQL join with the local `evidence`
  * table.
  */
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';
 import { verdictToLabel } from '../labels/vocabulary.ts';
@@ -453,6 +458,110 @@ ${renderFederatedReviews(federated)}
 </html>`;
 }
 
+/**
+ * Discover Lexicon JSON files on disk so the HTTP routes can serve them.
+ * Built once at startup; the files don't change at runtime.
+ *
+ * The canonical resolution path for these schemas is the
+ * `com.atproto.lexicon.schema` records on the labeler's PDS (plus the
+ * `_lexicon.<authority>` DNS TXT pointer). This HTTP mirror is a courtesy
+ * for humans browsing — typing the NSID into the URL bar should land you on
+ * the JSON without GitHub navigation.
+ */
+interface LexiconEntry {
+  nsid: string;
+  path: string;
+  body: string;
+  etag: string;
+}
+
+function loadLexiconEntries(): LexiconEntry[] {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const dir = resolve(here, '..', '..', 'lexicons');
+  let files: string[];
+  try {
+    files = listJsonRecursive(dir);
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message, dir },
+      'lexicon mirror: lexicons/ directory missing or unreadable, /lexicons routes will return 404',
+    );
+    return [];
+  }
+  const entries: LexiconEntry[] = [];
+  for (const path of files) {
+    try {
+      const body = readFileSync(path, 'utf8');
+      const parsed = JSON.parse(body) as { id?: string };
+      if (typeof parsed.id !== 'string' || !parsed.id.includes('.')) continue;
+      const etag = `"${createHash('sha1').update(body).digest('hex').slice(0, 16)}"`;
+      entries.push({ nsid: parsed.id, path, body, etag });
+    } catch (err) {
+      logger.warn({ err: (err as Error).message, path }, 'lexicon mirror: skipping invalid file');
+    }
+  }
+  entries.sort((a, b) => a.nsid.localeCompare(b.nsid));
+  return entries;
+}
+
+function listJsonRecursive(root: string): string[] {
+  const out: string[] = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const d = stack.pop()!;
+    for (const name of readdirSync(d)) {
+      const full = join(d, name);
+      const st = statSync(full);
+      if (st.isDirectory()) stack.push(full);
+      else if (name.endsWith('.json')) out.push(full);
+    }
+  }
+  return out;
+}
+
+function renderLexiconIndex(entries: LexiconEntry[], labelerDid: string): string {
+  if (entries.length === 0) {
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Lexicons</title></head>
+<body><p>No lexicons are currently published from this host.</p></body></html>`;
+  }
+  const rows = entries
+    .map(
+      (e) => `
+        <li>
+          <code><a href="/lexicons/${escapeHtml(e.nsid)}.json">${escapeHtml(e.nsid)}.json</a></code>
+          <br>
+          <small>Canonical atproto record:
+            <code>at://${escapeHtml(labelerDid)}/com.atproto.lexicon.schema/${escapeHtml(e.nsid)}</code>
+          </small>
+        </li>`,
+    )
+    .join('');
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<title>Lexicons hosted by this labeler</title>
+<style>
+ body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 760px; margin: 2em auto; padding: 0 1em; color: #111; }
+ a { color: #0066c0; }
+ code { background: #f4f4f4; padding: 0 .2em; border-radius: 3px; }
+ li { margin-bottom: 1em; }
+</style>
+</head>
+<body>
+<h1>Lexicons</h1>
+<p>These are courtesy HTTP mirrors of the
+  <a href="https://atproto.com/specs/lexicon#lexicon-publication-and-resolution" rel="noopener" target="_blank">atproto-spec-canonical</a>
+  Lexicon schemas this labeler publishes. The authoritative records live on the labeler's PDS as
+  <code>com.atproto.lexicon.schema</code> records; the DNS TXT at
+  <code>_lexicon.&lt;authority&gt;</code> resolves the NSID to the owning DID.</p>
+<ul>${rows}</ul>
+<p><small>Design + rationale: <a href="https://github.com/DracoBlue/atproto-fact-labeler/blob/main/docs/PROPOSAL_lexicons/LEXICON_DESIGN.md" rel="noopener" target="_blank">docs/PROPOSAL_lexicons/LEXICON_DESIGN.md</a>.</small></p>
+</body>
+</html>`;
+}
+
 export function registerDetailRoutes(app: LabelerApp): void {
   app.get('/healthz', async () => ({ ok: true }));
 
@@ -482,6 +591,42 @@ export function registerDetailRoutes(app: LabelerApp): void {
     reply.header('content-type', 'text/plain; charset=utf-8');
     reply.header('x-robots-tag', 'noindex, nofollow');
     return 'User-agent: *\nDisallow: /\n';
+  });
+
+  // Courtesy HTTP mirror of the Lexicon schemas — the spec-canonical
+  // resolution path is DNS TXT → com.atproto.lexicon.schema record, but
+  // typing facts.kiesel.app/lexicons/app.kiesel.facts.claimVerdict.json
+  // into a browser is what a human would naturally try first.
+  const lexicons = loadLexiconEntries();
+  const lexiconsByNsid = new Map(lexicons.map((e) => [e.nsid, e] as const));
+
+  app.get('/lexicons', async (_req, reply) => {
+    reply.header('content-type', 'text/html; charset=utf-8');
+    reply.header('x-robots-tag', 'noindex, nofollow, noarchive, nosnippet');
+    return renderLexiconIndex(lexicons, cfg.LABELER_DID);
+  });
+
+  app.get<{ Params: { file: string } }>('/lexicons/:file', async (req, reply) => {
+    // The route param is the filename portion of the path (no slash inside).
+    // We accept `<nsid>.json` and `<nsid>` (trailing-.json optional for ergonomics).
+    const raw = req.params.file;
+    const nsid = raw.endsWith('.json') ? raw.slice(0, -'.json'.length) : raw;
+    const entry = lexiconsByNsid.get(nsid);
+    if (!entry) {
+      reply.code(404);
+      reply.header('content-type', 'application/json; charset=utf-8');
+      reply.header('x-robots-tag', 'noindex, nofollow');
+      return { error: 'NotFound', message: `No lexicon for nsid '${nsid}' is hosted here.` };
+    }
+    if (req.headers['if-none-match'] === entry.etag) {
+      reply.code(304);
+      return null;
+    }
+    reply.header('content-type', 'application/json; charset=utf-8');
+    reply.header('etag', entry.etag);
+    reply.header('cache-control', 'public, max-age=300');
+    reply.header('x-robots-tag', 'noindex, nofollow');
+    return entry.body;
   });
 
   app.get<{ Querystring: { uri?: string; format?: string } }>(
