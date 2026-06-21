@@ -9,8 +9,8 @@ Bluesky subscribers".
 
 | What | Why | Notes / link out |
 |---|---|---|
-| **A Bluesky service account** | The labeler signs labels under its own DID, distinct from any personal account. | Create at [bsky.app](https://bsky.app) (PDS = `bsky.social`) or any other PDS (Eurosky, self-hosted). The labeler registration step uses [`@skyware/labeler`](https://github.com/skyware-js/labeler) — its [setup walkthrough](https://skyware.js.org/guides/labeler/introduction/getting-started/) covers the DID / PLC token bits in detail. |
-| **A server with ~1 GB RAM, ~1 GB disk** | The labeler is a single Node process plus SQLite. | Coolify, a small VPS, Kubernetes — all fine. Docker is the only hard requirement. |
+| **A Bluesky service account, registered as a labeler** | The labeler signs labels under its own DID, distinct from any personal account, and the account's DID document must declare the labeler endpoint + label vocabulary. | (1) Create a dedicated account at [bsky.app](https://bsky.app) or another PDS. (2) Register the labeler endpoint + signing key: `pnpm dlx @skyware/labeler setup`. (3) Declare the six `fact-*` label values: `pnpm dlx @skyware/labeler label edit` and paste the contents of [`config/labels.json`](../config/labels.json). Full DID / PLC token detail: [skyware-labeler getting started](https://skyware.js.org/guides/labeler/introduction/getting-started/). |
+| **A server with ~1 GB RAM, ~1 GB disk** | The labeler is a single Node process plus SQLite. | Any host that runs Node 24 + pnpm 11 (or Docker) works. |
 | **An OpenAI-compatible LLM endpoint** | Stages 1, 3, 4 of the matching pipeline call out to a chat-completions API for claim extraction, rerank, and NLI judging. | Default points at [Vercel AI Gateway](https://vercel.com/ai-gateway). [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.ai/), vLLM, OpenAI itself all work — same OpenAI shape, different `OPENAI_BASE_URL`. Model recommendations: [`adr/model-choices.md`](./adr/model-choices.md). |
 | **A domain you control** *(optional but recommended)* | Custom handles like `facts.example.org` look like a real service and aren't tied to bsky.social. | Skip if `facts.bsky.social` is acceptable for staging. DNS setup below if you want a custom handle. |
 | **A Google Cloud API key** *(optional)* | Enables the live Fact Check Tools API (Path 3) which closes the English-publisher gap. | [`sources/factcheck-api.md`](./sources/factcheck-api.md) walks the `gcloud` setup. |
@@ -18,9 +18,12 @@ Bluesky subscribers".
 
 ## Quick start — minimum to run
 
-The labeler ships as a Docker image at
-`ghcr.io/dracoblue/atproto-fact-labeler:latest`. The repo's
-`docker-compose.yml` points at that image — no source build needed.
+The project ships a Docker image at
+`ghcr.io/dracoblue/atproto-fact-labeler:latest` and the repo's
+`docker-compose.yml` points at it — that's the path the rest of
+this doc assumes. **Docker isn't required** though; it's a Node 24
++ pnpm 11 app and runs bare-metal too (`pnpm install && pnpm
+start`).
 
 ```bash
 git clone https://github.com/DracoBlue/atproto-fact-labeler.git
@@ -50,9 +53,9 @@ curl http://localhost:14831/healthz   # → {"ok":true}
 docker compose logs -f fact-labeler
 ```
 
-At this point the service runs and the pipeline can label posts —
-but the labels are not yet visible to Bluesky users. To make them
-visible, complete *Register with Bluesky* below.
+Subscribers on Bluesky see emitted labels in real time, assuming
+the service account was registered as a labeler in the Prerequisites
+step above.
 
 ## Verify it works — trigger a fact-check
 
@@ -134,7 +137,7 @@ candidates above threshold survive into NLI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LABELER_DID` | `did:plc:placeholder-…` | The labeler service DID. Stays placeholder until you register a Bluesky service account (see *Register with Bluesky* below). |
+| `LABELER_DID` | `did:plc:placeholder-…` | The labeler service DID. Stays placeholder until you complete the prerequisite Bluesky-account registration. |
 | `LABELER_HANDLE` | *(empty)* | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. |
 | `LABELER_SIGNING_KEY` | *(auto on first run)* | secp256k1 signing key for label records. Auto-generated and persisted to `.env` on first run. **Back it up** — losing it invalidates every emitted label. |
 | `LABELER_PORT` | `14831` | Internal port serving `subscribeLabels` / `queryLabels` **and** the detail page. |
@@ -203,47 +206,6 @@ Same creds, two surfaces.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `LOG_LEVEL` | `info` | `trace` · `debug` · `info` · `warn` · `error` · `fatal`. |
-
-## Register with Bluesky
-
-After the service runs and `pnpm test:matching` is **14/14 green**,
-register with the Bluesky network so AppViews start hydrating
-emitted labels for subscribed users.
-
-The full skyware-labeler setup walkthrough lives at
-[skyware-js/labeler · getting started](https://skyware.js.org/guides/labeler/introduction/getting-started/).
-The condensed flow:
-
-```bash
-# 1. Set up the labeler endpoint + signing key in the account's DID document.
-#    Skyware asks for service-account creds and a PLC token (mailed to the
-#    account's address) and either generates a signing key or uses the one
-#    in .env. Persist the signing key.
-pnpm dlx @skyware/labeler setup
-
-# 2. Declare the six fact-* label values in the account's
-#    app.bsky.labeler.service record.
-pnpm dlx @skyware/labeler label edit
-# When the editor opens, paste the contents of config/labels.json and save.
-```
-
-`config/labels.json` is the canonical six-label vocabulary
-(`fact-supported`, `fact-refuted`, `fact-disputed`, `fact-mixed`,
-`fact-outdated`, `fact-unknown`) with `en` + `de` locales.
-
-Per-field meaning condensed from
-[atproto.com/specs/label](https://atproto.com/specs/label):
-
-- `severity: inform` — informational label, not moderation. The
-  client may surface a small badge or footnote.
-- `blurs: none` — never hide the post or media; we only annotate.
-- `defaultSetting` — `inform` for positive / uncertain cases,
-  `warn` for the four that flag a problem.
-- `adultOnly: false` — not an adult-content label.
-
-After both steps, AppViews open a long-lived WebSocket against
-`subscribeLabels` and stay connected. Labels emitted from this
-point on flow to subscribers in real time.
 
 ## Going to production
 
