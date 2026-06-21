@@ -106,6 +106,12 @@ appears on the post within ~30 s.
    - **Letting the labeler reply.** With `REPLY_TO_MENTIONS=true`
      the labeler posts a threaded reply under your mention with a
      `Details: https://...` link to the detail page.
+   - **Visiting the labeler's profile feed.** With
+     `REPLY_TO_REPORTS=true`, every report-triggered label also
+     becomes a quote-post of the reported post on the labeler's
+     own Bluesky feed, carrying the verdict text + `Details: ...`
+     URL. Browse the labeler's profile to see them all in one
+     place.
    - **Typing the URL.** `LABELER_DETAIL_BASE_URL` + `/posts?uri=`
      + URL-encoded at-uri of the labeled post.
 
