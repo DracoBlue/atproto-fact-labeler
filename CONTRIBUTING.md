@@ -40,7 +40,7 @@ pnpm cli:embed-rebuild
 ```
 
 Then `pnpm test` for the unit tests, `pnpm test:matching` for the
-end-to-end 13-case fixture (requires a live LLM endpoint).
+end-to-end 14-case fixture (requires a live LLM endpoint).
 
 ## Before you push
 
@@ -50,18 +50,31 @@ pnpm test
 ```
 
 The CI runs both; PRs that don't pass these locally won't merge.
+Behaviour changes need test coverage — new code paths without tests
+will get pushback unless there's a good reason. One concern per PR;
+a bug fix and a new feature in the same PR makes bisecting future
+regressions harder. Don't bundle dependency upgrades into feature
+PRs — Dependabot handles those on its own schedule.
 
-## Pull request conventions
+## Commit messages
 
-- One concern per PR. A bug fix and a new feature in the same PR makes
-  bisecting future regressions harder.
-- Commit messages: short imperative subject (≤ 72 chars), then a blank
-  line, then a paragraph or two on *why*. Existing history (`git log
-  --oneline`) shows the style.
-- Touch tests where behaviour changes. New code paths without tests
-  will get pushback unless there's a good reason.
-- Don't bundle dependency upgrades into feature PRs — Dependabot
-  handles those on its own schedule.
+[Conventional Commits](https://www.conventionalcommits.org/). The
+release line is driven by
+[release-please](https://github.com/googleapis/release-please)
+based on commit messages on `main`:
+
+- `feat: …` → minor version bump
+- `fix: …` → patch version bump
+- `feat!: …` or `BREAKING CHANGE:` footer → major version bump
+- `chore: …`, `docs: …`, `refactor: …`, `test: …`, `ci: …` → no version bump
+
+release-please opens a Release PR on `main` that collects pending
+changes. Merging that PR creates the tag and triggers the Docker
+publish job to GHCR.
+
+Body convention: short imperative subject (≤ 72 chars), blank line,
+then a paragraph or two on *why* the change was made. The existing
+`git log --oneline` shows the tone.
 
 ## Areas where help is especially welcome
 
