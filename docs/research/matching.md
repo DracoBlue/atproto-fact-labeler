@@ -1,6 +1,6 @@
 # Research: Claim-to-Fact-Check Matching
 
-> Companion to [`docs/pipeline/README.md`](./pipeline/README.md). Captures the
+> Companion to [`docs/pipeline/README.md`](../pipeline/README.md). Captures the
 > peer-reviewed sources that justify the three-stage architecture
 > (retrieve → rerank → entail) replacing our broken FTS-only lookup.
 >
@@ -251,7 +251,7 @@ thresholds need calibration.
 ## Open questions
 
 1. **Concrete cosine / reranker thresholds**: not universally published.
-   Calibrate on a held-out set ([`docs/pipeline/README.md`](./pipeline/README.md) §
+   Calibrate on a held-out set ([`docs/pipeline/README.md`](../pipeline/README.md) §
    Test-set / CI gate).
 2. **Deployed verdict-flip-on-contradiction**: principled but unclear
    if any production system implements it as documented behaviour.

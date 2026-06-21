@@ -92,10 +92,10 @@ every claim so a single under-confidence detection never blocks them.
 [DEPLOY.md § Periodic re-ingest](../DEPLOY.md#7-periodic-re-ingest)) call
 `detectLang()` for every row. Nothing extra to do.
 
-### Existing index — one-shot rebuild
+### Backfilling lang on an existing index
 
-Older databases were ingested before this change and still carry the
-URL-heuristic codes. Walk every row and rewrite:
+`pnpm cli:lang-rebuild` walks every row and rewrites the `lang`
+column from `detectLang()`:
 
 ```bash
 # Preview the rewrite (no DB changes; prints new distribution)

@@ -76,30 +76,22 @@ dedicated NLI model.
 
 | Stage | File | Model role |
 |---|---|---|
-| 0 | `src/pipeline/extract.ts` | LLM produces atomic + falsifiable + decontextualised claims; strict JSON schema |
-| 1 | `src/pipeline/retrieve.ts` | granite-278m-multilingual embeddings, cosine over `claim_review.embedding` BLOB |
-| 2 | `src/pipeline/rerank.ts` | one batched LLM call rates top-K candidates 0..1 |
-| 3 | `src/pipeline/entail.ts` | LLM-as-judge per surviving candidate; strict-JSON-Schema |
-| 4 | `src/pipeline/matching.ts` | polarity-aware aggregate, returns null → `uncovered` |
+| 1 | `src/pipeline/extract.ts` | LLM produces atomic + falsifiable + decontextualised claims; strict JSON schema |
+| 2 | `src/pipeline/retrieve.ts` | granite-278m-multilingual embeddings, cosine over `claim_review.embedding` BLOB |
+| 3 | `src/pipeline/rerank.ts` | one batched LLM call rates top-K candidates 0..1 |
+| 4 | `src/pipeline/entail.ts` | LLM-as-judge per surviving candidate; strict-JSON-Schema |
+| 5 | `src/pipeline/matching.ts` | polarity-aware aggregate, returns null → `uncovered` |
 
 `src/embedding/client.ts` forces `encoding_format: 'float'` to work
 around the LM Studio + openai-node base64 incompatibility.
 
-## Frame of reference
+## Research backing
 
-The pipeline mirrors the operational framing of the two organisations
-whose claim-matching pipelines are most publicly documented:
-
-- **Meedan (Alegre + Check)** — matching answers *"can the claims in
-  these two posts be served with one fact-check?"* — a clustering
-  question, not a verdict pass-through.
-  [Meedan post](https://meedan.org/post/claim-matching-global-fact-checks-at-meedan),
-  [Alegre repo](https://github.com/meedan/alegre).
-- **Full Fact** — two claims match iff they have *identical truth
-  conditions, t(v) = t(u)*. There is no possible world in which one
-  is true and the other false. By construction, this rules out
-  flipping polarity by accident.
-  [Full Fact post](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/).
+The pipeline shape mirrors the operational framings of Meedan
+(Alegre + Check) and Full Fact (`t(v) = t(u)`), and follows the
+FACT-GPT / FEVEROUS / AVeriTeC literature for the rerank + NLI
+stages. Full citations + the side-by-side comparison live in
+[`../research/matching.md`](../research/matching.md).
 
 ## Test gate
 

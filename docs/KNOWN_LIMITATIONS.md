@@ -143,39 +143,6 @@ regression coverage.
 
 ---
 
-## What is *not* a limitation here
-
-These were limitations during development; they are no longer present
-in the shipping system. Documented so operators tracking against an
-older mental model can stop worrying about them:
-
-- **Wrong labels emitted from junk publishers.** Closed by the
-  publisher allowlist (see [`FEED_QUALITY.md`](./sources/allowlist.md)).
-  Every path — bulk feed, live API, own ingest — flows through the
-  same allowlist gate.
-- **Stored XSS / `javascript:` URLs from feed content.** Closed by
-  the URL-scheme allowlist + noindex headers in
-  [`src/detail/server.ts`](../src/detail/server.ts) and the
-  `escapeHtml` everywhere user-controlled content is rendered.
-  See [`SECURITY.md`](../SECURITY.md).
-- **Label-signing-key abuse via `tools.ozone.moderation.emitEvent`.**
-  Closed by the
-  `auth: (did) => did === cfg.LABELER_DID` restriction on the
-  LabelerServer.
-- **Cross-lingual NLI mistakes reaching the wire.** Closed by the
-  same-language retrieval filter described in item #1 above. The
-  trade-off is the coverage gap, also in #1.
-- **Stale labels after publisher delisting.** Closed by
-  `pnpm cleanup:claims` (removes the publisher's rows from the
-  index) and `pnpm retire` (negates already-emitted labels and
-  stamps `verdict.retired_at` so the detail page stops surfacing
-  the withdrawn evidence). See
-  [`LIFECYCLE.md § Phase 3`](LIFECYCLE.md#phase-3--retiring-content-variant-c--emit-negations).
-- **Single-publisher verdicts at conf=1.0 emitting without review.**
-  Closed by `HITL_AUTO_MIN_VOTES=2` default (item #3 above).
-
----
-
 ## If you hit a *different* limitation
 
 If you're seeing the labeler refuse to label something it

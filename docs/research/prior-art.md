@@ -1,7 +1,7 @@
 # Prior Art: Fact-Checking Systems & HITL Tooling
 
-> Companion to [`PIPELINE.md`](./pipeline/README.md) and
-> [`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md). Where those two cover
+> Companion to [`PIPELINE.md`](../pipeline/README.md) and
+> [`matching.md`](./matching.md). Where those two cover
 > the *matching* problem this labeler solves today, this document covers
 > the wider landscape: previously-built fact-checking pipelines and the
 > annotation tools that would slot in for a human-in-the-loop reviewer
@@ -14,7 +14,7 @@
 
 ## TL;DR
 
-- **For matching today** — see [`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md).
+- **For matching today** — see [`matching.md`](./matching.md).
   This file covers everything else.
 - **HITL reviewer queue, when we need one**: pair
   **Argilla** (extraction review — schema-flexible, Krippendorff's α,

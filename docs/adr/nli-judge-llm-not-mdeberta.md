@@ -44,7 +44,7 @@ hit **6 / 6** correct. On the full fixture in `pnpm test:matching`:
 **14 / 14** correct, including all four polarity-matrix cases.
 
 The systematic failure mode is the literature-documented one. As
-captured in [`../RESEARCH-MATCHING.md`](../RESEARCH-MATCHING.md)
+captured in [`../research/matching.md`](../research/matching.md)
 § FACT-GPT: contradiction-class F1 on small / base NLI models is
 around 0.46 vs. 0.83 on entailment, even with fine-tuning. The
 probe data is concrete evidence of that gap in our setup, not a

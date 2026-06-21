@@ -196,93 +196,21 @@ curl -s -X POST http://localhost:14831/xrpc/com.atproto.moderation.createReport 
 The reported post is dispatched immediately. Watch the HITL surface
 (stdin / Telegram / auto) for the resulting proposal.
 
-## Reports against the labeler's own posts → feedback channel
+## Bypassed cases → feedback channel
 
-A report whose `subject.uri` belongs to the labeler account itself is
-treated as **user feedback**, not as a normal dispatch. We never run the
-fact-check pipeline on our own work — that's both pointless (we already
-know what we said) and a recursion risk. Instead the report is persisted
-in the `feedback` table for an operator to review.
+Two report classes don't go through the fact-check pipeline:
 
-The check is a cheap string match (`at://<labelerDid>/...`); no AppView
-round-trip needed.
+- A report whose `subject.uri` belongs to the labeler account
+  itself ("you got something wrong on your own post"). Re-checking
+  our own work is pointless and recursive.
+- A report with `reasonType` set to the *appeal* constant — a user
+  tapping *Anfechten / Appeal* on a label we emitted. Re-running the
+  pipeline on the same input would produce the same verdict.
 
-### Reviewing feedback
-
-```bash
-pnpm run feedback:list                     # 50 most recent rows
-pnpm run feedback:list --unresolved        # only rows without a resolution
-pnpm run feedback:list --since 2026-06-01  # since a date
-pnpm run feedback:list --limit 100         # cap output
-```
-
-Sample output:
-
-```
-#3  2026-06-17 12:14:02  [open]
-  subject : at://did:plc:fact-labeler-abcdef/app.bsky.feed.post/3kxrep1
-  type    : com.atproto.moderation.defs#reasonOther
-  reason  : The verdict is wrong, CORRECTIV is outdated.
-```
-
-A "resolved" workflow (marking, replying, retiring the original verdict)
-is not yet wired — the rows are read-only from the CLI today. When you
-act on a piece of feedback, mark it manually:
-
-```bash
-sqlite3 data/labeler.sqlite \
-  "UPDATE feedback SET resolved_at = datetime('now'), resolution = 'retired verdict' WHERE id = 3;"
-```
-
-## Label appeals → feedback channel, no re-dispatch
-
-When a Bluesky user taps **"Anfechten" / "Appeal"** on a label this
-labeler emitted, the client sends a `createReport` with `reasonType`
-set to one of:
-
-- `com.atproto.moderation.defs#reasonAppeal` (legacy)
-- `tools.ozone.report.defs#reasonAppeal` (Ozone)
-
-Both are recognised by
-[`isAppealReason()`](../../src/feedback/store.ts). The dispatcher
-**short-circuits**: it does **not** re-run the pipeline (the same
-input would produce the same verdict and waste an LLM call), and
-instead records the appeal in the `feedback` table with the
-reporting DID, the reason string the user typed, and the subject
-URI of the label being contested.
-
-When `HITL_MODE=telegram` or `HITL_MODE=auto-telegram`, the operator
-also receives a plain-text Telegram message naming the contested URI,
-the reporting DID, the reason text, a deep link to the detail page,
-and the exact `pnpm retire` command to use if the appeal is upheld.
-On `stdin` / `auto` modes the Telegram push is a no-op — operators
-on those modes review via `pnpm feedback:list`.
-
-```
-{"level":40, "msg":"label appeal received — recorded as feedback,
-  pipeline NOT re-run. Operator review: pnpm feedback:list /
-  pnpm retire --uri=...",
-  "feedbackId":42, "uri":"at://…/3kx",
-  "reasonType":"tools.ozone.report.defs#reasonAppeal",
-  "reportedBy":"did:plc:alice"}
-```
-
-Operator review:
-
-```bash
-pnpm feedback:list --only-unresolved
-# decide per appeal: leave the label, or retire it
-pnpm retire --uri=at://did:plc:bob/app.bsky.feed.post/3kx
-# mark the feedback row resolved
-sqlite3 /data/labeler.sqlite \
-  "UPDATE feedback SET resolved_at = datetime('now'),
-   resolution = 'appeal upheld, label retired'
-   WHERE id = 42;"
-```
-
-The `feedback` dedup index on `(subject_uri, reason_type, reason)`
-absorbs repeated appeals against the same label — the `count`
-column reflects how many times the appeal has been raised.
+Both land in the `feedback` table for operator review and never
+reach the dispatcher. See [`../feedback.md`](../feedback.md) for the
+review CLIs, Telegram surfacing on appeals, the resolved-workflow,
+and the dedup behaviour.
 
 ## Edge cases
 

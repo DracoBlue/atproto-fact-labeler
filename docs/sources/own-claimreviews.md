@@ -149,35 +149,17 @@ The JSON inside the `<script>` tag and the `item` object in
   domain from the allowlist (revoking a contributor, etc.), running
   cleanup drops the orphaned rows.
 
-## Native atproto records (in progress)
+## Publishing fact-checks as atproto records instead of JSON-LD?
 
-The publisher half of the project's
-[`kiesel-app/facts:lexicons/`](https://github.com/kiesel-app/facts/tree/main/lexicons) is `app.kiesel.facts.claimReview` — an
-atproto-native record type mirroring schema.org/ClaimReview
-field-for-field, designed for fact-checkers who already operate on
-atproto and want to publish reviews as first-class records on their
-own PDS instead of (or alongside) JSON-LD-in-articles. Discoverable
-via [Constellation](https://constellation.microcosm.blue/) backlinks
-on the subject Bluesky post.
-
-This is **additional** to the bulk-DataFeed path documented above,
-not a replacement. The bulk JSON ingest still works exactly as
-described. Use the atproto-record path when:
-
-- You operate a fact-check newsroom on atproto and want full record
-  control (correct, supersede, retire).
-- You want your reviews to be discoverable by *other* labelers, not
-  just this one — Constellation indexes records by subject URI, so
-  any labeler can query "which fact-checkers have reviewed this
-  post?".
-
-Design + schema:
-[`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md)
-and [`kiesel-app/facts:claimReview.json`](https://github.com/kiesel-app/facts/blob/main/lexicons/app/kiesel/facts/claimReview.json).
+If you're already on atproto and would rather skip the
+JSON-LD-on-website round-trip, see
+[`atproto-records.md`](./atproto-records.md) — Path 4, separate
+intake path using `app.kiesel.facts.claimReview` records on your
+PDS.
 
 ## See also
 
-- [`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md) — atproto-native record types (one for publishers, one for labelers).
+- [`./atproto-records.md`](./atproto-records.md) — Path 4, atproto-native ClaimReview records.
 - [`docs/sources/licensing.md § Path 1`](./licensing.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
 - [`docs/sources/allowlist.md`](./allowlist.md) — the allowlist that
   filters every ingest, including yours.

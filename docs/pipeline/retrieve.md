@@ -51,7 +51,7 @@ the right CLI to run after a model swap or a fresh ingest.
 ## Why a single cosine threshold doesn't work
 
 Measured on the calibration set
-([`../RESEARCH-MATCHING.md`](../RESEARCH-MATCHING.md)):
+([`../research/matching.md`](../research/matching.md)):
 
 | Class | min | median | max |
 |---|---|---|---|

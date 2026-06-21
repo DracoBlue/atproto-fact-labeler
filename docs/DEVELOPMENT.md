@@ -1,7 +1,7 @@
 # Development
 
 For the matching architecture itself see [PIPELINE.md](./pipeline/README.md) and
-its companion [RESEARCH-MATCHING.md](./RESEARCH-MATCHING.md). This file
+its companion [matching.md](./research/matching.md). This file
 covers the dev workflow only.
 
 ## Matching fixtures — `pnpm test:matching`

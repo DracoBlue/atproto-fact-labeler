@@ -102,7 +102,7 @@ silently drop DE-pendant fact-checks from retrieval.
 
 Already justified in detail in
 [`PIPELINE.md` § Stage 2](../pipeline/README.md#stage-2--dense-retrieval) and
-[`RESEARCH-MATCHING.md`](../RESEARCH-MATCHING.md). Summary: measured
+[`matching.md`](../research/matching.md). Summary: measured
 EN↔DE crosslingual cosine 0.81 vs ~0.52 for English-centric alternatives
 (mxbai-large-v1), 75 emb/s on M3 Max, 280 MB index for 92 k rows. Ships
 with LM Studio. No serious competitor at this size found on Vercel.

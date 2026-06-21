@@ -248,13 +248,13 @@ Cross-cutting:
   what the system measurably doesn't do yet, with evidence.
 - [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) — offline dev,
   fixtures, smoke test, commit conventions.
-- [`docs/ATPROTO_LABEL_LANDSCAPE.md`](./docs/ATPROTO_LABEL_LANDSCAPE.md)
+- [`docs/research/atproto-label-landscape.md`](./docs/research/atproto-label-landscape.md)
   — atproto label surfaces and what already exists in the space.
 - [`docs/adr/model-choices.md`](./docs/adr/model-choices.md) —
   LLM / embedding choices and the hybrid-vs-pure-local trade-off.
-- [`docs/RESEARCH-MATCHING.md`](./docs/RESEARCH-MATCHING.md) —
+- [`docs/research/matching.md`](./docs/research/matching.md) —
   peer-reviewed evidence for the retrieve → rerank → NLI shape.
-- [`docs/PRIOR_ART.md`](./docs/PRIOR_ART.md) — fact-checking
+- [`docs/research/prior-art.md`](./docs/research/prior-art.md) — fact-checking
   literature + HITL tooling (Argilla / Ozone) we considered.
 
 Built on

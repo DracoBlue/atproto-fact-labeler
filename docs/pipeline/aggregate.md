@@ -74,11 +74,6 @@ version. If aggregation only used pass-through, true claims like
 multiple publishers have addressed the topic. Polarity flip
 recovers the signal.
 
-The principle is formalised by **Full Fact's t(v) = t(u)** — two
-claims match iff they have identical truth conditions. A
-contradiction is the case where they have *opposite* truth
-conditions; the publisher's verdict is reusable but the polarity is
-inverted. ([Full Fact: Towards a common definition of claim matching](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/))
 
 ### 2. Disputed instead of majority vote
 
@@ -103,15 +98,7 @@ Single-publisher verdicts go through human review by default.
 
 ## Research backing
 
-- **Full Fact** — claim-matching definition (`t(v) = t(u)`) and the
-  argument against verdict pass-through.
-  ([blog post](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/))
-- **Meedan Alegre + Check** — production claim-matching
-  architecture. Treats publisher consensus as a clustering question,
-  not a voting question.
-  ([Meedan post](https://meedan.org/post/claim-matching-global-fact-checks-at-meedan),
-   [Alegre repo](https://github.com/meedan/alegre))
-- **AVeriTeC** — defines aggregation over multi-source evidence as a
-  separate stage with its own evaluation. Confirms that aggregating
-  *after* the polarity gate is the standard frame.
-  ([Schlichtkrull et al. 2023](https://arxiv.org/abs/2305.13117))
+The polarity-flip-on-contradiction rule formalises Full Fact's
+`t(v) = t(u)` definition; the "disputed instead of majority vote"
+choice mirrors Meedan Alegre's clustering frame. Full citations:
+[`../research/matching.md`](../research/matching.md).

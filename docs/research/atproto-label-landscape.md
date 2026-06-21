@@ -1,6 +1,6 @@
 # Research: Claim Verification on atproto & the Fediverse
 
-> Companion to [`PRIOR_ART.md`](./PRIOR_ART.md). Where that document
+> Companion to [`prior-art.md`](./prior-art.md). Where that document
 > covers the wider fact-checking literature and HITL tooling, this one
 > covers **how atproto and the Fediverse expose label / annotation
 > infrastructure** — protocol surfaces, existing labelers, and the
@@ -82,7 +82,7 @@ Operational facts:
 Setup for a real Ozone deployment requires a dedicated account for the
 labeler, PLC-directory registration as a moderation service, and
 publishing an `app.bsky.labeler.service` record so clients discover it.
-See [`LIFECYCLE.md`](./LIFECYCLE.md) for the going-live walkthrough as it
+See [`LIFECYCLE.md`](../LIFECYCLE.md) for the going-live walkthrough as it
 applies to this project.
 
 Sources:
@@ -243,7 +243,7 @@ Stable since ~2016.
 DataFeed of ClaimReview markups — directly ingestible as a source for an
 atproto claim labeler to label posts referencing previously fact-checked
 claims. **This is what we ingest today** — see
-[`LICENSING.md`](./sources/licensing.md) for the licensing of the corpus and the
+[`LICENSING.md`](../sources/licensing.md) for the licensing of the corpus and the
 mapping from publisher-native ratings to our internal verdict
 vocabulary.
 
@@ -263,14 +263,14 @@ Sources:
 2. **ClaimReview → atproto label mapping** had no canonical proposal
    before this project. The mapping
    (URL / claim / rating → `fact-supported` / `fact-refuted` / ...) is
-   documented in [`LICENSING.md`](./sources/licensing.md) §
+   documented in [`LICENSING.md`](../sources/licensing.md) §
    "Internal verdict vocabulary" and worth proposing upstream as a
    reusable lexicon.
 3. **Data Commons ClaimReview feed ingestion** for automated matching of
    posts against known fact-checks is the **shipped ingest path** in
-   `src/ingest/claimreview-feed.ts`. URL-first matching has been
-   superseded by dense + NLI matching — see
-   [`PIPELINE.md`](./pipeline/README.md).
+   `src/ingest/claimreview-feed.ts`. Matching architecture: dense
+   retrieval + LLM rerank + NLI polarity gate — see
+   [`pipeline/README.md`](../pipeline/README.md).
 4. **Open Community Notes** is a draft spec with no production
    implementation. Could be a target for a future "user-proposed claim"
    layer that bridges to our labeler engine.
@@ -308,7 +308,7 @@ Sources:
   fact-check bots using it instead of the more common reply-bot pattern
   (e.g., `@factcheck` mention bots)?
 - Is the ClaimReview → atproto label mapping documented in
-  [`LICENSING.md`](./sources/licensing.md) worth a public RFC against
+  [`LICENSING.md`](../sources/licensing.md) worth a public RFC against
   [`@atproto/lexicon`](https://github.com/bluesky-social/atproto)?
 
 ## Sources

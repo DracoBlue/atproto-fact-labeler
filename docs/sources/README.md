@@ -10,6 +10,9 @@ Per-path operational reference:
 - [`factcheck-api.md`](./factcheck-api.md) — Google Fact Check
   Tools API for per-claim live lookups (closes the English
   publisher gap).
+- [`atproto-records.md`](./atproto-records.md) — Path 4 (in
+  progress): atproto-native ClaimReview records published by
+  fact-checkers on their own PDS, discovered via Constellation.
 
 Cross-cutting:
 

@@ -1,8 +1,8 @@
 # Google Data Commons Fact Check feed
 
-The largest intake path: a ~88k-entry compilation of `ClaimReview`
-JSON-LD blobs from publishers worldwide, distributed as a daily
-~60 MB JSON dump. CC BY 4.0 on the compilation. Excellent
+The largest intake path: a compilation of `ClaimReview` JSON-LD
+blobs from publishers worldwide (~92k entries upstream, ~88k after
+allowlist filter), distributed as a daily ~60 MB JSON dump. CC BY 4.0 on the compilation. Excellent
 non-English coverage (dpa, AFP, Univision El Detector, factly.in,
 dozens more). English coverage is weaker — for that, pair with
 [`factcheck-api.md`](./factcheck-api.md).
