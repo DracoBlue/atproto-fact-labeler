@@ -31,7 +31,8 @@
     "cleanup:claims": "tsx src/cli/cleanup-claims.ts",
     "proposal:accept": "tsx src/cli/proposal-accept.ts",
     "test:matching": "tsx src/cli/test-matching.ts",
-    "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see docs/LIFECYCLE.md § Phase 1)'"
+    "labeler:setup": "echo 'Run: pnpm dlx @skyware/labeler setup (see docs/HOSTING.md § Setup step 4)'",
+    "labeler:declare": "tsx src/cli/labeler-declare.ts"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

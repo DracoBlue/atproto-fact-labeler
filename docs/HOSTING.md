@@ -61,21 +61,26 @@ pnpm cli:lang-rebuild         # populate language column
 pnpm cli:embed-rebuild        # compute embeddings (~15 min cold)
 
 # 4. Turn the Bluesky account into a labeler
-#    Skyware asks for the account creds and a PLC token mailed to the
-#    address. PERSIST THE SIGNING KEY — losing it invalidates every
-#    emitted label.
+#    Step a — update the DID document to declare the labeler endpoint
+#    and signing key. Skyware asks for the account creds and a PLC
+#    token mailed to the address.
+#    PERSIST THE SIGNING KEY — losing it invalidates every emitted
+#    label.
 pnpm dlx @skyware/labeler setup
 
-#    Then declare the six fact-* labels by pasting config/labels.json
-#    into the editor that opens.
-pnpm dlx @skyware/labeler label edit
+#    Step b — declare the six fact-* label values in the account's
+#    app.bsky.labeler.service record. Reads config/labels.json
+#    directly; no editor paste.
+pnpm labeler:declare
 
 # 5. Start the service
 pnpm start                    # or: docker compose up -d
 ```
 
 Skyware's [getting-started guide](https://skyware.js.org/guides/labeler/introduction/getting-started/)
-has the DID / PLC-token detail for step 4.
+has the DID / PLC-token detail for step 4a. Step 4b is idempotent —
+re-run after editing `config/labels.json` to push the new
+definitions; the Bluesky AppView picks them up within a minute.
 
 ## First label
 
@@ -494,9 +499,9 @@ visible to real Bluesky users:
       service account** (not assumed to be bsky.social)
 - [ ] Bluesky service-account credentials are valid (test by sending
       one `pnpm cli:label --reply`)
-- [ ] `config/labels.json` is on disk — needed by `pnpm dlx
-      @skyware/labeler label edit` to declare the six `fact-*`
-      label values
+- [ ] `pnpm labeler:declare` has run successfully — the six
+      `fact-*` label values are present in the account's
+      `app.bsky.labeler.service` record
 - [ ] Backup of `/data` is automated
 
 ## Cheat sheet
