@@ -48,10 +48,10 @@
             "description": "The aggregated verdict. 'supported' = fact-checkers confirm the claim. 'refuted' = fact-checkers refute it. 'disputed' = fact-checkers disagree among themselves. 'mixed' = the claim is partially true. 'outdated' = was true when reviewed but no longer current. 'unknown' = reviewed but unresolved by the publisher."
           },
           "confidence": {
-            "type": "number",
+            "type": "integer",
             "minimum": 0,
-            "maximum": 1,
-            "description": "Aggregated confidence in the verdict, in [0, 1]. Specific computation is labeler-internal; consumers should treat it as ordinal."
+            "maximum": 1000,
+            "description": "Aggregated confidence in the verdict, expressed as an integer in [0, 1000] (so 826 means 0.826). Stored as integer because the atproto data model intentionally excludes floats. Specific computation is labeler-internal; consumers should treat it as ordinal."
           },
           "voteBreakdown": {
             "type": "ref",

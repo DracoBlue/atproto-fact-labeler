@@ -44,7 +44,7 @@ describe('buildClaimVerdictRecord', () => {
       subject: { uri: 'at://did:plc:alice/app.bsky.feed.post/3kx', cid: 'bafy-post' },
       claimText: 'the earth is round.',
       verdict: 'supported',
-      confidence: 0.826,
+      confidence: 826,
       voteBreakdown: { entail: 0, contradict: 1, neutral: 3 },
       verifiedAt: '2026-06-20T10:00:00Z',
       validAt: '2023-03-03T00:00:00Z',

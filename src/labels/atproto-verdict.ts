@@ -66,7 +66,14 @@ export function buildClaimVerdictRecord(input: BuildClaimVerdictInput): Record<s
   ) {
     record.decontextualizedText = input.decontextualizedText;
   }
-  if (input.confidence !== null) record.confidence = input.confidence;
+  if (input.confidence !== null) {
+    // The atproto data model has no float type — confidence is encoded as an
+    // integer in [0, 1000]. The lexicon documents this. Consumers divide by
+    // 1000 to recover the [0, 1] value. Clamp to be defensive about pipeline
+    // output drift.
+    const scaled = Math.round(input.confidence * 1000);
+    record.confidence = Math.max(0, Math.min(1000, scaled));
+  }
   if (input.rationale) record.rationale = input.rationale;
   if (input.validAt) record.validAt = input.validAt;
   if (emittedLabel) record.emittedLabel = emittedLabel;

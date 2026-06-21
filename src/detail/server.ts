@@ -135,7 +135,10 @@ function renderRowFromRecord(
     atomic_text: record.claimText ?? '',
     decontextualized_text: record.decontextualizedText ?? record.claimText ?? '',
     verdict_label: label,
-    verdict_confidence: record.confidence ?? null,
+    // confidence is stored as integer 0..1000 in the record (no atproto
+    // float). Recover the [0, 1] display value.
+    verdict_confidence:
+      typeof record.confidence === 'number' ? record.confidence / 1000 : null,
     verdict_rationale: record.rationale ?? fallback.rationale,
     verified_at: record.verifiedAt ?? fallback.verifiedAt ?? '',
     valid_at: record.validAt ?? fallback.validAt,
