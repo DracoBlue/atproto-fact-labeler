@@ -36,119 +36,80 @@ a command" — it's identity, hardware, and external accounts.
 
 ## Setup
 
-Six steps from "empty server" to "labels live on the wire".
-
-### 1. Clone, configure, install deps
+Pick one path. Each line below works as-is bare-metal; prefix with
+`docker compose run --rm fact-labeler` to run inside the bundled
+image. The compose file already points at
+`ghcr.io/dracoblue/atproto-fact-labeler:latest` — no source build
+needed.
 
 ```bash
+# 1. Get the code + configure
 git clone https://github.com/DracoBlue/atproto-fact-labeler.git
 cd atproto-fact-labeler
-
 cp .env.example .env
-$EDITOR .env             # OPENAI_API_KEY at minimum
-```
+$EDITOR .env                  # OPENAI_API_KEY at minimum
+pnpm install                  # skip this if you're using Docker
 
-If you're running Docker, you don't need a local Node — skip the
-install step and prefix the rest with
-`docker compose run --rm fact-labeler`. Bare-metal:
-`pnpm install`.
-
-### 2. Pull the bulk fact-check feed
-
-```bash
+# 2. Pull the bulk fact-check feed (~60 MB)
+#    (sources/data-commons.md explains what's in it + how to refresh)
 curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.json \
   -o data.json
-```
 
-What the feed is, who's filtered out, how to refresh:
-[`sources/data-commons.md`](./sources/data-commons.md).
+# 3. Build the local index
+pnpm ingest                   # import allow-listed rows into SQLite
+pnpm cli:lang-rebuild         # populate language column
+pnpm cli:embed-rebuild        # compute embeddings (~15 min cold)
 
-### 3. Build the local index
-
-```bash
-pnpm ingest                  # import allow-listed ClaimReview rows into SQLite
-pnpm cli:lang-rebuild        # populate the language column on every row
-pnpm cli:embed-rebuild       # compute embedding vectors (~15 min cold)
-```
-
-Prefix each with `docker compose run --rm fact-labeler` if using
-Docker.
-
-### 4. Register the account as a labeler
-
-This is what *makes* the Bluesky account into a labeler. Two
-commands from [`@skyware/labeler`](https://github.com/skyware-js/labeler) —
-its [getting-started guide](https://skyware.js.org/guides/labeler/introduction/getting-started/)
-has the DID / PLC-token detail.
-
-```bash
+# 4. Turn the Bluesky account into a labeler
+#    Skyware asks for the account creds and a PLC token mailed to the
+#    address. PERSIST THE SIGNING KEY — losing it invalidates every
+#    emitted label.
 pnpm dlx @skyware/labeler setup
-# Asks for service-account creds and a PLC token mailed to the account.
-# Either generates a signing key or uses LABELER_SIGNING_KEY from .env.
-# PERSIST THE SIGNING KEY — losing it invalidates every emitted label.
 
+#    Then declare the six fact-* labels by pasting config/labels.json
+#    into the editor that opens.
 pnpm dlx @skyware/labeler label edit
-# When the editor opens, paste the contents of config/labels.json
-# and save. This declares the six fact-* label values in the
-# account's app.bsky.labeler.service record.
+
+# 5. Start the service
+pnpm start                    # or: docker compose up -d
 ```
 
-`config/labels.json` is the canonical six-label vocabulary
-(`fact-supported`, `fact-refuted`, `fact-disputed`, `fact-mixed`,
-`fact-outdated`, `fact-unknown`) with `en` + `de` locales.
+Skyware's [getting-started guide](https://skyware.js.org/guides/labeler/introduction/getting-started/)
+has the DID / PLC-token detail for step 4.
 
-### 5. Start the service
+## First label
+
+You're going to subscribe to your own labeler on Bluesky, then
+mention it on a post that contains a factual claim. The label
+appears on the post within ~30 s.
+
+1. Open the [moderation settings page on Bluesky](https://bsky.app/moderation),
+   search for your labeler's handle, and tap *Subscribe to labeler*.
+2. On Bluesky, find a post that makes a falsifiable claim ("the
+   earth is flat", "vaccines contain microchips" — pick whatever
+   you'd actually want a fact-check on). Reply to it and mention
+   `@<your-labeler-handle>` in the reply.
+3. Within ~30 seconds the post should sprout a `fact-*` badge in
+   your Bluesky timeline.
+4. Click the badge → the labeler's detail page opens at
+   `https://<your-host>/posts?uri=<at-uri>` and shows the extracted
+   claim, the NLI vote breakdown, and every cited publisher's
+   article URL.
+
+If nothing shows up after a minute, check `pnpm run lifecycle:status`
+and the labeler logs. The `pnpm cli:label <url>` CLI runs the same
+pipeline directly and is useful when the on-wire path isn't
+behaving — it prints the verdict and evidence to stdout without
+emitting on the wire.
+
+The 14-case fixture is the calibrated correctness gate:
 
 ```bash
-pnpm start                                   # bare-metal
-# or:
-docker compose up -d                         # Docker
+pnpm test:matching            # 14/14 is the going-live bar
 ```
 
-Verify it's up:
-
-```bash
-curl http://localhost:14831/healthz          # → {"ok":true}
-```
-
-### 6. Sanity-check the pipeline before going live
-
-```bash
-pnpm test:matching                           # 14-case fixture
-```
-
-`14/14 green` is the going-live gate. Anything less, fix
-before exposing the labeler to real traffic.
-
-## Verify it works — trigger a fact-check
-
-The pipeline can be exercised end-to-end without registering with
-Bluesky. Pick a post that contains a real claim and run the CLI:
-
-```bash
-docker compose run --rm fact-labeler \
-  pnpm cli:label https://bsky.app/profile/<author>/post/<rkey>
-```
-
-This runs extract → retrieve → rerank → NLI → aggregate against the
-post's text, and prints the resulting verdict + evidence. Useful flags:
-
-- `--dry-run` — produce the verdict without emitting a label on the
-  wire. Use this while the labeler is unregistered.
-- `--filter polarity` (on `pnpm test:matching`) — exercise the
-  14-case fixture against the configured LLM. Treat anything below
-  14/14 as a release blocker; see
-  [`pipeline/README.md § Test gate`](./pipeline/README.md#test-gate).
-
-To verify the on-wire path once registered: subscribe to the
-labeler on the [Bluesky settings page](https://bsky.app/moderation),
-then mention `@<your-handle>` in a Bluesky reply to a post with a
-factual claim. Within ~30 seconds you should see the label appear on
-the reported post.
-
-The detail page at `https://<your-host>/posts?uri=<at-uri>` shows
-the full reasoning: extracted claim, NLI vote breakdown, every
-cited publisher's article URL.
+Anything below that, fix before exposing the labeler to real
+traffic.
 
 ## Configuration reference
 
@@ -200,7 +161,7 @@ candidates above threshold survive into NLI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LABELER_DID` | `did:plc:placeholder-…` | The labeler service DID. Stays placeholder until *Setup § 4 — Register the account as a labeler* writes it. |
+| `LABELER_DID` | `did:plc:placeholder-…` | The labeler service DID. Stays placeholder until *Setup step 4* (`@skyware/labeler setup`) writes it. |
 | `LABELER_HANDLE` | *(empty)* | Optional Bluesky handle (no `@`, must look like a domain). Enables plain-text mention fallback when post `facets` are missing. |
 | `LABELER_SIGNING_KEY` | *(auto on first run)* | secp256k1 signing key for label records. Auto-generated and persisted to `.env` on first run. **Back it up** — losing it invalidates every emitted label. |
 | `LABELER_PORT` | `14831` | Internal port serving `subscribeLabels` / `queryLabels` **and** the detail page. |
