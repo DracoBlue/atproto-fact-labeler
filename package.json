@@ -26,7 +26,6 @@
     "cli:label": "tsx src/cli/label-post.ts",
     "cli:embed-rebuild": "tsx src/cli/embed-rebuild.ts",
     "cli:lang-rebuild": "tsx src/cli/lang-rebuild.ts",
-    "lexicons:publish": "tsx src/cli/lexicons-publish.ts",
     "verdicts:backfill": "tsx src/cli/verdicts-backfill.ts",
     "verdicts:reset-atproto": "tsx src/cli/verdicts-reset-atproto.ts",
     "cleanup:claims": "tsx src/cli/cleanup-claims.ts",

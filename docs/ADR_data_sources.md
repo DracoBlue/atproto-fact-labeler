@@ -37,7 +37,7 @@ Plus two practical constraints:
 Three independent intake paths, configurable per deployment, each
 filling a gap the others have. A fourth path is in flight as the
 project moves to atproto-native records (see
-[`PROPOSAL_lexicons/LEXICON_DESIGN.md`](PROPOSAL_lexicons/LEXICON_DESIGN.md)).
+[`kiesel-app/facts`](https://github.com/kiesel-app/facts)).
 All paths route through the same
 [`config/claimreview-publishers-allowlist.txt`](../config/claimreview-publishers-allowlist.txt)
 so the editorial bar stays identical regardless of intake.

@@ -172,12 +172,12 @@ described. Use the atproto-record path when:
   post?".
 
 Design + schema:
-[`docs/PROPOSAL_lexicons/LEXICON_DESIGN.md`](PROPOSAL_lexicons/LEXICON_DESIGN.md)
+[`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md)
 and [`lexicons/app/kiesel/facts/claimReview.json`](../lexicons/app/kiesel/facts/claimReview.json).
 
 ## See also
 
-- [`docs/PROPOSAL_lexicons/LEXICON_DESIGN.md`](PROPOSAL_lexicons/LEXICON_DESIGN.md) — atproto-native record types (one for publishers, one for labelers).
+- [`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md) — atproto-native record types (one for publishers, one for labelers).
 - [`docs/LICENSING.md § Path 1`](LICENSING.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
 - [`docs/FEED_QUALITY.md`](FEED_QUALITY.md) — the allowlist that
   filters every ingest, including yours.

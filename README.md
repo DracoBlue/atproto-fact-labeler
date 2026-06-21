@@ -82,7 +82,7 @@ Per trigger:
   attribution. Discoverable via
   [Constellation](https://constellation.microcosm.blue/) backlinks on
   the labeled post. Design + schema:
-  [docs/PROPOSAL_lexicons/LEXICON_DESIGN.md](./docs/PROPOSAL_lexicons/LEXICON_DESIGN.md).
+  [kiesel-app/facts:docs/DESIGN.md](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md).
 - **`GET /posts?uri=at://…`** — per-post detail page (HTML, or
   `?format=json`) with the verdict, the rationale, and every source
   with publisher attribution + link.
