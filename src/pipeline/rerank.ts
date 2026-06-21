@@ -1,7 +1,7 @@
 /**
- * Stage 2 — relevance rerank.
+ * Stage 3 — relevance rerank.
  *
- * Sits between Stage 1 dense retrieval (top-K cosine) and Stage 3 NLI
+ * Sits between Stage 2 dense retrieval (top-K cosine) and Stage 4 NLI
  * polarity gate. Single batched LLM call rates each retrieved candidate
  * for topical relevance to the user's claim, then drops candidates below
  * a threshold and caps to RERANK_KEEP.

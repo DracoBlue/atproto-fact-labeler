@@ -1,4 +1,4 @@
-# Stage 2 — Relevance rerank
+# Stage 3 — Relevance rerank
 
 **Code**: [`src/pipeline/rerank.ts`](../../src/pipeline/rerank.ts).
 **Purpose**: ask the simpler question *"is this candidate even on-topic?"*
@@ -20,7 +20,7 @@ jointly, which is materially more accurate at small k.
 One **single batched call** rates every retrieved candidate 0..1
 against the user's claim in one round-trip. We keep the top
 `RERANK_KEEP` (default 5) whose score ≥ `RERANK_THRESHOLD` (default
-0.5) and discard the rest before Stage 3 NLI runs.
+0.5) and discard the rest before Stage 4 NLI runs.
 
 The rerank prompt asks a much simpler question than NLI does — just
 "is this candidate even on-topic?". The model returns a strict
@@ -48,7 +48,7 @@ bottleneck.
 | My dog is brown (uncovered) | 34 s | 11 s | **−66 %** — Stage 2 drops all candidates, Stage 3 never runs |
 | (full 13-case fixture) | 826 s | see [`README.md` § Test gate](./README.md#test-gate) | — |
 
-The big uncovered-case wins come from Stage 2 zeroing out every
+The big uncovered-case wins come from Stage 3 zeroing out every
 candidate — Stage 3 sees an empty list and `uncovered` is returned
 without paying for any NLI calls.
 

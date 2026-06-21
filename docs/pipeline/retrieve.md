@@ -1,4 +1,4 @@
-# Stage 1 — Dense retrieval
+# Stage 2 — Dense retrieval
 
 **Code**: [`src/pipeline/retrieve.ts`](../../src/pipeline/retrieve.ts).
 **Purpose**: pull up to top-K semantically similar ClaimReview entries
@@ -9,7 +9,7 @@ pre-computed multilingual embeddings.
 `MIN_COSINE` floor 0.55 deliberately *low* — empirical measurement
 showed legitimate Earth-spherical fact-checks at 0.70 and the worst
 unrelated false-positives at 0.84 (Trump-2016 confused with Trump-2020).
-A single cosine threshold cannot separate the two; Stage 3 NLI does.
+A single cosine threshold cannot separate the two; Stage 4 NLI does.
 
 ## Same-language filter
 
@@ -71,7 +71,7 @@ Measured on the calibration set
 | Class | min | median | max |
 |---|---|---|---|
 | legitimate match | 0.696 | 0.778 | 0.856 |
-| true negation (must reach Stage 3) | 0.721 | 0.853 | 0.935 |
+| true negation (must reach Stage 4) | 0.721 | 0.853 | 0.935 |
 | unrelated | 0.417 | 0.595 | **0.840** |
 
 The max-unrelated **exceeds** the min-match. The "Trump won 2020"

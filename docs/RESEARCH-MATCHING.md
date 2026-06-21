@@ -41,7 +41,7 @@ Source: <https://aclanthology.org/2024.fever-1.1/>
 All four top systems use multi-stage pipelines with cross-encoder or
 dense reranking and an NLI / LLM verification head:
 
-| System | Stage 1 (retrieve) | Stage 2 (rerank) | Stage 3 (verdict) | Score |
+| System | Stage 2 (retrieve) | Stage 3 (rerank) | Stage 4 (verdict) | Score |
 | --- | --- | --- | --- | --- |
 | TUDA_MAI | n/a public | n/a public | n/a public | **63 %** |
 | HerO  | BM25 top-10k | SFR-embedding-2 → top-10 | LLM-as-judge | 57 % |

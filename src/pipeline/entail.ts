@@ -1,10 +1,10 @@
 /**
- * Stage 3 — NLI polarity gate.
+ * Stage 4 — NLI polarity gate.
  *
  * Determines whether the input claim entails, contradicts, or is neutral
  * w.r.t. each retrieved fact-check's claim_reviewed text. This is the
  * principled fix for the FTS aggregator's polarity bug — see docs/PIPELINE.md
- * § "Stage 3 — NLI polarity gate".
+ * § "Stage 4 — NLI polarity gate".
  *
  * Modes:
  *   - llm-judge: prompt OPENAI_MODEL (e.g. qwen3.6-27b) with a structured

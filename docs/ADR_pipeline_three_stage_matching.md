@@ -51,7 +51,7 @@ benchmarks, FACT-GPT polarity-aware NLI) endorses this shape.
   was built around the three failure modes above as
   `polarity-matrix`, `uncovered-*`, and `temporal-entity` categories.
   Treat regressions on these as release blockers.
-- The deployment shape constrained Stage 2 (rerank) and Stage 3 (NLI)
+- The deployment shape constrained Stage 3 (rerank) and Stage 4 (NLI)
   to LLM-as-judge rather than dedicated cross-encoders, captured in
   [`pipeline/nli-judge.md` § Why an LLM judge, not a dedicated mDeBERTa head`](./pipeline/nli-judge.md#why-an-llm-judge-not-a-dedicated-mdeberta-head).
   Those sub-decisions can be revisited independently.

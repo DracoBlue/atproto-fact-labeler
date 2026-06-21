@@ -43,9 +43,9 @@ Two valid deployment shapes:
   zero local-process dependency.
 
 The embedding crosslingual penalty in pure-Vercel mode is accepted on
-the basis that **Stage 2 (rerank) and Stage 3 (NLI) are the real quality
+the basis that **Stage 3 (rerank) and Stage 4 (NLI) are the real quality
 gates** — they filter retrieved candidates aggressively, so a moderate
-Stage 1 quality drop does not propagate to the final verdict. The
+Stage 2 quality drop does not propagate to the final verdict. The
 matching pipeline was specifically designed so retrieval is allowed to
 be permissive.
 
@@ -93,15 +93,15 @@ silently drop DE-pendant fact-checks from retrieval.
 - Per query (one cli:label call): ~30 tokens → ~$0.0000007, i.e. about
   $1 per 1.4M calls. Negligible vs the LLM cost of the same call.
 - The accepted -7 percentage point crosslingual cosine drop is offset
-  by Stage 2 + Stage 3 doing the real filtering work; not benchmarked
+  by Stage 3 + Stage 4 doing the real filtering work; not benchmarked
   on `pnpm test:matching` directly but treated as load-bearing
-  architectural property of the pipeline (Stage 1 is the recall stage,
+  architectural property of the pipeline (Stage 2 is the recall stage,
   not the precision stage).
 
 **Why granite-278m-multilingual for embedding**
 
 Already justified in detail in
-[`PIPELINE.md` § Stage 1](./pipeline/README.md#stage-1--dense-retrieval) and
+[`PIPELINE.md` § Stage 2](./pipeline/README.md#stage-2--dense-retrieval) and
 [`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md). Summary: measured
 EN↔DE crosslingual cosine 0.81 vs ~0.52 for English-centric alternatives
 (mxbai-large-v1), 75 emb/s on M3 Max, 280 MB index for 92 k rows. Ships

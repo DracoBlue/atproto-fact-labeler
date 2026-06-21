@@ -1,4 +1,4 @@
-# Stage 4 — Aggregate
+# Stage 5 — Aggregate
 
 **Code**:
 [`src/pipeline/matching.ts`](../../src/pipeline/matching.ts)
@@ -9,7 +9,7 @@ candidates into one of the six verdict labels.
 
 ## Procedure
 
-After Stage 3 we have at most 5 candidates, each tagged
+After Stage 4 we have at most 5 candidates, each tagged
 `entailment`, `contradiction`, or `neutral`.
 
 1. **Drop all `neutral` candidates.**

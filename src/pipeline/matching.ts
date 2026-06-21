@@ -1,10 +1,10 @@
 /**
- * Stage 4 — combine retrieval + NLI + aggregation with polarity awareness.
+ * Stage 5 — combine retrieval + NLI + aggregation with polarity awareness.
  *
  * Replaces the old `lookupCandidates → normaliseRating → aggregateVerdicts`
  * chain. Concretely:
- *   1) Stage 1 retrieve(claim) → top-K cosine candidates.
- *   2) Stage 3 judgeNli(claim, candidate.claimReviewed) per candidate.
+ *   1) Stage 2 retrieve(claim) → top-K cosine candidates.
+ *   2) Stage 4 judgeNli(claim, candidate.claimReviewed) per candidate.
  *   3) Drop `neutral`. Flip publisher verdict on `contradiction`. Pass through
  *      on `entailment`.
  *   4) Aggregate over the surviving set. Returns `null` if 0 survive
@@ -32,7 +32,7 @@ import {
 import type { DbLike } from '../store/runtime-sqlite.ts';
 
 export interface MatchedCandidate extends RetrieveCandidate {
-  /** Stage 2 rerank score, undefined when reranking was skipped. */
+  /** Stage 3 rerank score, undefined when reranking was skipped. */
   rerankScore?: number;
   nliLabel: NliLabel;
   nliConfidence: number;
@@ -49,7 +49,7 @@ export interface MatchingResult {
   candidates: MatchedCandidate[];
   /** Diagnostic counters. */
   retrieved: number;
-  /** Candidates after Stage 2 rerank (== retrieved when rerank disabled). */
+  /** Candidates after Stage 3 rerank (== retrieved when rerank disabled). */
   reranked: number;
   entailed: number;
   contradicted: number;
@@ -105,7 +105,7 @@ export async function matchClaim(
   // Optional live supplement via Google Fact Check Tools API. When the
   // operator has set FACTCHECK_API_KEY, we issue a claims:search call per
   // unique lang, filter through the publisher allowlist, persist new hits
-  // into claim_review, and inline-embed them — so Stage 1 retrieval below
+  // into claim_review, and inline-embed them — so Stage 2 retrieval below
   // picks them up via the normal cosine path. Cached on subsequent runs;
   // no-op when the key is unset. See docs/FACTCHECK_API.md.
   if (cfg.FACTCHECK_API_KEY) {
@@ -127,8 +127,8 @@ export async function matchClaim(
     db,
   );
 
-  // Stage 2 — relevance rerank. Cuts the top-K=10 down to RERANK_KEEP (default 5)
-  // so Stage 3 NLI only runs on the most relevant survivors.
+  // Stage 3 — relevance rerank. Cuts the top-K=10 down to RERANK_KEEP (default 5)
+  // so Stage 4 NLI only runs on the most relevant survivors.
   let postRerank: Array<RetrieveCandidate & { rerankScore?: number }> = retrieve.candidates;
   if (cfg.RERANK_MODE === 'llm' && retrieve.candidates.length > 0) {
     const rer = await rerankCandidates(claim, retrieve.candidates, {

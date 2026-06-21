@@ -18,7 +18,7 @@ const Schema = z.object({
    */
   OPENAI_MAX_TOKENS: z.coerce.number().int().nonnegative().default(4096),
 
-  // --- Embedding (Stage 1: dense retrieval) -----------------------------
+  // --- Embedding (Stage 2: dense retrieval) -----------------------------
   // OpenAI-compatible `/v1/embeddings` endpoint. Optional base_url/key fall
   // back to OPENAI_* so a single LM Studio instance can serve both. Set
   // explicitly when embeddings live on a different server.
@@ -31,16 +31,16 @@ const Schema = z.object({
    */
   EMBEDDING_MODEL: z.string().default('openai/text-embedding-3-small'),
 
-  // --- Reranker (Stage 2: relevance gate before NLI) --------------------
+  // --- Reranker (Stage 3: relevance gate before NLI) --------------------
   // `llm`: single batched LLM call rates each top-K retrieved candidate
   //        for topical relevance to the user's claim. Keeps top RERANK_KEEP
-  //        above RERANK_THRESHOLD, drops the rest before Stage 3 NLI runs.
-  // `off`: skip Stage 2; Stage 3 NLI runs on every Stage 1 candidate.
+  //        above RERANK_THRESHOLD, drops the rest before Stage 4 NLI runs.
+  // `off`: skip Stage 3; Stage 4 NLI runs on every Stage 2 candidate.
   RERANK_MODE: z.enum(['llm', 'off']).default('llm'),
   RERANK_KEEP: z.coerce.number().int().positive().default(5),
   RERANK_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
 
-  // --- NLI (Stage 3: polarity gate) -------------------------------------
+  // --- NLI (Stage 4: polarity gate) -------------------------------------
   // `llm-judge` reuses the LLM (OPENAI_*) with a 3-class entailment prompt.
   // `dedicated` is reserved but throws — see docs/ADR_nli_llm_judge_over_mdeberta.md.
   NLI_MODE: z.enum(['llm-judge', 'dedicated']).default('llm-judge'),

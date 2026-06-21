@@ -347,7 +347,7 @@ Paper: <https://aclanthology.org/2025.fever-1.18/>.
 **SK_DU (2024)** — *cross-encoder evidence retrieval* combined with LLM
 question generation as a documented multi-stage approach. **Steal**: add
 a cross-encoder reranking layer between dense retrieval and LLM verdict.
-This is exactly Stage 2 in our PIPELINE.md — currently deferred but
+This is exactly Stage 3 in our pipeline — currently deferred but
 straightforward to add.
 
 **HerO 2 (HUMANE, 2025 2nd)** — *document summarisation + answer
@@ -493,7 +493,7 @@ ever outgrow the current minimal pipeline. Saves weeks of plumbing.
   Brier numbers. Derive our HITL escalation thresholds from reviewer
   feedback once a reviewer pool exists.
 - **Structured / proof-style verdicts** are an open contribution on
-  AVeriTeC. Worth revisiting if we add a verification stage (Stage 5
+  AVeriTeC. Worth revisiting if we add a verification stage (Stage 6
   in PIPELINE.md § Future extensions).
 
 ## Caveats

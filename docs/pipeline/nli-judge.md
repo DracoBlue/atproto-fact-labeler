@@ -1,4 +1,4 @@
-# Stage 3 — NLI polarity gate
+# Stage 4 — NLI polarity gate
 
 **Code**: [`src/pipeline/entail.ts`](../../src/pipeline/entail.ts).
 **Purpose**: ask how the user's claim relates to each surviving
@@ -50,7 +50,7 @@ qwen3 takes 4–9 s, dominating the ~1 min wall-clock per
 [Transformers.js](https://huggingface.co/docs/transformers.js) —
 ~100× speedup on paper.
 
-The hard requirement on any Stage 3 swap is that the polarity-matrix
+The hard requirement on any Stage 4 swap is that the polarity-matrix
 fixture in
 [`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json)
 stays **14/14 green**. Polarity correctness is the whole point of
@@ -97,12 +97,12 @@ implement `NLI_MODE=dedicated`.
 ### Consequences
 
 - **Polarity safety preserved.** The polarity-matrix test set stays
-  the binding correctness gate; we do not ship a Stage 3 that would
+  the binding correctness gate; we do not ship a Stage 4 that would
   silently relabel "the earth is not flat" as `fact-refuted`.
 - **Latency remains qwen3-bound.** Per-claim wall-clock stays ~1 min
   on M3 Max; firehose mode is impractical without further work. The
-  documented mitigation is **Stage 2 cross-encoder rerank** — it
-  cuts Stage 3 input from top-10 to top-5 and roughly halves NLI
+  documented mitigation is **Stage 3 cross-encoder rerank** — it
+  cuts Stage 4 input from top-10 to top-5 and roughly halves NLI
   cost. See [`rerank.md`](./rerank.md).
 - **`NLI_MODE=dedicated` is now load-bearing as a deliberate
   not-implemented sentinel.** `src/pipeline/entail.ts` throws if
@@ -136,13 +136,13 @@ true claims as refuted.
 
 ## Alternatives considered
 
-- **mDeBERTa as Stage 3-only judge** — rejected per the probe above.
-- **mDeBERTa as Stage 2 cheap pre-filter, qwen3 as Stage 3 judge** —
+- **mDeBERTa as Stage 4-only judge** — rejected per the probe above.
+- **mDeBERTa as Stage 3 cheap pre-filter, qwen3 as Stage 4 judge** —
   considered, deferred. The pre-filter only helps the uncovered
   class (where all candidates are neutral); the polarity-matrix
   cases still pay full qwen3 cost. Net latency saving on the full
   fixture is modest (~30 % on the easy cases, ~0 % on the hard
-  ones). Worth doing only after a proper Stage 2 reranker is in
+  ones). Worth doing only after a proper Stage 3 reranker is in
   place.
 - **Larger ONNX NLI models** (DeBERTa-v3-large, RoBERTa-large-mnli) —
   the Xenova mirrors examined had broken `tokenizer_config.json`

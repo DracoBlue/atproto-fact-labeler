@@ -2,7 +2,7 @@
 
 ## Why this matters
 
-Stage 1 retrieval (`src/pipeline/retrieve.ts`) restricts candidate
+Stage 2 retrieval (`src/pipeline/retrieve.ts`) restricts candidate
 fact-checks to the **same language as the incoming claim**. Cross-lingual
 NLI is fragile — even strong LLM judges flip polarity on translated
 text far more often than on same-language pairs, and the cosine
@@ -112,7 +112,7 @@ Idempotent — re-running on a freshly-ingested DB is a no-op.
 
 **No `embed-rebuild` needed afterwards.** `lang-rebuild` only writes
 to the `claim_review.lang` column. The `embedding`, `embedding_dim`,
-and `embedding_model` columns are untouched, so Stage 1 retrieval
+and `embedding_model` columns are untouched, so Stage 2 retrieval
 keeps using the same vectors it already had — only the same-language
 filter that runs alongside the cosine match now has correct data to
 filter against. Embeddings need to be recomputed only when the

@@ -1,7 +1,7 @@
 /**
  * OpenAI-compatible embedding client.
  *
- * Used by Stage 1 (dense retrieval) to embed both ClaimReview rows during
+ * Used by Stage 2 (dense retrieval) to embed both ClaimReview rows during
  * index build and incoming claims at query time. Falls back to the
  * OPENAI_* slot when EMBEDDING_BASE_URL / EMBEDDING_API_KEY are unset so a
  * single LM Studio instance can serve LLM + embeddings.

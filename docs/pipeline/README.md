@@ -7,11 +7,11 @@ all wired in code today, calibrated against the 14-case fixture in
 Per-stage docs (what the code does + why this shape + research +
 model choice + caveats):
 
-- [`extract.md`](./extract.md) — Stage 0, LLM produces atomic falsifiable claims with decontextualised standalone text
-- [`retrieve.md`](./retrieve.md) — Stage 1, dense cosine top-K
-- [`rerank.md`](./rerank.md) — Stage 2, LLM relevance judge
-- [`nli-judge.md`](./nli-judge.md) — Stage 3, LLM entail/contradict/neutral + polarity flip rationale
-- [`aggregate.md`](./aggregate.md) — Stage 4, verdict aggregation
+- [`extract.md`](./extract.md) — Stage 1, LLM produces atomic falsifiable claims with decontextualised standalone text
+- [`retrieve.md`](./retrieve.md) — Stage 2, dense cosine top-K
+- [`rerank.md`](./rerank.md) — Stage 3, LLM relevance judge
+- [`nli-judge.md`](./nli-judge.md) — Stage 4, LLM entail/contradict/neutral + polarity flip rationale
+- [`aggregate.md`](./aggregate.md) — Stage 5, verdict aggregation
 - [`language-detection.md`](./language-detection.md) — cross-cutting same-language filter
 
 Why this matching architecture exists in this shape (vs alternatives
@@ -25,14 +25,14 @@ that were considered and rejected):
         │
         ▼
    ┌──────────────────────────────────┐
-   │ STAGE 0 — Claim extraction       │
+   │ STAGE 1 — Claim extraction       │
    │   LLM produces atomic falsifiable│
    │   claims + decontextualised text │
    └──────────────┬───────────────────┘
                   │
                   ▼
    ┌──────────────────────────────────┐
-   │ STAGE 1 — Dense retrieval        │
+   │ STAGE 2 — Dense retrieval        │
    │   granite-278m multilingual      │
    │   cosine top-K from index        │
    │   same-language filter           │
@@ -40,14 +40,14 @@ that were considered and rejected):
                   │
                   ▼
    ┌──────────────────────────────────┐
-   │ STAGE 2 — LLM relevance rerank   │
+   │ STAGE 3 — LLM relevance rerank   │
    │   single batched LLM call        │
    │   keeps top-K above threshold    │
    └──────────────┬───────────────────┘
                   │
                   ▼
    ┌──────────────────────────────────┐
-   │ STAGE 3 — NLI polarity gate      │
+   │ STAGE 4 — NLI polarity gate      │
    │   LLM-as-judge, 3-class          │
    │   entail / contradict / neutral  │
    └──────────────┬───────────────────┘
@@ -61,7 +61,7 @@ that were considered and rejected):
         │through  │verdict  │
         ▼         ▼         ▼
    ┌──────────────────────────────────┐
-   │ STAGE 4 — Aggregate              │
+   │ STAGE 5 — Aggregate              │
    │   only over entail + flipped     │
    │   contradict matches             │
    │   if none → uncovered            │
@@ -114,7 +114,7 @@ The labelled fixture lives at
 - **`true-supported`** — "COVID vaccines are safe and effective".
   Property: contradiction-flip recovers true from false-rated
   anti-vax reviews.
-- **`temporal-entity`** — Trump-vs-Biden 2020. Property: Stage 3 NLI
+- **`temporal-entity`** — Trump-vs-Biden 2020. Property: Stage 4 NLI
   correctly disambiguates same-topic claims with different truth
   values.
 - **`publisher-uncertainty`** — Bill Gates microchip implants.
@@ -173,9 +173,9 @@ The shipped pipeline is the **minimum sensible first version**. The
 list below is what we would add next, in rough order of
 impact-per-effort, if volume or precision needs grow.
 
-### 1. Dedicated cross-encoder reranker (Stage 2)
+### 1. Dedicated cross-encoder reranker (Stage 3)
 
-Today Stage 2 is an LLM call (~5–8 s on qwen3-27B for a batched rate
+Today Stage 3 is an LLM call (~5–8 s on qwen3-27B for a batched rate
 of 10 candidates). A dedicated `BAAI/bge-reranker-v2-m3` in-process
 would do the same in ~50 ms. The LLM-judge equivalence holds while
 volume is low; at firehose scale this becomes the bottleneck.
@@ -201,7 +201,7 @@ Today, posts with no entailment- or contradiction-class match return
 labels what's already in someone else's fact-check database can
 never address novel claims.
 
-Add a Stage 5 that runs retrieval-augmented LLM verification when
+Add an extra stage that runs retrieval-augmented LLM verification when
 Stage 4 returns null: web-search for evidence, prompt qwen3 with
 gathered snippets, ask for a verdict + supporting URLs. Mark the
 resulting verdict as `verifier_kind='rag-llm'` (different from

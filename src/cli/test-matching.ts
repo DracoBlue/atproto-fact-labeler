@@ -1,7 +1,7 @@
 /**
  * pnpm test:matching
  *
- * Runs every case in test/fixtures/matching-cases.json through the Stage 2-4
+ * Runs every case in test/fixtures/matching-cases.json through the Stage 2-5
  * pipeline (retrieve → entail → match) against the live SQLite index and
  * the configured LLM endpoint. Prints a pass/fail report and exits non-zero
  * on regression.
@@ -13,8 +13,8 @@
  *
  * Flags:
  *   --filter <substring>   Run only cases whose claim or category matches
- *   --top <n>              Override Stage 1 topK (default 8)
- *   --min-cosine <n>       Override Stage 1 minCosine floor (default 0.55)
+ *   --top <n>              Override Stage 2 topK (default 8)
+ *   --min-cosine <n>       Override Stage 2 minCosine floor (default 0.55)
  *   --json                 Emit JSON-only report (for CI ingest)
  */
 import { readFileSync } from 'node:fs';

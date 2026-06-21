@@ -192,7 +192,7 @@ export async function processPost(
     if ((c.confidence ?? 0) < 0.45) continue;
     falsifiableClaims++;
 
-    // S2 + S3 — retrieve + NLI polarity gate + aggregate. See
+    // S2..S5 — retrieve + rerank + NLI polarity gate + aggregate. See
     // docs/PIPELINE.md for the three-stage architecture.
     const match = await matchClaim(
       c.decontextualized_text || c.atomic_text,
@@ -219,7 +219,7 @@ export async function processPost(
       continue;
     }
 
-    // S5 — persist claim, verdict, evidence, proposal.
+    // S6 — persist claim, verdict, evidence, proposal.
     const claimResult = db.prepare(INSERT_CLAIM).run(
       post.uri,
       c.atomic_text,

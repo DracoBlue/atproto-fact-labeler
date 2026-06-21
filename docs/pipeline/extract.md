@@ -1,4 +1,4 @@
-# Stage 0 — Claim extraction
+# Stage 1 — Claim extraction
 
 **Code**:
 [`src/pipeline/extract.ts`](../../src/pipeline/extract.ts).
@@ -67,7 +67,7 @@ outside the post's surrounding context. Example:
 - Decontextualised: *"Children should not receive COVID-19 vaccines."*
 
 Without decontextualisation the cosine similarity in
-[Stage 1](./retrieve.md) misses the topical anchor and the candidate
+[Stage 2](./retrieve.md) misses the topical anchor and the candidate
 pool fills with unrelated "shouldn't" statements. Decontextualisation
 is the cheapest improvement to matching recall measured on the
 fixture (+0.18 hits-per-claim on the polarity-matrix cases).

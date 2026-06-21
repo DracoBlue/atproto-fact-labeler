@@ -54,7 +54,7 @@ addressed — anywhere, in any language.
 router, not a judge. It does **not** invent verdicts. The
 [`src/pipeline/orchestrator.ts`](../src/pipeline/orchestrator.ts)
 path bails out cleanly when retrieval returns zero candidates or
-when every candidate is dropped by Stage 2 (rerank) or Stage 3 (NLI).
+when every candidate is dropped by Stage 3 (rerank) or Stage 4 (NLI).
 
 **What to do about it as an operator.** Nothing — this is the
 correct behaviour. If you operate a newsroom that wants to publish

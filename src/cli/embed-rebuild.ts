@@ -2,7 +2,7 @@
  * pnpm cli:embed-rebuild [--force] [--batch N] [--limit N]
  *
  * Compute dense embeddings for every claim_review row whose `embedding` is
- * NULL, or all rows when --force is given. Required before Stage 1 (dense
+ * NULL, or all rows when --force is given. Required before Stage 2 (dense
  * retrieve) can produce useful results.
  *
  * If EMBEDDING_MODEL has changed since the last run, rows tagged with the

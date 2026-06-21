@@ -2,9 +2,9 @@
  * Glue between `factcheck-api.ts` and the local `claim_review` cache.
  *
  * The matching pipeline calls `populateLiveCandidates(claim, langs)` before
- * Stage 1 retrieval. We fetch from the Google Fact Check Tools API, filter
+ * Stage 2 retrieval. We fetch from the Google Fact Check Tools API, filter
  * through the publisher allowlist, persist new hits, embed them inline so
- * Stage 1's cosine search picks them up in the same `matchClaim` call.
+ * Stage 2's cosine search picks them up in the same `matchClaim` call.
  *
  * Subsequent invocations against the same claim see the rows as ordinary
  * cached entries — no further API calls, no embed cost.

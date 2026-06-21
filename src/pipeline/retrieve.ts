@@ -1,14 +1,14 @@
 /**
- * Stage 1 — dense retrieval.
+ * Stage 2 — dense retrieval.
  *
  * Embed the incoming claim, cosine against every ClaimReview row whose
  * embedding_model matches the current model, return top-K candidates sorted
  * by cosine descending.
  *
  * Threshold deliberately LOW (~0.55) — see docs/PIPELINE.md § "Why a single
- * threshold doesn't work." The quality gate lives in Stage 3 (NLI), not here.
- * Stage 1's job is to recall as many topically related candidates as possible
- * without flooding Stage 3.
+ * threshold doesn't work." The quality gate lives in Stage 4 (NLI), not here.
+ * Stage 2's job is to recall as many topically related candidates as possible
+ * without flooding Stage 4.
  */
 import { getConfig } from '../config/index.ts';
 import { getDb } from '../store/db.ts';

@@ -116,7 +116,7 @@ OPENAI_API_KEY=<vercel-or-openai-key>
 OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1
 OPENAI_MODEL=google/gemini-2.5-flash
 
-# ---- Embeddings (Stage 1) ----
+# ---- Embeddings (Stage 2) ----
 # TWO valid options, pick by deployment shape (see docs/ADR_model_choices.md):
 #
 # OPTION A — hybrid (recommended for best retrieval): granite-278m local.
@@ -130,7 +130,7 @@ EMBEDDING_MODEL=text-embedding-granite-embedding-278m-multilingual
 # OPTION B — pure-Vercel (no LM Studio at all). Trades −7% crosslingual
 # quality for one less process to run. EN↔DE crosslingual cosine 0.75,
 # ~$0.07 one-time corpus rebuild, ~$1 per 1.4 M query calls. Pipeline
-# Stage 2 + 3 are the real quality gates so the Stage 1 drop is acceptable.
+# Stage 3 + 4 are the real quality gates so the Stage 2 drop is acceptable.
 # Uncomment to use:
 # EMBEDDING_API_KEY=${OPENAI_API_KEY}
 # EMBEDDING_BASE_URL=https://ai-gateway.vercel.sh/v1
@@ -310,7 +310,7 @@ docker compose run --rm fact-labeler pnpm cli:embed-rebuild
 
 For an index originally built before the `eld`-based language detector
 landed, run a one-shot `pnpm cli:lang-rebuild` so the same-language SQL
-filter in Stage 1 retrieval has correct `lang` values to filter
+filter in Stage 2 retrieval has correct `lang` values to filter
 against. **Independent of `embed-rebuild`** — only the `lang` column is
 touched, embeddings are not re-computed. Idempotent — re-running on a
 freshly-ingested DB is a no-op. See
@@ -413,7 +413,7 @@ Together, Groq, Mistral, …
 | `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [docs/ADR_model_choices.md](ADR_model_choices.md). |
 | `OPENAI_MAX_TOKENS` | `8192` | Per-request `max_tokens`. Reasoning models burn tokens on internal thinking — too small a budget truncates the JSON. `0` lets the server pick. |
 
-### Embedding endpoint (Stage 1)
+### Embedding endpoint (Stage 2)
 
 Separate slot so embeddings can live on a different server from the
 LLM. Leaving `_API_KEY` / `_BASE_URL` blank falls back to the
@@ -425,18 +425,18 @@ LLM. Leaving `_API_KEY` / `_BASE_URL` blank falls back to the
 | `EMBEDDING_BASE_URL` | *(falls back to `OPENAI_BASE_URL`)* | `/v1/embeddings` base URL. |
 | `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embedding model. All-local recommendation: `text-embedding-granite-embedding-278m-multilingual`. |
 
-### Rerank (Stage 2)
+### Rerank (Stage 3)
 
 Single batched LLM call rating retrieved candidates 0–1; only
 candidates above threshold survive into NLI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `RERANK_MODE` | `llm` | `llm` runs the rerank call; `off` skips Stage 2. |
+| `RERANK_MODE` | `llm` | `llm` runs the rerank call; `off` skips Stage 3. |
 | `RERANK_KEEP` | `5` | Max candidates kept after rerank. |
 | `RERANK_THRESHOLD` | `0.5` | Drop candidates below this rerank score. |
 
-### NLI (Stage 3)
+### NLI (Stage 4)
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
