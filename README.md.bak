@@ -241,10 +241,10 @@ The `docs/` tree is organised by what the labeler *does*:
 
 Cross-cutting:
 
-- [`docs/HOSTING.md`](./docs/HOSTING.md) — operator handbook:
-  prerequisites, minimum-to-run, trigger example, full env-var
-  reference, Bluesky registration, DNS + reverse proxy, lifecycle
-  ops (pause / retire / clear), going-live checklist.
+- [`docs/HOSTING.md`](./docs/HOSTING.md) — production deploy
+  walkthrough + full env-var reference (§ 11).
+- [`docs/HOSTING.md`](./docs/HOSTING.md) — registering with
+  Bluesky, pausing emissions, retiring labels.
 - [`docs/KNOWN_LIMITATIONS.md`](./docs/KNOWN_LIMITATIONS.md) —
   what the system measurably doesn't do yet, with evidence.
 - [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) — offline dev,

@@ -82,7 +82,7 @@ Operational facts:
 Setup for a real Ozone deployment requires a dedicated account for the
 labeler, PLC-directory registration as a moderation service, and
 publishing an `app.bsky.labeler.service` record so clients discover it.
-See [`LIFECYCLE.md`](../LIFECYCLE.md) for the going-live walkthrough as it
+See [`HOSTING.md`](../HOSTING.md) for the going-live walkthrough as it
 applies to this project.
 
 Sources:

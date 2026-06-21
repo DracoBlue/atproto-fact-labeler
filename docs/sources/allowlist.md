@@ -95,4 +95,4 @@ you can cite.
 If you want already-emitted labels off the wire too, follow
 `pnpm cleanup:claims` with `pnpm retire` — that negates the live
 labels and hides the underlying verdict from the detail page. See
-[`../LIFECYCLE.md § Phase 3`](../LIFECYCLE.md#phase-3--retiring-content-variant-c--emit-negations).
+[`../LIFECYCLE.md § Phase 3`](../HOSTING.md#retiring-labels-variant-c).

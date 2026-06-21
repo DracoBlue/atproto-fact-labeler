@@ -26,10 +26,11 @@ operator + contributor reference, organised by what the labeler
 
 ## Cross-cutting docs
 
-- [`DEPLOY.md`](./DEPLOY.md) — production deploy walkthrough +
-  full env-var reference (§ 11).
-- [`LIFECYCLE.md`](./LIFECYCLE.md) — registering with Bluesky,
-  pausing emissions, retiring labels, clearing the declaration.
+- [`HOSTING.md`](./HOSTING.md) — operator handbook. Prerequisites,
+  minimum-to-run, trigger example, full env-var reference, Bluesky
+  registration via `@skyware/labeler`, DNS + reverse proxy, periodic
+  re-ingest, lifecycle (pause / retire / clear), going-live
+  checklist.
 - [`KNOWN_LIMITATIONS.md`](./KNOWN_LIMITATIONS.md) — what the
   system measurably doesn't do yet, with evidence. Operator-facing.
 - [`DEVELOPMENT.md`](./DEVELOPMENT.md) — offline dev, fixtures,

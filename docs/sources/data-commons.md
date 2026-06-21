@@ -110,7 +110,7 @@ future evidence lookups change.
 ## Cron-friendly periodic refresh
 
 The standard weekly refresh (see
-[`../DEPLOY.md § Periodic re-ingest`](../DEPLOY.md)) covers the
+[`../HOSTING.md § Periodic re-ingest`](../HOSTING.md)) covers the
 happy case. Chaining `cleanup:claims` after `ingest` makes sure
 allowlist edits propagate even without manual intervention:
 

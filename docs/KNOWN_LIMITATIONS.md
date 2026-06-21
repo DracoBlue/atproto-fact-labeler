@@ -92,7 +92,7 @@ publisher — gets human attention before it goes on-wire.
   responsible call alone.
 - Either way, `pnpm proposal:accept --id=N` is the manual override
   for a single deferred proposal (see
-  [`LIFECYCLE.md § Phase 3.5`](LIFECYCLE.md#phase-35--manually-accepting-a-deferred-proposal)).
+  [`HOSTING.md § Manually accepting a deferred proposal`](HOSTING.md#manually-accepting-a-deferred-proposal)).
 
 ---
 
@@ -130,7 +130,7 @@ constructions) could ship without notice.
 
 **Guardrail.** None automatic — this is a deliberate operator
 checkpoint, not a runtime gate. The default
-[`LABELER_REPLY_DEFAULT_LANG`](DEPLOY.md#11-configuration-reference)
+[`LABELER_REPLY_DEFAULT_LANG`](HOSTING.md#configuration-reference)
 is `en`; widening it to `de` was preceded by adding cases #13 / #14
 to the fixture so regressions are caught.
 

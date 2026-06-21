@@ -89,7 +89,7 @@ every claim so a single under-confidence detection never blocks them.
 ### New ingest — automatic
 
 `pnpm ingest` (and the periodic refresh job from
-[DEPLOY.md § Periodic re-ingest](../DEPLOY.md#7-periodic-re-ingest)) call
+[HOSTING.md § Periodic re-ingest](../HOSTING.md#periodic-re-ingest)) call
 `detectLang()` for every row. Nothing extra to do.
 
 ### Backfilling lang on an existing index
@@ -117,7 +117,7 @@ keeps using the same vectors it already had — only the same-language
 filter that runs alongside the cosine match now has correct data to
 filter against. Embeddings need to be recomputed only when the
 `EMBEDDING_MODEL` itself changes (see
-[`DEPLOY.md` § Periodic re-ingest](../DEPLOY.md#7-periodic-re-ingest)).
+[`HOSTING.md` § Periodic re-ingest](../HOSTING.md#periodic-re-ingest)).
 
 After the rebuild, the same-language filter in
 `src/pipeline/retrieve.ts` becomes meaningful. The retrieve query then
@@ -148,5 +148,5 @@ largest bucket, followed by `pt`, `es`, `ta`, `te`, `hi`, `fa`, `ar`,
 - [`src/cli/lang-rebuild.ts`](../../src/cli/lang-rebuild.ts) — the one-shot rebuild CLI.
 - [`src/pipeline/retrieve.ts`](../../src/pipeline/retrieve.ts) — the same-language SQL filter that depends on this column being correct.
 - [`docs/pipeline/README.md`](./README.md) — explains the cross-lingual NLI weakness that motivated the filter.
-- [`../DEPLOY.md`](../DEPLOY.md) — periodic-refresh checklist now includes `cli:lang-rebuild` for upgrades from older indices.
+- [`../HOSTING.md`](../HOSTING.md) — periodic-refresh checklist now includes `cli:lang-rebuild` for upgrades from older indices.
 - [`experiment/language/`](../../experiment/language/) — the comparison data behind the eld pick.
