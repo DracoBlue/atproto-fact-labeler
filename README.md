@@ -35,7 +35,8 @@ Three intake paths, mix and match:
    thin on Lead Stories, USA Today, Snopes, AAP. Filtered through a
    [curated publisher allowlist](./docs/sources/allowlist.md) to drop
    the SEO spam and injection attempts the open feed ships alongside
-   real fact-checkers.
+   real fact-checkers. Details:
+   [docs/sources/data-commons.md](./docs/sources/data-commons.md).
 3. **Google Fact Check Tools API (live)** — query
    [`claims:search`](https://developers.google.com/fact-check/tools/api)
    per claim. Closes the bulk-feed gap above. One API key in `.env`,
