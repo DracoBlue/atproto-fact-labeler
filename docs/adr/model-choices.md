@@ -8,14 +8,14 @@ The pipeline has three OpenAI-compatible model slots:
 
 1. **`OPENAI_MODEL`** — extraction (S1), reranker (S2), NLI judge (S3).
    All three currently share the same model; see
-   [`ADR_nli_llm_judge_over_mdeberta.md`](./pipeline/nli-judge.md)
+   [`ADR_nli_llm_judge_over_mdeberta.md`](../pipeline/nli-judge.md)
    for why we did not split NLI off.
 2. **`EMBEDDING_MODEL`** — dense retrieval (S1).
 3. Optional separate base-URL + key per slot, so embedding can live on
    a different server from the LLM (e.g. local LM Studio for embeddings
    + Vercel for the LLM).
 
-[`test/fixtures/matching-cases.json`](../test/fixtures/matching-cases.json)
+[`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json)
 is the binding correctness gate: the 13-case fixture must remain green
 on whichever model the operator picks. Each model swap we evaluate is
 benchmarked against it.
@@ -101,8 +101,8 @@ silently drop DE-pendant fact-checks from retrieval.
 **Why granite-278m-multilingual for embedding**
 
 Already justified in detail in
-[`PIPELINE.md` § Stage 2](./pipeline/README.md#stage-2--dense-retrieval) and
-[`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md). Summary: measured
+[`PIPELINE.md` § Stage 2](../pipeline/README.md#stage-2--dense-retrieval) and
+[`RESEARCH-MATCHING.md`](../RESEARCH-MATCHING.md). Summary: measured
 EN↔DE crosslingual cosine 0.81 vs ~0.52 for English-centric alternatives
 (mxbai-large-v1), 75 emb/s on M3 Max, 280 MB index for 92 k rows. Ships
 with LM Studio. No serious competitor at this size found on Vercel.
@@ -140,7 +140,7 @@ Won head-to-head against four alternatives on the same fixture:
 - **The `EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY` split is load-bearing**
   for the Vercel shape. Without explicit values, embedding requests
   fall through to `OPENAI_BASE_URL` (Vercel) which does not host
-  granite. See [`.env.example`](../.env.example) for the canonical
+  granite. See [`.env.example`](../../.env.example) for the canonical
   three-line Vercel-side override:
 
   ```ini

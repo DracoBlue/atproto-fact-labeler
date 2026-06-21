@@ -13,7 +13,7 @@ register the labeler with Bluesky, and the labeler registration can be
 done from any operator workstation, not necessarily the server.
 
 For the **model choices** (LLM, embedding) and the rationale per
-deployment shape, see [`ADR_model_choices.md`](./ADR_model_choices.md).
+deployment shape, see [`ADR_model_choices.md`](./adr/model-choices.md).
 Summary: hybrid (Vercel LLM + local granite) is the recommended shape
 for best retrieval quality, pure-Vercel works too at a ~7% crosslingual
 quality cost.
@@ -111,13 +111,13 @@ below. The keys not listed here keep their `.env.example` defaults.
 
 ```ini
 # ---- LLM (Stage S1 + S2 + S3) ----
-# Vercel AI Gateway is the documented cloud path. See docs/ADR_model_choices.md.
+# Vercel AI Gateway is the documented cloud path. See docs/adr/model-choices.md.
 OPENAI_API_KEY=<vercel-or-openai-key>
 OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1
 OPENAI_MODEL=google/gemini-2.5-flash
 
 # ---- Embeddings (Stage 2) ----
-# TWO valid options, pick by deployment shape (see docs/ADR_model_choices.md):
+# TWO valid options, pick by deployment shape (see docs/adr/model-choices.md):
 #
 # OPTION A — hybrid (recommended for best retrieval): granite-278m local.
 # Run LM Studio on the same host as Coolify (or in a separate container)
@@ -410,7 +410,7 @@ Together, Groq, Mistral, …
 | --- | --- | --- |
 | `OPENAI_API_KEY` | — *(required)* | API key for the chat endpoint. Any non-empty value if the server doesn't check. |
 | `OPENAI_BASE_URL` | `https://ai-gateway.vercel.sh/v1` | Chat-completions base URL. |
-| `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [docs/ADR_model_choices.md](ADR_model_choices.md). |
+| `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [docs/adr/model-choices.md](adr/model-choices.md). |
 | `OPENAI_MAX_TOKENS` | `8192` | Per-request `max_tokens`. Reasoning models burn tokens on internal thinking — too small a budget truncates the JSON. `0` lets the server pick. |
 
 ### Embedding endpoint (Stage 2)

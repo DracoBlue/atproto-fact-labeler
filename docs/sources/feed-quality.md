@@ -8,7 +8,7 @@ where editorial responsibility actually lives.
 This doc explains *why* the allowlist exists and what tiers we ship by
 default. For the operational mechanics — file format, ingest CLI,
 refresh after upstream changes, periodic cron — see
-[`bulk-feed.md`](./bulk-feed.md).
+[`bulk-feed.md`](./data-commons.md).
 
 ## The fact-check feed is open submission
 

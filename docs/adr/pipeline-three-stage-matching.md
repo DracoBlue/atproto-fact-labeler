@@ -40,22 +40,22 @@ polarity gate, followed by polarity-aware aggregation.
   mode 3).
 
 The architecture is documented stage-by-stage at
-[`pipeline/`](./pipeline/README.md). The literature consensus
+[`pipeline/`](../pipeline/README.md). The literature consensus
 (Meedan Alegre, Full Fact's `t(v) = t(u)`, FEVER 2024 cross-encoder
 benchmarks, FACT-GPT polarity-aware NLI) endorses this shape.
 
 ## Consequences
 
 - The matching test fixture
-  ([`test/fixtures/matching-cases.json`](../test/fixtures/matching-cases.json))
+  ([`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json))
   was built around the three failure modes above as
   `polarity-matrix`, `uncovered-*`, and `temporal-entity` categories.
   Treat regressions on these as release blockers.
 - The deployment shape constrained Stage 3 (rerank) and Stage 4 (NLI)
   to LLM-as-judge rather than dedicated cross-encoders, captured in
-  [`pipeline/nli-judge.md` § Why an LLM judge, not a dedicated mDeBERTa head`](./pipeline/nli-judge.md#why-an-llm-judge-not-a-dedicated-mdeberta-head).
+  [`pipeline/nli-judge.md` § Why an LLM judge, not a dedicated mDeBERTa head`](../pipeline/nli-judge.md#why-an-llm-judge-not-a-dedicated-mdeberta-head).
   Those sub-decisions can be revisited independently.
 - Per-claim wall-clock went from ~0.3 s (FTS) to ~25 s (qwen3 LLM
   judge × top-K). The latency budget is now LLM-bound. Mitigation
   options listed in
-  [`pipeline/README.md` § Future extensions](./pipeline/README.md#future-extensions).
+  [`pipeline/README.md` § Future extensions](../pipeline/README.md#future-extensions).

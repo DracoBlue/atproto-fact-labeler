@@ -88,7 +88,7 @@ truth. Extraction stays neutral by construction.
 
 Same `OPENAI_MODEL` env as Stages 2 and 3 — qwen3.6-27b on the
 all-local deployment, gemini-2.5-flash on the Vercel-hosted shape.
-See [`../ADR_model_choices.md`](../ADR_model_choices.md) for the
+See [`../ADR_model_choices.md`](../adr/model-choices.md) for the
 head-to-head and the reasons. Both produced 14/14 on
 `pnpm test:matching` and agreed on every extracted-claim text on the
 fixture posts.
