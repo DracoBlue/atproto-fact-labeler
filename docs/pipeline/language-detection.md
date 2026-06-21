@@ -47,7 +47,7 @@ jp         776   ← Japanese, the language is ja
 
 ## What we use now
 
-[`src/ingest/detect-lang.ts`](../src/ingest/detect-lang.ts) wraps the
+[`src/ingest/detect-lang.ts`](../../src/ingest/detect-lang.ts) wraps the
 **[eld] library** (medium dataset) with a confidence + length guard:
 
 ```ts
@@ -74,7 +74,7 @@ detector to be meaningful.
 
 ## How we chose this library
 
-See [`experiment/language/RECOMMENDATION.md`](../experiment/language/RECOMMENDATION.md)
+See [`experiment/language/RECOMMENDATION.md`](../../experiment/language/RECOMMENDATION.md)
 for the side-by-side run of `franc-min`, `franc-all`, `tinyld`, and
 `eld/medium` against the first 100 ClaimReview rows. Headline:
 
@@ -87,7 +87,7 @@ for the side-by-side run of `franc-min`, `franc-all`, `tinyld`, and
 
 eld won on both speed and confidence, with ≥95 % pair-wise agreement
 against every other library on the cases they all answered.
-[`experiment/language/report.md`](../experiment/language/report.md) has
+[`experiment/language/report.md`](../../experiment/language/report.md) has
 the row-by-row data; `experiment/language/compare.ts` is the script.
 
 ## Mis-tagged posts — declared ∪ detected
@@ -122,7 +122,7 @@ every claim so a single under-confidence detection never blocks them.
 ### New ingest — automatic
 
 `pnpm ingest` (and the periodic refresh job from
-[DEPLOY.md § Periodic re-ingest](DEPLOY.md#7-periodic-re-ingest)) call
+[DEPLOY.md § Periodic re-ingest](../DEPLOY.md#7-periodic-re-ingest)) call
 `detectLang()` for every row. Nothing extra to do.
 
 ### Existing index — one-shot rebuild
@@ -150,7 +150,7 @@ keeps using the same vectors it already had — only the same-language
 filter that runs alongside the cosine match now has correct data to
 filter against. Embeddings need to be recomputed only when the
 `EMBEDDING_MODEL` itself changes (see
-[`DEPLOY.md` § Periodic re-ingest](DEPLOY.md#7-periodic-re-ingest)).
+[`DEPLOY.md` § Periodic re-ingest](../DEPLOY.md#7-periodic-re-ingest)).
 
 After the rebuild, the same-language filter in
 `src/pipeline/retrieve.ts` becomes meaningful. The retrieve query then
@@ -177,9 +177,9 @@ largest bucket, followed by `pt`, `es`, `ta`, `te`, `hi`, `fa`, `ar`,
 
 ## Where this is referenced
 
-- [`src/ingest/claimreview-feed.ts`](../src/ingest/claimreview-feed.ts) — `guessLanguage()`, the ingest call site.
-- [`src/cli/lang-rebuild.ts`](../src/cli/lang-rebuild.ts) — the one-shot rebuild CLI.
-- [`src/pipeline/retrieve.ts`](../src/pipeline/retrieve.ts) — the same-language SQL filter that depends on this column being correct.
-- [`docs/PIPELINE.md`](PIPELINE.md) — explains the cross-lingual NLI weakness that motivated the filter.
-- [`docs/DEPLOY.md`](DEPLOY.md) — periodic-refresh checklist now includes `cli:lang-rebuild` for upgrades from older indices.
-- [`experiment/language/`](../experiment/language/) — the comparison data behind the eld pick.
+- [`src/ingest/claimreview-feed.ts`](../../src/ingest/claimreview-feed.ts) — `guessLanguage()`, the ingest call site.
+- [`src/cli/lang-rebuild.ts`](../../src/cli/lang-rebuild.ts) — the one-shot rebuild CLI.
+- [`src/pipeline/retrieve.ts`](../../src/pipeline/retrieve.ts) — the same-language SQL filter that depends on this column being correct.
+- [`docs/pipeline/README.md`](./README.md) — explains the cross-lingual NLI weakness that motivated the filter.
+- [`../DEPLOY.md`](../DEPLOY.md) — periodic-refresh checklist now includes `cli:lang-rebuild` for upgrades from older indices.
+- [`experiment/language/`](../../experiment/language/) — the comparison data behind the eld pick.

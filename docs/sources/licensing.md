@@ -20,7 +20,7 @@ written permission from that publisher.
 ## Path 1 — Your own ClaimReview articles
 
 Operators that publish their own ClaimReview-tagged articles and feed
-them via `pnpm ingest` (see [`OWN_FACT_CHECKS.md`](OWN_FACT_CHECKS.md))
+them via `pnpm ingest` (see [`OWN_FACT_CHECKS.md`](./own-claimreviews.md))
 own the licensing decision end-to-end. The operator's own posture on
 licensing, attribution, redistribution, and downstream use governs
 the entries from this path. No third-party Terms layer over it.
@@ -52,7 +52,7 @@ JSON dump.
 ## Path 3 — Google Fact Check Tools API (`claims:search`)
 
 Activated when `FACTCHECK_API_KEY` is set. See
-[`FACTCHECK_API.md`](FACTCHECK_API.md) for setup.
+[`FACTCHECK_API.md`](./factcheck-api.md) for setup.
 
 - **Governs**: [Google APIs Terms of Service][gapi-tos] plus the
   endpoint-specific [Fact Check Tools API terms][fctools-tos].
@@ -91,7 +91,7 @@ Activated when `FACTCHECK_API_KEY` is set. See
 
 ## What the labeler itself ships
 
-- **The codebase** — MIT, see [`LICENSE`](../LICENSE).
+- **The codebase** — MIT, see [`LICENSE`](../../LICENSE).
 - **The normalised verdict + matching pipeline + the on-wire labels**
   — derivative work, MIT-licensed and redistributable.
 - **The embeddings cached locally** — derived from publisher text,
@@ -107,7 +107,7 @@ least one entry whose publisher name field carried an active XSS
 payload. The labeler filters at ingest with a curated publisher
 allowlist that applies to **both** Path 2 (bulk) and Path 3 (live
 API), so the same editorial bar gates every entry regardless of
-intake path. See [`FEED_QUALITY.md`](FEED_QUALITY.md) for the
+intake path. See [`FEED_QUALITY.md`](./feed-quality.md) for the
 allowlist criteria, how to add a publisher, and how to report bad
 upstream entries back to Google.
 

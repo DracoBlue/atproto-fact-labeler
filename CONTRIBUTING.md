@@ -18,7 +18,7 @@ If you already know, jump straight to the matching issue template:
 | Report a security issue | See [SECURITY.md](SECURITY.md) — do **not** open a public issue |
 
 The allowlist forms are structured because every entry there is an
-editorial decision — see [`docs/FEED_QUALITY.md`](docs/FEED_QUALITY.md)
+editorial decision — see [`docs/sources/feed-quality.md`](docs/sources/feed-quality.md)
 for the reasoning. The form makes sure we collect the evidence we need
 to act on the request.
 

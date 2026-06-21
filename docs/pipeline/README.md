@@ -1,0 +1,260 @@
+# Claim matching pipeline
+
+How the labeler turns an incoming post into a verdict. Four stages,
+all wired in code today, calibrated against the 14-case fixture in
+[`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json).
+
+Per-stage docs (`why this stage exists` + `what the code does`):
+
+- [`retrieve.md`](./retrieve.md) — Stage 1, dense cosine top-K
+- [`rerank.md`](./rerank.md) — Stage 2, LLM relevance judge
+- [`nli-judge.md`](./nli-judge.md) — Stage 3, LLM entail/contradict/neutral + polarity flip rationale
+- [`aggregate.md`](./aggregate.md) — Stage 4, verdict aggregation
+- [`language-detection.md`](./language-detection.md) — cross-cutting same-language filter
+
+Extraction (the LLM call that produces atomic claims *before* Stage 1)
+lives in [`src/pipeline/extract.ts`](../../src/pipeline/extract.ts); it
+is documented inline with the prompt and has no separate doc here yet.
+
+## Architecture
+
+```
+   atomic claim from extraction
+              │
+              ▼
+   ┌──────────────────────────────────┐
+   │ STAGE 1 — Dense retrieval        │
+   │   granite-278m multilingual      │
+   │   cosine top-K from index        │
+   │   same-language filter           │
+   └──────────────┬───────────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────────┐
+   │ STAGE 2 — LLM relevance rerank   │
+   │   single batched LLM call        │
+   │   keeps top-K above threshold    │
+   └──────────────┬───────────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────────┐
+   │ STAGE 3 — NLI polarity gate      │
+   │   LLM-as-judge, 3-class          │
+   │   entail / contradict / neutral  │
+   └──────────────┬───────────────────┘
+                  │
+        ┌─────────┼─────────┐
+        │         │         │
+        ▼         ▼         ▼
+   entailment  contradict  neutral
+        │         │         │
+        │ pass    │ flip    │ ignore
+        │through  │verdict  │
+        ▼         ▼         ▼
+   ┌──────────────────────────────────┐
+   │ STAGE 4 — Aggregate              │
+   │   only over entail + flipped     │
+   │   contradict matches             │
+   │   if none → uncovered            │
+   └──────────────────────────────────┘
+```
+
+## What runs in code today
+
+All four stages share one OpenAI-compatible endpoint (LM Studio
+locally, the configured provider in production). No Python, no
+training, no dedicated NLI model.
+
+| Stage | File | Model role |
+|---|---|---|
+| 1 | `src/pipeline/retrieve.ts` | granite-278m-multilingual embeddings, cosine over `claim_review.embedding` BLOB |
+| 2 | `src/pipeline/rerank.ts` | one batched LLM call rates top-K candidates 0..1 |
+| 3 | `src/pipeline/entail.ts` | LLM-as-judge per surviving candidate; strict-JSON-Schema |
+| 4 | `src/pipeline/matching.ts` | polarity-aware aggregate, returns null → `uncovered` |
+
+Extraction front-loads onto the same model. `src/embedding/client.ts`
+forces `encoding_format: 'float'` to work around the LM Studio +
+openai-node base64 incompatibility.
+
+## Why this shape and not the old FTS pass-through
+
+The previous `src/pipeline/lookup.ts` (deleted) ran a single SQLite
+FTS5 `OR`-query and aggregated top-5 publisher native ratings. Two
+real Bluesky posts walked it into the classic failure modes:
+
+| Post | Truth | Labeler verdict | What actually happened |
+|---|---|---|---|
+| "the earth is not flat" | true | `fact-refuted` (conf 0.879) | FTS matched 5 unrelated false-claim articles via `earth*` or `flat*` prefix; aggregator passed through 5× "False". |
+| "the earth is round" | true | `fact-refuted` (conf 1.0) | FTS matched articles about Japan earthquakes, AOC tweets, COVID stimulus — none about Earth shape; aggregator returned conf 1.0 anyway. |
+
+Three failure modes are baked into that design:
+
+1. **Single-stage keyword retrieval.** `earth* OR round*` matches every
+   document containing either prefix. Cross-stem hits (e.g.
+   "Earth**quake**") flood the result set on common words.
+2. **No quality gate before aggregation.** We take the top-k regardless
+   of relevance score. If the top-k are all spurious, aggregation still
+   produces "5/5 publishers say False, confidence 1.0."
+3. **Publisher-verdict pass-through ignores polarity.** A fact-check
+   that refutes "earth is flat" gets normalised to `false`. We then
+   apply that to "earth is not flat" — the *negation* — without
+   flipping. Verdict is double-wrong.
+
+The peer-reviewed literature has solved all three. The architecture
+above is the published consensus, with our per-stage trade-offs
+documented inline.
+
+## Frame of reference
+
+The pipeline mirrors the operational framing of the two organisations
+whose claim-matching pipelines are most publicly documented:
+
+- **Meedan (Alegre + Check)** — matching answers *"can the claims in
+  these two posts be served with one fact-check?"* — a clustering
+  question, not a verdict pass-through.
+  [Meedan post](https://meedan.org/post/claim-matching-global-fact-checks-at-meedan),
+  [Alegre repo](https://github.com/meedan/alegre).
+- **Full Fact** — two claims match iff they have *identical truth
+  conditions, t(v) = t(u)*. There is no possible world in which one
+  is true and the other false. By construction, this rules out
+  flipping polarity by accident.
+  [Full Fact post](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/).
+
+The FTS-and-aggregate predecessor did verdict pass-through, which
+neither framing endorses. The current pipeline does clustering +
+polarity check, which both endorse.
+
+## Test gate
+
+The labelled fixture lives at
+[`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json) —
+14 cases grouped into six categories:
+
+- **`polarity-matrix`** — earth round/flat × is/isn't (4 cases).
+  Property: *true claims and their negations get opposite verdicts*.
+  This is what the FTS pipeline failed and what the rewrite exists to
+  fix.
+- **`classic-conspiracy`** — Vaccines+microchips, 5G+COVID. Property:
+  publishers' false ratings pass through via entailment.
+- **`true-supported`** — "COVID vaccines are safe and effective".
+  Property: contradiction-flip recovers true from false-rated
+  anti-vax reviews.
+- **`temporal-entity`** — Trump-vs-Biden 2020. Property: Stage 3 NLI
+  correctly disambiguates same-topic claims with different truth
+  values.
+- **`publisher-uncertainty`** — Bill Gates microchip implants.
+  Property: when publishers themselves are uncertain, the system does
+  not over-commit (verdict = `unknown`).
+- **`uncovered`** — my dog, Mick Jagger (vs Mugabe / Jackie Chan
+  death hoaxes), German unemployment (vs Italian unemployment).
+  Property: high-cosine topical neighbours with *different* entities
+  or numbers must drop as `neutral`, not flow through as `entailment`.
+
+```bash
+pnpm test:matching                       # full set
+pnpm test:matching --filter polarity     # by category
+pnpm test:matching --filter uncovered    # by category
+pnpm test:matching --json > report.json  # machine-readable
+```
+
+**Not** part of `pnpm test` — needs LM Studio running, a populated
+index, and ~15 min wall-clock for the full set on M3 Max. Treat a
+regression here as a release blocker.
+
+Each case asserts `expected_verdict` (one of `true | false | mixed |
+unknown | disputed | outdated | uncovered`) and optionally
+`min_confidence`. Add a case whenever a new failure mode is
+identified in production. The fixture is small and curated; adding
+noise weakens the gate. If a real-world post produces a wrong label,
+the fix lands in two parts: (a) the pipeline change, (b) the case
+that proves it stays fixed.
+
+## What the pipeline deliberately does NOT do
+
+- **Does not invent verdicts when no fact-check matches.** Out of
+  scope. Non-matching posts are `uncovered`. The labeler routes
+  existing fact-checks; it does not produce new ones.
+- **Does not try to be perfect on contradiction detection.** F1 ~0.46
+  is the published ceiling for unsupervised NLI. We accept some
+  contradictions getting classified as `neutral` and silently
+  abstaining. Abstain is safe; flip is consequential; never-flip is
+  wrong.
+- **Does not change the trigger or reply surfaces.** All mentions /
+  reports / watchlist / firehose handling is unchanged; only the
+  matching engine sits at this level.
+
+## Open questions
+
+1. **Concrete cosine and reranker thresholds.** Papers tune per
+   dataset. We calibrate `RERANK_THRESHOLD` on the fixture above.
+2. **Is polarity flip on contradiction actually deployed anywhere?**
+   The research found it principled (FACT-GPT, ProoFVer) but not
+   widely documented as a deployed production pattern. We are early
+   — but on the correct side of the correctness frontier.
+3. **Cross-lingual NLI** — closing the cases where the only matching
+   fact-check is in a different language than the post. See
+   [`language-detection.md`](./language-detection.md) for the current
+   trade-off.
+
+## Future extensions
+
+The shipped pipeline is the **minimum sensible first version**. The
+list below is what we would add next, in rough order of
+impact-per-effort, if volume or precision needs grow.
+
+### 1. Dedicated cross-encoder reranker (Stage 2)
+
+Today Stage 2 is an LLM call (~5–8 s on qwen3-27B for a batched rate
+of 10 candidates). A dedicated `BAAI/bge-reranker-v2-m3` in-process
+would do the same in ~50 ms. The LLM-judge equivalence holds while
+volume is low; at firehose scale this becomes the bottleneck.
+
+### 2. Dedicated NLI model fast path
+
+`MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` runs the same 3-class
+entailment in ~30 ms via Transformers.js — ~100× speedup vs the
+LLM-judge. The trade-off is world-knowledge: mDeBERTa correctly
+handles direct negation pairs but fails on meta-claims like *"Hindu
+mythology *portrayed* the earth as spherical"* vs *"the earth is
+round"* — qwen3 gets this right (see [`nli-judge.md`](./nli-judge.md)
+§ Hindu mythology case).
+
+Realistic compromise: use mDeBERTa as the fast path, **escalate to
+LLM-judge only when mDeBERTa is uncertain** (confidence < 0.7).
+`NLI_MODE=dedicated` is the env knob already reserved for this.
+
+### 3. AVeriTeC-style fallback for `uncovered` claims
+
+Today, posts with no entailment- or contradiction-class match return
+`uncovered`. That's the safe failure mode, but a labeler that *only*
+labels what's already in someone else's fact-check database can
+never address novel claims.
+
+Add a Stage 5 that runs retrieval-augmented LLM verification when
+Stage 4 returns null: web-search for evidence, prompt qwen3 with
+gathered snippets, ask for a verdict + supporting URLs. Mark the
+resulting verdict as `verifier_kind='rag-llm'` (different from
+`feed`) so operators can tune trust separately.
+
+This is a much bigger commitment — moving from "claim matcher" to
+"claim verifier" — and worth a separate design doc.
+
+### 4. Threshold calibration
+
+`MIN_COSINE` is currently 0.55 (low, by design). `RERANK_THRESHOLD`
+and NLI confidence floors are not exposed. Sweep against the fixture;
+pick the operating point that maximises the polarity-matrix
+property. Wire as a CI gate so future pipeline changes can't regress.
+
+### 5. Index-build performance
+
+`pnpm cli:embed-rebuild` currently does ~75–130 emb/s against LM
+Studio (~12–20 min for 92k rows). Possible speedups: parallel batches
+against multiple LM Studio instances; in-process Transformers.js to
+drop HTTP overhead; `sqlite-vec` once the corpus crosses ~500k rows.
+
+### 6. Multi-language extraction prompt
+
+Extraction currently uses a single English prompt. Posts in DE/FR/ES
+still work because qwen3 is multilingual, but a per-language prompt
+would likely improve atomic claim quality on non-English content.

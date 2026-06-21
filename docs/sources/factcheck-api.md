@@ -30,7 +30,7 @@ When `FACTCHECK_API_KEY` is set, every `matchClaim()` call:
 1. Issues one `claims:search` per unique candidate language (declared
    + detected, deduped).
 2. Filters each hit through
-   [`config/claimreview-publishers-allowlist.txt`](../config/claimreview-publishers-allowlist.txt) —
+   [`config/claimreview-publishers-allowlist.txt`](../../config/claimreview-publishers-allowlist.txt) —
    same gate as bulk ingest. Garbage publishers from the API surface
    are dropped before they hit Stage 1.
 3. `INSERT OR IGNORE` into `claim_review`. Already-cached hits skip
@@ -105,7 +105,7 @@ Hits land in `claim_review` like any other entry:
   Fact Check Tools API.` — distinguishable from bulk-feed rows for
   later audit.
 - `lang` uses the API's `languageCode` if set, otherwise the local
-  [`detectLang()`](../src/ingest/detect-lang.ts) fallback.
+  [`detectLang()`](../../src/ingest/detect-lang.ts) fallback.
 - `embedding` / `embedding_dim` / `embedding_model` are populated
   inline so Stage 1 retrieval finds the row on the *same* `matchClaim`
   call — no need for a subsequent `embed-rebuild`.
@@ -126,13 +126,13 @@ Same allowlist, same rerank, same NLI, same `cleanup:claims` semantics.
   responses go through the same gate as ingest; off-allowlist
   publishers (including ones not yet vetted) are silently dropped.
   Add publishers via the
-  [allowlist Issue template](../.github/ISSUE_TEMPLATE/publisher-add.yml).
+  [allowlist Issue template](../../.github/ISSUE_TEMPLATE/publisher-add.yml).
 
 ## See also
 
-- [`docs/LICENSING.md § Path 3`](LICENSING.md#path-3--google-fact-check-tools-api-claimssearch) — the Terms of Service governing API responses, caching posture, and the operator-responsibility model.
-- [`docs/FEED_QUALITY.md`](FEED_QUALITY.md) — the publisher allowlist and the upstream feed's quality problems.
-- [`docs/LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md) — the same-language filter that runs alongside the cross-feed merge.
-- [`docs/PIPELINE.md`](PIPELINE.md) — stages 1–4.
+- [`docs/sources/licensing.md § Path 3`](./licensing.md#path-3--google-fact-check-tools-api-claimssearch) — the Terms of Service governing API responses, caching posture, and the operator-responsibility model.
+- [`docs/sources/feed-quality.md`](./feed-quality.md) — the publisher allowlist and the upstream feed's quality problems.
+- [`docs/pipeline/language-detection.md`](../pipeline/language-detection.md) — the same-language filter that runs alongside the cross-feed merge.
+- [`docs/pipeline/README.md`](../pipeline/README.md) — stages 1–4.
 - [Google Fact Check Tools API reference](https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search).
 - [Data Commons Fact Check FAQ](https://datacommons.org/factcheck/faq) — defines the bulk feed as a subset.

@@ -25,10 +25,10 @@ post volume far exceeds a single local LLM endpoint's throughput.
 
 If any of those isn't true, prefer one of the other triggers:
 
-- [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) for user-initiated checks.
-- [TRIGGER_REPORTS.md](./TRIGGER_REPORTS.md) for the Bluesky moderation
+- [TRIGGER_MENTIONS.md](./mentions.md) for user-initiated checks.
+- [TRIGGER_REPORTS.md](./reports.md) for the Bluesky moderation
   UI's "Report" flow.
-- [TRIGGER_WATCHLIST.md](./TRIGGER_WATCHLIST.md) for a curated set of
+- [TRIGGER_WATCHLIST.md](./watchlist.md) for a curated set of
   accounts.
 
 ## Setup
@@ -154,9 +154,9 @@ These can ride alongside `TRIGGER_FIREHOSE=true` if added to
 
 ## See also
 
-- [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) — user mentions the
+- [TRIGGER_MENTIONS.md](./mentions.md) — user mentions the
   labeler in a post or reply.
-- [TRIGGER_REPORTS.md](./TRIGGER_REPORTS.md) — user reports the post
+- [TRIGGER_REPORTS.md](./reports.md) — user reports the post
   via `createReport`.
-- [TRIGGER_WATCHLIST.md](./TRIGGER_WATCHLIST.md) — proactively check
+- [TRIGGER_WATCHLIST.md](./watchlist.md) — proactively check
   named accounts.

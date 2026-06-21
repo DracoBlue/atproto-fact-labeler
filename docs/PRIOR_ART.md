@@ -1,6 +1,6 @@
 # Prior Art: Fact-Checking Systems & HITL Tooling
 
-> Companion to [`PIPELINE.md`](./PIPELINE.md) and
+> Companion to [`PIPELINE.md`](./pipeline/README.md) and
 > [`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md). Where those two cover
 > the *matching* problem this labeler solves today, this document covers
 > the wider landscape: previously-built fact-checking pipelines and the

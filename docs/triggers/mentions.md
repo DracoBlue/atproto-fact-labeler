@@ -234,168 +234,20 @@ is missed.
 ## Reply to the mention author (opt-in)
 
 By default the labeler stays silent on Bluesky — it only signs labels.
-With `REPLY_TO_MENTIONS=true` the labeler also **replies** to Alice's
-mention post after a successful label emit, so the user who asked sees
-the verdict inline in the thread.
+With `REPLY_TO_MENTIONS=true` the labeler also **replies** to the mention
+post after a successful label emit, so the user who asked sees the
+verdict inline in the thread.
 
-### Setup
-
-This trigger needs the labeler service account to authenticate as a real
-Bluesky user (so it can post). Generate an **app password** in the
-account's settings (`bsky.app` → Settings → Privacy and Security → App
-Passwords). Never use the main account password.
-
-```bash
-REPLY_TO_MENTIONS=true
-LABELER_BSKY_SERVICE=https://bsky.social
-LABELER_BSKY_IDENTIFIER=facts.example.org      # or did:plc:fact-labeler-abcdef
-LABELER_BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-LABELER_DETAIL_BASE_URL=https://facts.example.org   # for the deep-link in the reply
-```
-
-Config validation fails fast at startup if `REPLY_TO_MENTIONS=true` but
-the identifier or app password is missing.
-
-### Conditions
-
-The reply fires only when **all** of:
-
-1. `REPLY_TO_MENTIONS=true`,
-2. trigger reason is `mention` or `mention-reply` (never for watchlist /
-   firehose / report),
-3. a label was actually emitted — i.e. HITL accepted the proposal
-   (rejections and defers produce no reply),
-4. we haven't already replied to this proposal (one reply per proposal,
-   tracked in the `mention_reply` table).
-
-### Example reply payload
-
-After Alice's mention from the example above is accepted by the HITL,
-the labeler posts a reply on Alice's PDS, linking **directly to the
-original CORRECTIV article**:
-
-```jsonc
-// at://did:plc:fact-labeler-abcdef/app.bsky.feed.post/<rkey>
-{
-  "$type":     "app.bsky.feed.post",
-  "text":      "Verdict: refuted. Sources: CORRECTIV, AFP Fact Check, Snopes. Details: https://correctiv.org/faktencheck/wissenschaft/2018/01/30/erde-scheibe-kugel/",
-  "createdAt": "2026-06-17T10:01:42.000Z",
-  "reply": {
-    "parent": {
-      "uri": "at://did:plc:alice-abcdef/app.bsky.feed.post/3kxalice",
-      "cid": "bafy-alice"
-    },
-    "root": {
-      "uri": "at://did:plc:bob-abcdef/app.bsky.feed.post/3kxbob",
-      "cid": "bafy-bob"
-    }
-  }
-}
-```
-
-- `parent` points at **Alice's mention** — that's who we're answering.
-- `root` is the original thread root, taken from Alice's own
-  `replyRoot` if set (Bob's post here) or her post URI otherwise.
-- The post body fits inside 280 characters; longer source lists are
-  trimmed and the URL preserved.
-
-### Where the `Details:` link points
-
-The link is chosen per-verdict so the user lands one click closer to
-the underlying journalism:
-
-| Verdict | Link target |
-| --- | --- |
-| `supported`, `refuted`, `mixed`, `outdated`, `unknown` | **Top publisher's original article** — taken from `evidence.source_url`, ordered by retrieval cosine after the NLI gate. Most cases are clear and one source's URL is enough. |
-| `disputed` | The labeler's **own detail page**. When publishers disagreed enough that we labeled the post as disputed, no single source's URL tells the whole story — the detail page lists every conflicting source side by side. |
-| `no-claim`, `no-match` | No link (these replies are short diagnostic messages without a target). |
-
-This matches the labeler's epistemic stance: we route users to the
-journalism that did the verification work, not to ourselves.
-
-### Reply behaviour by outcome
-
-| Outcome | Reply | Reply kind |
-| --- | --- | --- |
-| HITL accept → label emitted | yes | `verdict` |
-| HITL reject | no | — (we don't amplify proposals a moderator rejected) |
-| HITL defer | no yet — if a later accept fires, the verdict reply goes out then | — |
-| extraction returned no falsifiable claim | **yes** | `no-claim` |
-| at least one falsifiable claim but no ClaimReview match | **yes** | `no-match` |
-| target post couldn't be loaded (deleted, AppView unreachable) | **yes** | `no-target` |
-
-Diagnostic replies (`no-claim`, `no-match`, `no-target`) bypass HITL — they're a
-statement about our own pipeline's behaviour, not an editorial verdict on
-the user's content. Dedup is by mention-source URI: at most one reply
-per Alice's mention post, regardless of kind. Across restarts this is
-enforced by a unique index on `mention_reply.replied_to_uri`.
-
-### Internationalisation
-
-Replies are posted in the **mention author's language**, picked from the
-`langs` field of Alice's post. Currently supported: English (`en`) and
-German (`de`). BCP-47 region subtags are normalised (`de-AT` → `de`).
-
-When the mention post has no `langs`, or uses an unsupported language,
-the reply falls back to `LABELER_REPLY_DEFAULT_LANG` (default `en`).
-
-Example diagnostic replies:
-
-```
-en  "I couldn't find a falsifiable factual claim in that post — nothing to fact-check."
-de  "Ich konnte in dem Beitrag keine prüfbare Tatsachenbehauptung finden — nichts zu prüfen."
-
-en  "I checked, but no fact-check publisher I know of has covered that claim yet."
-de  "Ich habe geprüft, aber bislang hat keine mir bekannte Faktencheck-Quelle diese Aussage abgedeckt."
-
-en  "I couldn't load the post you asked about — maybe it was deleted or unavailable."
-de  "Ich konnte den verlinkten Beitrag nicht laden — möglicherweise gelöscht oder nicht erreichbar."
-```
-
-Verdict replies translate the head as well:
-
-```
-en  Verdict: refuted. Sources: CORRECTIV, AFP. Details: https://…
-de  Einschätzung: widerlegt. Quellen: CORRECTIV, AFP. Details: https://…
-```
-
-To add more languages, extend `TRANSLATIONS` in
-`src/replier/i18n.ts` and add the new key to `SUPPORTED_LANGS`. The
-picker, format functions, and tests pick it up automatically.
-
-### Reply delivery is retried
-
-If Bluesky's API rejects the reply (5xx, 429, network error), the labeler
-persists the attempt to `reply_queue` instead of dropping it. A background
-worker drains the queue every 30 s with exponential backoff
-(60 s → 1 h, max 7 attempts) so transient failures recover on their own.
-Rows that exhaust all retries land in `status='failed'` and stop trying.
-
-The dedup check (`hasReplied`) consults both `mention_reply` and
-`reply_queue`, so a re-triggered mention while a previous reply is still
-queued doesn't enqueue a second job.
-
-### Operational notes
-
-- App passwords can be revoked from `bsky.app` settings at any time.
-  Revoking a password while the labeler is running will surface as a
-  401 on the next post; the client tries a refresh once and then logs
-  the error.
-- Bluesky's API has per-account rate limits. A high mention volume will
-  eventually hit them; failed posts are logged but do not block the
-  pipeline.
-- The reply uses an authenticated `com.atproto.repo.createRecord` call.
-  The labels themselves are still signed with the labeler's secp256k1
-  key — the two paths are independent.
-- The detail link uses `LABELER_DETAIL_BASE_URL` if set, otherwise
-  falls back to `LABELER_HOSTNAME`. For a production deploy, set
-  `LABELER_DETAIL_BASE_URL` to the public reverse-proxy URL.
+See [`replies.md`](./replies.md) for the full reply behaviour —
+when it fires, what the post body looks like, where the `Details:`
+link points (top publisher article for clean verdicts, our detail
+page for `disputed`), the i18n picker, and the retry queue.
 
 ## See also
 
-- [TRIGGER_REPORTS.md](./TRIGGER_REPORTS.md) — user reports the post
+- [TRIGGER_REPORTS.md](./reports.md) — user reports the post
   via `createReport`.
-- [TRIGGER_WATCHLIST.md](./TRIGGER_WATCHLIST.md) — proactively check
+- [TRIGGER_WATCHLIST.md](./watchlist.md) — proactively check
   named accounts.
-- [TRIGGER_FIREHOSE.md](./TRIGGER_FIREHOSE.md) — check every post (opt-in,
+- [TRIGGER_FIREHOSE.md](./firehose.md) — check every post (opt-in,
   high cost).

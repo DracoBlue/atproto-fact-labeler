@@ -73,9 +73,9 @@ useful for downstream rendering.
 | `claimReviewed` | ✓ | The atomic claim text. This is what gets embedded for cosine retrieval. Keep it concise (~1500 chars max). |
 | `reviewRating.alternateName` (or `.name`) | ✓ | Free-text verdict. Mapped to an internal verdict via `src/pipeline/normalise-rating.ts` (False/Fake/Falso → `false`, True/Correct → `true`, etc.). |
 | `author.name` | recommended | Publisher display name shown in the detail page. |
-| `author.url` | recommended | Publisher host. Used by the [publisher allowlist](FEED_QUALITY.md). If the host doesn't match an allowlist line the entry is dropped at ingest. |
+| `author.url` | recommended | Publisher host. Used by the [publisher allowlist](./feed-quality.md). If the host doesn't match an allowlist line the entry is dropped at ingest. |
 | `datePublished` | recommended | Used downstream for "current as of" rendering and supersedes-by-newer logic. |
-| `inLanguage` | recommended | BCP-47 lang. When absent, `detectLang()` infers from the text. See [LANGUAGE_DETECTION.md](LANGUAGE_DETECTION.md). |
+| `inLanguage` | recommended | BCP-47 lang. When absent, `detectLang()` infers from the text. See [LANGUAGE_DETECTION.md](../pipeline/language-detection.md). |
 
 ## Bulk import — many claims
 
@@ -101,7 +101,7 @@ the same file after editing a verdict and only the changed row updates.
 ## Allowlist — add yourself
 
 Ingest checks `author.url` against
-[`config/claimreview-publishers-allowlist.txt`](../config/claimreview-publishers-allowlist.txt).
+[`config/claimreview-publishers-allowlist.txt`](../../config/claimreview-publishers-allowlist.txt).
 A row from `example.org` will be silently dropped unless `example.org`
 is on the list. For your own deployment, just add yourself:
 
@@ -111,7 +111,7 @@ is on the list. For your own deployment, just add yourself:
 ```
 
 If you're contributing your domain back to the public repo, use the
-[Publisher addition Issue template](../.github/ISSUE_TEMPLATE/publisher-add.yml)
+[Publisher addition Issue template](../../.github/ISSUE_TEMPLATE/publisher-add.yml)
 — same evidence bar as any other inclusion request.
 
 ## Putting it on the wire — JSON-LD on your articles
@@ -122,7 +122,7 @@ two things "for free":
 
 1. Google's Fact Check Tools API picks it up and serves it as a live
    hit to *other* labeler deployments that have set
-   `FACTCHECK_API_KEY` — see [`FACTCHECK_API.md`](FACTCHECK_API.md).
+   `FACTCHECK_API_KEY` — see [`FACTCHECK_API.md`](./factcheck-api.md).
    Your fact-checks reach more operators without any deal.
 2. Search engines may render the rich result (note: Google [phased out
    the dedicated UI in 2025][gserp], but the structured data is still
@@ -152,7 +152,7 @@ The JSON inside the `<script>` tag and the `item` object in
 ## Native atproto records (in progress)
 
 The publisher half of the project's
-[`lexicons/`](../lexicons/) is `app.kiesel.facts.claimReview` — an
+[`kiesel-app/facts:lexicons/`](https://github.com/kiesel-app/facts/tree/main/lexicons) is `app.kiesel.facts.claimReview` — an
 atproto-native record type mirroring schema.org/ClaimReview
 field-for-field, designed for fact-checkers who already operate on
 atproto and want to publish reviews as first-class records on their
@@ -173,15 +173,15 @@ described. Use the atproto-record path when:
 
 Design + schema:
 [`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md)
-and [`lexicons/app/kiesel/facts/claimReview.json`](../lexicons/app/kiesel/facts/claimReview.json).
+and [`kiesel-app/facts:claimReview.json`](https://github.com/kiesel-app/facts/blob/main/lexicons/app/kiesel/facts/claimReview.json).
 
 ## See also
 
 - [`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md) — atproto-native record types (one for publishers, one for labelers).
-- [`docs/LICENSING.md § Path 1`](LICENSING.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
-- [`docs/FEED_QUALITY.md`](FEED_QUALITY.md) — the allowlist that
+- [`docs/sources/licensing.md § Path 1`](./licensing.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
+- [`docs/sources/feed-quality.md`](./feed-quality.md) — the allowlist that
   filters every ingest, including yours.
-- [`docs/FACTCHECK_API.md`](FACTCHECK_API.md) — using the Google live
+- [`docs/sources/factcheck-api.md`](./factcheck-api.md) — using the Google live
   API alongside or instead of your own bulk file.
 - [schema.org `ClaimReview`](https://schema.org/ClaimReview) — the
   canonical field reference.

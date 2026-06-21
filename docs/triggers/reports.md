@@ -163,6 +163,20 @@ the same JSON directly with `curl` or `httpie`.)
    `"unknown"` for now — Bluesky's PDS-side JWT isn't yet propagated to
    the labeler in this implementation.
 
+## Quote-post the reported post (opt-in)
+
+With `REPLY_TO_REPORTS=true` the labeler **quote-posts** the reported
+post on its own feed after a successful label emit, so the verdict +
+sources land in the labeler's timeline. The post-author's postgate
+setting is honoured (no quote if quotes are disabled).
+
+Quote-posts are idempotent per reported URI: re-reports of the same
+post don't produce a second quote.
+
+See [`replies.md`](./replies.md) for the full reply behaviour shared
+with the [mentions](./mentions.md) trigger — payload format,
+`Details:` link policy, postgate handling, i18n picker, retry queue.
+
 ## Local development
 
 You can simulate a report against a running labeler with curl:
@@ -230,7 +244,7 @@ set to one of:
 - `tools.ozone.report.defs#reasonAppeal` (Ozone)
 
 Both are recognised by
-[`isAppealReason()`](../src/feedback/store.ts). The dispatcher
+[`isAppealReason()`](../../src/feedback/store.ts). The dispatcher
 **short-circuits**: it does **not** re-run the pipeline (the same
 input would produce the same verdict and waste an LLM call), and
 instead records the appeal in the `feedback` table with the
@@ -289,9 +303,9 @@ column reflects how many times the appeal has been raised.
 
 ## See also
 
-- [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) — user mentions the
+- [TRIGGER_MENTIONS.md](./mentions.md) — user mentions the
   labeler in a post or reply.
-- [TRIGGER_WATCHLIST.md](./TRIGGER_WATCHLIST.md) — proactively check
+- [TRIGGER_WATCHLIST.md](./watchlist.md) — proactively check
   named accounts.
-- [TRIGGER_FIREHOSE.md](./TRIGGER_FIREHOSE.md) — check every post (opt-in,
+- [TRIGGER_FIREHOSE.md](./firehose.md) — check every post (opt-in,
   high cost).

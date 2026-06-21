@@ -1,4 +1,21 @@
-# ADR: Data sources — where fact-checks come from
+# Sources — where the fact-checks come from
+
+This README explains *why* the labeler uses the three intake paths
+it does. For per-path operational reference:
+
+- [`own-claimreviews.md`](./own-claimreviews.md) — host your own
+  fact-checks as `ClaimReview` JSON-LD on your domain; `pnpm ingest`
+  pulls them in.
+- [`bulk-feed.md`](./bulk-feed.md) — daily Google Data Commons
+  Fact Check feed; ingest, allowlist, refresh, cleanup.
+- [`factcheck-api.md`](./factcheck-api.md) — Google Fact Check
+  Tools API for per-claim live lookups (closes the English
+  publisher gap).
+- [`feed-quality.md`](./feed-quality.md) — the publisher allowlist
+  as editorial chokepoint; reporting upstream to Google.
+- [`licensing.md`](./licensing.md) — per-path licensing.
+
+---
 
 **Status**: accepted · 2026-06-20
 
@@ -39,7 +56,7 @@ filling a gap the others have. A fourth path is in flight as the
 project moves to atproto-native records (see
 [`kiesel-app/facts`](https://github.com/kiesel-app/facts)).
 All paths route through the same
-[`config/claimreview-publishers-allowlist.txt`](../config/claimreview-publishers-allowlist.txt)
+[`config/claimreview-publishers-allowlist.txt`](../../config/claimreview-publishers-allowlist.txt)
 so the editorial bar stays identical regardless of intake.
 
 | Path | What | When to enable | Coverage | Licence |
@@ -51,9 +68,9 @@ so the editorial bar stays identical regardless of intake.
 
 Per-path setup, caching, and ToS implications:
 
-- **Path 1** — [`OWN_FACT_CHECKS.md`](OWN_FACT_CHECKS.md)
-- **Path 2** — [`FEED_QUALITY.md`](FEED_QUALITY.md) + [`LICENSING.md § Path 2`](LICENSING.md#path-2--google-data-commons-bulk-feed)
-- **Path 3** — [`FACTCHECK_API.md`](FACTCHECK_API.md) + [`LICENSING.md § Path 3`](LICENSING.md#path-3--google-fact-check-tools-api-claimssearch)
+- **Path 1** — [`OWN_FACT_CHECKS.md`](./own-claimreviews.md)
+- **Path 2** — [`FEED_QUALITY.md`](./feed-quality.md) + [`LICENSING.md § Path 2`](./licensing.md#path-2--google-data-commons-bulk-feed)
+- **Path 3** — [`FACTCHECK_API.md`](./factcheck-api.md) + [`LICENSING.md § Path 3`](./licensing.md#path-3--google-fact-check-tools-api-claimssearch)
 
 The default deployment runs Path 2 + Path 3 — they're independent
 upstreams (different licence, different infrastructure) so a Google
@@ -124,7 +141,7 @@ Empirically tested:
 The endpoint actively refuses bearer auth. Operator setup is
 necessarily a single GCP API key, restricted to
 `factchecktools.googleapis.com`. Documented in
-[`FACTCHECK_API.md`](FACTCHECK_API.md).
+[`FACTCHECK_API.md`](./factcheck-api.md).
 
 ### Public fact-checker organisations' RSS feeds — rejected
 
@@ -142,7 +159,7 @@ single API endpoint Google already curates.
   minutes without project-side approvals.
 - **The allowlist is the single editorial chokepoint.** All three
   paths feed `claim_review` through the same
-  [`PublisherAllowlist`](../src/ingest/publisher-allowlist.ts), so
+  [`PublisherAllowlist`](../../src/ingest/publisher-allowlist.ts), so
   decisions about which publishers count are made once, not three
   times.
 - **Coverage is the union of enabled paths.** Operators who only run

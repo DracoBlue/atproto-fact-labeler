@@ -1,13 +1,13 @@
 # Development
 
-For the matching architecture itself see [PIPELINE.md](./PIPELINE.md) and
+For the matching architecture itself see [PIPELINE.md](./pipeline/README.md) and
 its companion [RESEARCH-MATCHING.md](./RESEARCH-MATCHING.md). This file
 covers the dev workflow only.
 
 ## Matching fixtures — `pnpm test:matching`
 
 The polarity-matrix + regression test set referenced in
-[PIPELINE.md § Test-set / CI gate](./PIPELINE.md#test-set--ci-gate)
+[PIPELINE.md § Test-set / CI gate](./pipeline/README.md#test-set--ci-gate)
 lives at `test/fixtures/matching-cases.json`. Run it against your
 locally-configured LLM + embedding endpoint:
 

@@ -28,23 +28,23 @@ Three intake paths, mix and match:
 1. **Your own ClaimReview articles** — a newsroom or NGO that
    publishes ClaimReview-tagged fact-checks drops a single-item
    [`DataFeed`](https://schema.org/DataFeed) JSON into `pnpm ingest`.
-   Details: [docs/OWN_FACT_CHECKS.md](./docs/OWN_FACT_CHECKS.md).
+   Details: [docs/sources/own-claimreviews.md](./docs/sources/own-claimreviews.md).
 2. **The Google Data Commons bulk feed** — a daily ~60 MB
    [public dump](https://datacommons.org/factcheck/). Strong on
    non-English fact-checks (dpa, AFP, Univision, factly.in, …);
    thin on Lead Stories, USA Today, Snopes, AAP. Filtered through a
-   [curated publisher allowlist](./docs/FEED_QUALITY.md) to drop
+   [curated publisher allowlist](./docs/sources/feed-quality.md) to drop
    the SEO spam and injection attempts the open feed ships alongside
    real fact-checkers.
 3. **Google Fact Check Tools API (live)** — query
    [`claims:search`](https://developers.google.com/fact-check/tools/api)
    per claim. Closes the bulk-feed gap above. One API key in `.env`,
    no extra infra. Details:
-   [docs/FACTCHECK_API.md](./docs/FACTCHECK_API.md).
+   [docs/sources/factcheck-api.md](./docs/sources/factcheck-api.md).
 
 The pipeline (extract → retrieve → rerank → NLI → aggregate → HITL →
 sign) is documented stage-by-stage in
-[docs/PIPELINE.md](./docs/PIPELINE.md). What it currently doesn't
+[docs/pipeline/README.md](./docs/pipeline/README.md). What it currently doesn't
 handle, with evidence:
 [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md). Regression
 contract: 14 cases in
@@ -66,10 +66,10 @@ conservative so a single LLM endpoint isn't overwhelmed:
 | **Firehose** | off | Every Bluesky post. Realistic only with a high-throughput LLM endpoint. |
 
 Per trigger:
-[mentions](./docs/TRIGGER_MENTIONS.md) ·
-[reports](./docs/TRIGGER_REPORTS.md) ·
-[watchlist](./docs/TRIGGER_WATCHLIST.md) ·
-[firehose](./docs/TRIGGER_FIREHOSE.md).
+[mentions](./docs/triggers/mentions.md) ·
+[reports](./docs/triggers/reports.md) ·
+[watchlist](./docs/triggers/watchlist.md) ·
+[firehose](./docs/triggers/firehose.md).
 
 ### Public endpoints
 
@@ -203,7 +203,7 @@ docker compose run --rm fact-labeler pnpm cli:label at://...    # label a single
 Welcome. Areas where help is especially valuable:
 
 - **Adding a publisher to the allowlist** —
-  [`docs/FEED_QUALITY.md`](./docs/FEED_QUALITY.md) explains the
+  [`docs/sources/feed-quality.md`](./docs/sources/feed-quality.md) explains the
   editorial bar; use the [Publisher addition Issue
   template](./.github/ISSUE_TEMPLATE/publisher-add.yml) so reviewers
   can verify without back-and-forth.
@@ -225,17 +225,37 @@ GitHub Issues — see [SECURITY.md](./SECURITY.md).
 
 ## Further reading
 
-- [docs/DEPLOY.md](./docs/DEPLOY.md) — production deploy walkthrough.
-- [docs/LIFECYCLE.md](./docs/LIFECYCLE.md) — registering with
-  Bluesky, pausing emissions, retiring labels, clearing the
-  declaration.
-- [docs/PIPELINE.md](./docs/PIPELINE.md) — Stage 1–4 architecture.
-- [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md) — what
-  the system measurably doesn't do yet, with evidence.
-- [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) — offline dev,
+The `docs/` tree is organised by what the labeler *does*:
+
+- **[`docs/pipeline/`](./docs/pipeline/README.md)** — how a post
+  becomes a verdict. One file per stage (retrieve → rerank → NLI
+  judge → aggregate) plus the same-language filter.
+- **[`docs/sources/`](./docs/sources/README.md)** — where the
+  fact-checks come from. ADR on the three intake paths, plus
+  per-path operational reference, the publisher allowlist as
+  editorial chokepoint, and per-path licensing.
+- **[`docs/triggers/`](./docs/triggers/README.md)** — what makes a
+  post land in the pipeline. Mentions, reports, watchlist,
+  firehose, plus the shared reply / quote-post layer.
+
+Cross-cutting:
+
+- [`docs/DEPLOY.md`](./docs/DEPLOY.md) — production deploy
+  walkthrough + full env-var reference (§ 11).
+- [`docs/LIFECYCLE.md`](./docs/LIFECYCLE.md) — registering with
+  Bluesky, pausing emissions, retiring labels.
+- [`docs/KNOWN_LIMITATIONS.md`](./docs/KNOWN_LIMITATIONS.md) —
+  what the system measurably doesn't do yet, with evidence.
+- [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) — offline dev,
   fixtures, smoke test, commit conventions.
-- [docs/LICENSING.md](./docs/LICENSING.md) — what you may and may
-  not do with the data the labeler ingests.
+- [`docs/ATPROTO_LABEL_LANDSCAPE.md`](./docs/ATPROTO_LABEL_LANDSCAPE.md)
+  — atproto label surfaces and what already exists in the space.
+- [`docs/ADR_model_choices.md`](./docs/ADR_model_choices.md) —
+  LLM / embedding choices and the hybrid-vs-pure-local trade-off.
+- [`docs/RESEARCH-MATCHING.md`](./docs/RESEARCH-MATCHING.md) —
+  peer-reviewed evidence for the retrieve → rerank → NLI shape.
+- [`docs/PRIOR_ART.md`](./docs/PRIOR_ART.md) — fact-checking
+  literature + HITL tooling (Argilla / Ozone) we considered.
 
 Built on
 [`@skyware/labeler`](https://github.com/skyware-js/labeler).

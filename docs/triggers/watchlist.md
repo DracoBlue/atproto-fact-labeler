@@ -103,7 +103,7 @@ Replies are matched the same way — `post.did` is the **replier's** DID,
 not the parent's. If you watchlist Bob, every reply Bob writes is also
 considered, regardless of who he's replying to. If you want to fact-check
 posts that Bob is **replying to** (because they're contentious in his
-threads), use [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) instead.
+threads), use [TRIGGER_MENTIONS.md](./mentions.md) instead.
 
 ## Operational notes
 
@@ -114,18 +114,18 @@ threads), use [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) instead.
   Jetstream has streamed since the service was last running. To check
   historical posts from a newly-added watchlist DID, manually call the
   reports endpoint with each URI you care about
-  ([TRIGGER_REPORTS.md](./TRIGGER_REPORTS.md)).
+  ([TRIGGER_REPORTS.md](./reports.md)).
 - **Removing a DID** from the list takes effect on the next config
   reload (i.e. service restart). Labels already emitted are not
   retroactively retired — use `pnpm run retire` if you need that
-  (see `docs/LIFECYCLE.md` § Phase 3).
+  (see `../LIFECYCLE.md` § Phase 3).
 - **Public watchlist.** Bluesky's design assumes labelers are
   transparent. Consider publishing the watchlist (e.g. on the labeler
   account's pinned post) — operating it secretly invites mistrust.
 
 ## Edge cases
 
-- **Watchlist + firehose both enabled** ([TRIGGER_FIREHOSE.md](./TRIGGER_FIREHOSE.md)):
+- **Watchlist + firehose both enabled** ([TRIGGER_FIREHOSE.md](./firehose.md)):
   firehose precedence wins; the `reason` field on the proposal records
   `"firehose"`. The watchlist becomes redundant.
 - **Account on the watchlist deleted from atproto**: Jetstream stops
@@ -136,9 +136,9 @@ threads), use [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) instead.
 
 ## See also
 
-- [TRIGGER_MENTIONS.md](./TRIGGER_MENTIONS.md) — user mentions the
+- [TRIGGER_MENTIONS.md](./mentions.md) — user mentions the
   labeler in a post or reply.
-- [TRIGGER_REPORTS.md](./TRIGGER_REPORTS.md) — user reports the post
+- [TRIGGER_REPORTS.md](./reports.md) — user reports the post
   via `createReport`.
-- [TRIGGER_FIREHOSE.md](./TRIGGER_FIREHOSE.md) — check every post (opt-in,
+- [TRIGGER_FIREHOSE.md](./firehose.md) — check every post (opt-in,
   high cost).

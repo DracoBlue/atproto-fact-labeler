@@ -8,7 +8,7 @@ The pipeline has three OpenAI-compatible model slots:
 
 1. **`OPENAI_MODEL`** — extraction (S1), reranker (S2), NLI judge (S3).
    All three currently share the same model; see
-   [`ADR_nli_llm_judge_over_mdeberta.md`](./ADR_nli_llm_judge_over_mdeberta.md)
+   [`ADR_nli_llm_judge_over_mdeberta.md`](./pipeline/nli-judge.md)
    for why we did not split NLI off.
 2. **`EMBEDDING_MODEL`** — dense retrieval (S1).
 3. Optional separate base-URL + key per slot, so embedding can live on
@@ -101,7 +101,7 @@ silently drop DE-pendant fact-checks from retrieval.
 **Why granite-278m-multilingual for embedding**
 
 Already justified in detail in
-[`PIPELINE.md` § Stage 1](./PIPELINE.md#stage-1--dense-retrieval) and
+[`PIPELINE.md` § Stage 1](./pipeline/README.md#stage-1--dense-retrieval) and
 [`RESEARCH-MATCHING.md`](./RESEARCH-MATCHING.md). Summary: measured
 EN↔DE crosslingual cosine 0.81 vs ~0.52 for English-centric alternatives
 (mxbai-large-v1), 75 emb/s on M3 Max, 280 MB index for 92 k rows. Ships

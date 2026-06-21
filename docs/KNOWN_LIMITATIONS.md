@@ -32,10 +32,10 @@ detected language of the claim text. A French dpa-Faktencheck of
 "the earth is flat" is *not* offered as evidence for an English post,
 because gemini-class judges flip polarity on translated input far
 more often than on same-language pairs (see
-[`LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md)).
+[`LANGUAGE_DETECTION.md`](./pipeline/language-detection.md)).
 
 **What to do about it as an operator.** Enable
-[`FACTCHECK_API_KEY`](FACTCHECK_API.md) — the Google Fact Check Tools
+[`FACTCHECK_API_KEY`](./sources/factcheck-api.md) — the Google Fact Check Tools
 API supplements the local pool with live results keyed on the post's
 language and frequently closes this gap (Lead Stories, USA Today,
 Snopes, AAP and similar English-language publishers are reached via
@@ -59,7 +59,7 @@ when every candidate is dropped by Stage 2 (rerank) or Stage 3 (NLI).
 **What to do about it as an operator.** Nothing — this is the
 correct behaviour. If you operate a newsroom that wants to publish
 its own verdict, host your own ClaimReview articles and ingest them
-via [`OWN_FACT_CHECKS.md`](OWN_FACT_CHECKS.md); they then become part
+via [`OWN_FACT_CHECKS.md`](./sources/own-claimreviews.md); they then become part
 of the labeler's pool the same way bulk-feed entries are.
 
 ---
@@ -106,7 +106,7 @@ after polarity flips).
 underlying disagreement is preserved as the rationale on the detail
 page: e.g. *"NLI: 2 entail, 1 contradict, 2 neutral (dropped)"*.
 
-**Guardrail.** [`src/pipeline/aggregate.ts`](../src/pipeline/aggregate.ts)
+**Guardrail.** [`src/pipeline/normalise-rating.ts`](../src/pipeline/normalise-rating.ts)
 treats a publisher split as evidence of genuine disagreement, not as
 a signal to pick the majority. The aggregator never silently drops a
 publisher's dissenting verdict.
@@ -123,7 +123,7 @@ that's the publishers' job.
 [`pnpm test:matching`](../src/cli/test-matching.ts) fixture against.
 
 **Behaviour.** The pipeline will still process it (the on-device
-language detector covers ~60 languages via [`eld`](LANGUAGE_DETECTION.md)),
+language detector covers ~60 languages via [`eld`](./pipeline/language-detection.md)),
 but the NLI judge's polarity handling is unverified for that
 language. A subtle bug (e.g. an entail/contradict flip on "is not"
 constructions) could ship without notice.
@@ -150,7 +150,7 @@ in the shipping system. Documented so operators tracking against an
 older mental model can stop worrying about them:
 
 - **Wrong labels emitted from junk publishers.** Closed by the
-  publisher allowlist (see [`FEED_QUALITY.md`](FEED_QUALITY.md)).
+  publisher allowlist (see [`FEED_QUALITY.md`](./sources/feed-quality.md)).
   Every path — bulk feed, live API, own ingest — flows through the
   same allowlist gate.
 - **Stored XSS / `javascript:` URLs from feed content.** Closed by

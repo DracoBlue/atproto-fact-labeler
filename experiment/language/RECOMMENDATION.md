@@ -120,5 +120,5 @@ can upgrade to `eld/large` in one line; same API.
    `src/ingest/claimreview-feed.ts` with the detector above.
 3. Re-ingest the local DB; verify lang distribution looks sane
    (no more `in`, `au`, `cn` showing up as "languages").
-4. Document the policy in `docs/PIPELINE.md` so future contributors
+4. Document the policy in `docs/pipeline/README.md` so future contributors
    see why retrieval is single-language by default.

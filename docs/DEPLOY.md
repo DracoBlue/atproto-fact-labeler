@@ -92,7 +92,7 @@ See § "Periodic re-ingest" below.
 alongside real fact-checkers. The ingester only inserts rows whose
 publisher is on a curated allowlist
 (`config/claimreview-publishers-allowlist.txt`). Read
-[`docs/FEED_QUALITY.md`](FEED_QUALITY.md) before going live — that
+[`docs/sources/feed-quality.md`](./sources/feed-quality.md) before going live — that
 file decides which fact-checkers' verdicts your service propagates
 onto Bluesky, and tells you how to report the spam back to Google.
 
@@ -314,14 +314,14 @@ filter in Stage 1 retrieval has correct `lang` values to filter
 against. **Independent of `embed-rebuild`** — only the `lang` column is
 touched, embeddings are not re-computed. Idempotent — re-running on a
 freshly-ingested DB is a no-op. See
-[`LANGUAGE_DETECTION.md`](LANGUAGE_DETECTION.md).
+[`LANGUAGE_DETECTION.md`](./pipeline/language-detection.md).
 
 If you edited `config/claimreview-publishers-allowlist.txt` since the
 last refresh — for example to drop a previously-trusted publisher —
 also run `pnpm cleanup:claims` to delete the now-disallowed rows from
 the existing index. New ingests honour the allowlist, but already-
 ingested rows linger until removed. See
-[`FEED_QUALITY.md`](FEED_QUALITY.md).
+[`FEED_QUALITY.md`](./sources/feed-quality.md).
 
 The `cli:embed-rebuild` is model-aware: only newly-ingested rows or
 rows tagged with an outdated `EMBEDDING_MODEL` get re-embedded. Refresh
@@ -459,10 +459,10 @@ candidates above threshold survive into NLI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply, quoted record on quote-post). See [TRIGGER_MENTIONS.md](TRIGGER_MENTIONS.md). |
-| `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post. See [TRIGGER_REPORTS.md](TRIGGER_REPORTS.md). |
-| `TRIGGER_FIREHOSE` | `false` | Fact-check **every** post on the firehose. Volume-heavy; only enable with a high-throughput LLM. See [TRIGGER_FIREHOSE.md](TRIGGER_FIREHOSE.md). |
-| `TRIGGER_WATCHLIST` | *(empty)* | Comma-separated DIDs **or handles** whose posts are always checked. Handles resolve at startup; resolution failure aborts startup. See [TRIGGER_WATCHLIST.md](TRIGGER_WATCHLIST.md). |
+| `TRIGGER_MENTIONS` | `true` | Fact-check posts that mention the labeler (parent on reply, quoted record on quote-post). See [TRIGGER_MENTIONS.md](./triggers/mentions.md). |
+| `TRIGGER_REPORTS` | `true` | Mount `com.atproto.moderation.createReport` and dispatch every reported post. See [TRIGGER_REPORTS.md](./triggers/reports.md). |
+| `TRIGGER_FIREHOSE` | `false` | Fact-check **every** post on the firehose. Volume-heavy; only enable with a high-throughput LLM. See [TRIGGER_FIREHOSE.md](./triggers/firehose.md). |
+| `TRIGGER_WATCHLIST` | *(empty)* | Comma-separated DIDs **or handles** whose posts are always checked. Handles resolve at startup; resolution failure aborts startup. See [TRIGGER_WATCHLIST.md](./triggers/watchlist.md). |
 | `JETSTREAM_URL` | `wss://jetstream2.us-east.bsky.network/subscribe` | Bluesky live firehose. US-east is fine from EU. |
 | `JETSTREAM_FIXTURE` | *(empty)* | Path to a JSONL fixture for offline replay (development). |
 | `APPVIEW_URL` | `https://public.api.bsky.app` | Bluesky read-only AppView; used to fetch post text by URI. Unauthenticated. |
@@ -498,9 +498,9 @@ is `true`. Same creds, two surfaces.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CLAIMREVIEW_FEED_PATH` | `data.json` | Path to a Google Data Commons (or own single-item) `DataFeed` JSON. See [OWN_FACT_CHECKS.md](OWN_FACT_CHECKS.md). |
-| `CLAIMREVIEW_PUBLISHER_ALLOWLIST` | `config/claimreview-publishers-allowlist.txt` | Allowlist filtering both bulk ingest and live API responses. See [FEED_QUALITY.md](FEED_QUALITY.md). |
-| `FACTCHECK_API_KEY` | *(empty)* | Google Fact Check Tools API key. When set, every `matchClaim()` also queries `claims:search` live and merges hits into the candidate pool. Setup: [FACTCHECK_API.md](FACTCHECK_API.md). |
+| `CLAIMREVIEW_FEED_PATH` | `data.json` | Path to a Google Data Commons (or own single-item) `DataFeed` JSON. See [OWN_FACT_CHECKS.md](./sources/own-claimreviews.md). |
+| `CLAIMREVIEW_PUBLISHER_ALLOWLIST` | `config/claimreview-publishers-allowlist.txt` | Allowlist filtering both bulk ingest and live API responses. See [FEED_QUALITY.md](./sources/feed-quality.md). |
+| `FACTCHECK_API_KEY` | *(empty)* | Google Fact Check Tools API key. When set, every `matchClaim()` also queries `claims:search` live and merges hits into the candidate pool. Setup: [FACTCHECK_API.md](./sources/factcheck-api.md). |
 | `FACTCHECK_API_PAGE_SIZE` | `10` | Results per `claims:search` call. |
 | `FACTCHECK_API_TIMEOUT_MS` | `5000` | Per-call timeout for the live API. On timeout, the pipeline falls back to the local pool. |
 
