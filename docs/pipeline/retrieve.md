@@ -1,9 +1,9 @@
 # Stage 1 — Dense retrieval
 
 **Code**: [`src/pipeline/retrieve.ts`](../../src/pipeline/retrieve.ts).
-**Replaces**: the FTS5 keyword search (deleted). Whole-claim semantic
-similarity instead of token overlap kills the "`earth*` matches
-`earthquake`" class of false positives.
+**Purpose**: pull up to top-K semantically similar ClaimReview entries
+for a given claim, using whole-claim cosine similarity over
+pre-computed multilingual embeddings.
 
 **Output**: top-K candidates (default 10) sorted by cosine.
 `MIN_COSINE` floor 0.55 deliberately *low* — empirical measurement

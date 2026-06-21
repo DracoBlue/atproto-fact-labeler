@@ -4,24 +4,33 @@ How the labeler turns an incoming post into a verdict. Four stages,
 all wired in code today, calibrated against the 14-case fixture in
 [`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json).
 
-Per-stage docs (`why this stage exists` + `what the code does`):
+Per-stage docs (what the code does + why this shape + research +
+model choice + caveats):
 
+- [`extract.md`](./extract.md) — Stage 0, LLM produces atomic falsifiable claims with decontextualised standalone text
 - [`retrieve.md`](./retrieve.md) — Stage 1, dense cosine top-K
 - [`rerank.md`](./rerank.md) — Stage 2, LLM relevance judge
 - [`nli-judge.md`](./nli-judge.md) — Stage 3, LLM entail/contradict/neutral + polarity flip rationale
 - [`aggregate.md`](./aggregate.md) — Stage 4, verdict aggregation
 - [`language-detection.md`](./language-detection.md) — cross-cutting same-language filter
 
-Extraction (the LLM call that produces atomic claims *before* Stage 1)
-lives in [`src/pipeline/extract.ts`](../../src/pipeline/extract.ts); it
-is documented inline with the prompt and has no separate doc here yet.
+Why this matching architecture exists in this shape (vs alternatives
+that were considered and rejected):
+[`../ADR_pipeline_three_stage_matching.md`](../ADR_pipeline_three_stage_matching.md).
 
 ## Architecture
 
 ```
-   atomic claim from extraction
-              │
-              ▼
+   post text
+        │
+        ▼
+   ┌──────────────────────────────────┐
+   │ STAGE 0 — Claim extraction       │
+   │   LLM produces atomic falsifiable│
+   │   claims + decontextualised text │
+   └──────────────┬───────────────────┘
+                  │
+                  ▼
    ┌──────────────────────────────────┐
    │ STAGE 1 — Dense retrieval        │
    │   granite-278m multilingual      │
@@ -61,48 +70,20 @@ is documented inline with the prompt and has no separate doc here yet.
 
 ## What runs in code today
 
-All four stages share one OpenAI-compatible endpoint (LM Studio
-locally, the configured provider in production). No Python, no
-training, no dedicated NLI model.
+All stages share one OpenAI-compatible endpoint (LM Studio locally,
+the configured provider in production). No Python, no training, no
+dedicated NLI model.
 
 | Stage | File | Model role |
 |---|---|---|
+| 0 | `src/pipeline/extract.ts` | LLM produces atomic + falsifiable + decontextualised claims; strict JSON schema |
 | 1 | `src/pipeline/retrieve.ts` | granite-278m-multilingual embeddings, cosine over `claim_review.embedding` BLOB |
 | 2 | `src/pipeline/rerank.ts` | one batched LLM call rates top-K candidates 0..1 |
 | 3 | `src/pipeline/entail.ts` | LLM-as-judge per surviving candidate; strict-JSON-Schema |
 | 4 | `src/pipeline/matching.ts` | polarity-aware aggregate, returns null → `uncovered` |
 
-Extraction front-loads onto the same model. `src/embedding/client.ts`
-forces `encoding_format: 'float'` to work around the LM Studio +
-openai-node base64 incompatibility.
-
-## Why this shape and not the old FTS pass-through
-
-The previous `src/pipeline/lookup.ts` (deleted) ran a single SQLite
-FTS5 `OR`-query and aggregated top-5 publisher native ratings. Two
-real Bluesky posts walked it into the classic failure modes:
-
-| Post | Truth | Labeler verdict | What actually happened |
-|---|---|---|---|
-| "the earth is not flat" | true | `fact-refuted` (conf 0.879) | FTS matched 5 unrelated false-claim articles via `earth*` or `flat*` prefix; aggregator passed through 5× "False". |
-| "the earth is round" | true | `fact-refuted` (conf 1.0) | FTS matched articles about Japan earthquakes, AOC tweets, COVID stimulus — none about Earth shape; aggregator returned conf 1.0 anyway. |
-
-Three failure modes are baked into that design:
-
-1. **Single-stage keyword retrieval.** `earth* OR round*` matches every
-   document containing either prefix. Cross-stem hits (e.g.
-   "Earth**quake**") flood the result set on common words.
-2. **No quality gate before aggregation.** We take the top-k regardless
-   of relevance score. If the top-k are all spurious, aggregation still
-   produces "5/5 publishers say False, confidence 1.0."
-3. **Publisher-verdict pass-through ignores polarity.** A fact-check
-   that refutes "earth is flat" gets normalised to `false`. We then
-   apply that to "earth is not flat" — the *negation* — without
-   flipping. Verdict is double-wrong.
-
-The peer-reviewed literature has solved all three. The architecture
-above is the published consensus, with our per-stage trade-offs
-documented inline.
+`src/embedding/client.ts` forces `encoding_format: 'float'` to work
+around the LM Studio + openai-node base64 incompatibility.
 
 ## Frame of reference
 
@@ -120,10 +101,6 @@ whose claim-matching pipelines are most publicly documented:
   flipping polarity by accident.
   [Full Fact post](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/).
 
-The FTS-and-aggregate predecessor did verdict pass-through, which
-neither framing endorses. The current pipeline does clustering +
-polarity check, which both endorse.
-
 ## Test gate
 
 The labelled fixture lives at
@@ -132,8 +109,6 @@ The labelled fixture lives at
 
 - **`polarity-matrix`** — earth round/flat × is/isn't (4 cases).
   Property: *true claims and their negations get opposite verdicts*.
-  This is what the FTS pipeline failed and what the rewrite exists to
-  fix.
 - **`classic-conspiracy`** — Vaccines+microchips, 5G+COVID. Property:
   publishers' false ratings pass through via entailment.
 - **`true-supported`** — "COVID vaccines are safe and effective".
@@ -187,11 +162,7 @@ that proves it stays fixed.
 
 1. **Concrete cosine and reranker thresholds.** Papers tune per
    dataset. We calibrate `RERANK_THRESHOLD` on the fixture above.
-2. **Is polarity flip on contradiction actually deployed anywhere?**
-   The research found it principled (FACT-GPT, ProoFVer) but not
-   widely documented as a deployed production pattern. We are early
-   — but on the correct side of the correctness frontier.
-3. **Cross-lingual NLI** — closing the cases where the only matching
+2. **Cross-lingual NLI** — closing the cases where the only matching
    fact-check is in a different language than the post. See
    [`language-detection.md`](./language-detection.md) for the current
    trade-off.

@@ -55,3 +55,63 @@ publish the result + the evidence, do not over-commit.
 
 This is the boundary that distinguishes the labeler from a
 fact-checker.
+
+## Why this shape
+
+Two design choices are load-bearing for aggregation:
+
+### 1. Polarity flip on contradiction
+
+When a publisher rates "the Earth is flat" as *False*, the
+truth-value of *"the Earth is round"* is **True** — the publisher
+has implicitly committed to the negation. Stage 3 detected the
+contradiction; aggregation propagates it.
+
+This matters because most publishers fact-check the *false* version
+of a claim (the version that needs correcting), not the *true*
+version. If aggregation only used pass-through, true claims like
+"the Earth is round" would silently inherit `uncovered` even though
+multiple publishers have addressed the topic. Polarity flip
+recovers the signal.
+
+The principle is formalised by **Full Fact's t(v) = t(u)** — two
+claims match iff they have identical truth conditions. A
+contradiction is the case where they have *opposite* truth
+conditions; the publisher's verdict is reusable but the polarity is
+inverted. ([Full Fact: Towards a common definition of claim matching](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/))
+
+### 2. Disputed instead of majority vote
+
+If publishers disagree (e.g. 2 *True*, 2 *False*), the aggregator
+returns `disputed` — **not** the majority. Reasons:
+
+- A 2-vs-2 split on a claim is editorially interesting in itself.
+  Hiding it behind a majority verdict misrepresents the publisher
+  consensus.
+- The detail page can surface the conflict — multiple sources side
+  by side — which is more useful to a reader than a single label
+  that papers over the disagreement.
+- Production fact-checkers don't aggregate other fact-checkers
+  by majority vote either. The
+  [Meedan Alegre](https://github.com/meedan/alegre) pipeline treats
+  matched-but-disagreeing reviews as a routing question, not a
+  voting question.
+
+`HITL_AUTO_MIN_VOTES` adds a second guardrail at deployment time:
+auto-accept only fires when at least N publishers backed the verdict.
+Single-publisher verdicts go through human review by default.
+
+## Research backing
+
+- **Full Fact** — claim-matching definition (`t(v) = t(u)`) and the
+  argument against verdict pass-through.
+  ([blog post](https://fullfact.org/blog/2021/oct/towards-common-definition-claim-matching/))
+- **Meedan Alegre + Check** — production claim-matching
+  architecture. Treats publisher consensus as a clustering question,
+  not a voting question.
+  ([Meedan post](https://meedan.org/post/claim-matching-global-fact-checks-at-meedan),
+   [Alegre repo](https://github.com/meedan/alegre))
+- **AVeriTeC** — defines aggregation over multi-source evidence as a
+  separate stage with its own evaluation. Confirms that aggregating
+  *after* the polarity gate is the standard frame.
+  ([Schlichtkrull et al. 2023](https://arxiv.org/abs/2305.13117))

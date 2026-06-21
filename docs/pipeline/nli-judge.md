@@ -50,12 +50,11 @@ qwen3 takes 4–9 s, dominating the ~1 min wall-clock per
 [Transformers.js](https://huggingface.co/docs/transformers.js) —
 ~100× speedup on paper.
 
-The labeler exists *because* the FTS pipeline could not handle
-polarity ("the earth is not flat" → `fact-refuted`). The hard
-requirement on any Stage 3 swap is therefore: **the polarity-matrix
+The hard requirement on any Stage 3 swap is that the polarity-matrix
 fixture in
 [`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json)
-must remain 14/14 green.**
+stays **14/14 green**. Polarity correctness is the whole point of
+this stage.
 
 ### The probe
 

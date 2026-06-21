@@ -12,40 +12,7 @@ related but semantically unrelated rows into the candidate set.
 The single-language filter is the cheapest defence. It only works if
 the `claim_review.lang` column is populated *and correct*.
 
-## What we had before
-
-`src/ingest/claimreview-feed.ts` used to compute `lang` via two URL
-heuristics:
-
-```ts
-// /fa/, /de/, /es/, ... in the path:
-url.match(/\/(?:fa|de|en|es|fr|pt|it|nl|...)/);
-// publisher TLD as a fallback:
-publisher.match(/\.(de|fr|es|jp|kr|cn|br|au|in)/);
-```
-
-Two bugs:
-
-1. **TLDs are not BCP-47.** `jp` is a country code; the language is `ja`.
-   Same for `cn`→`zh`, `kr`→`ko`, `br`→`pt`. `au` and `in` aren't
-   languages at all — both stamped real rows as language=`au` / `in`.
-2. **Most publishers don't encode language in their URL.** ~70 % of the
-   88 k row corpus ended up with `lang = NULL`, which the same-language
-   filter then either ignores (loose mode) or discards (strict mode).
-
-Verified in `data/labeler.sqlite` pre-fix:
-
-```
-NULL    61 444
-in      19 866   ← Indian fact-checkers, not a language
-br       2 730   ← Brazilian, the language is pt
-es       1 920
-de         935
-jp         776   ← Japanese, the language is ja
-...
-```
-
-## What we use now
+## How detection works
 
 [`src/ingest/detect-lang.ts`](../../src/ingest/detect-lang.ts) wraps the
 **[eld] library** (medium dataset) with a confidence + length guard:
