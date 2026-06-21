@@ -16,7 +16,7 @@ model choice + caveats):
 
 Why this matching architecture exists in this shape (vs alternatives
 that were considered and rejected):
-[`../ADR_pipeline_three_stage_matching.md`](../adr/pipeline-three-stage-matching.md).
+[`../adr/pipeline-three-stage-matching.md`](../adr/pipeline-three-stage-matching.md).
 
 ## Architecture
 

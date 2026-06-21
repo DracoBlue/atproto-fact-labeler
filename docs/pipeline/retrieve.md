@@ -23,28 +23,13 @@ detection pipeline and operator rebuild flow:
 
 ## Embedding model
 
-Deployed:
+Default:
 [`text-embedding-granite-embedding-278m-multilingual`](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual)
-— IBM Granite, Apache-2.0, 303 MB, 768 dims, multilingual primary focus.
-Picked over BGE-M3 / Multilingual-E5-Large for three reasons measured
-on the fixture:
-
-1. Ships with LM Studio (`text-embedding-granite-embedding-278m-multilingual`)
-   — no separate runtime needed.
-2. **Crosslingual EN↔DE works**: "the earth is round" vs.
-   "Die Erde ist keine Scheibe" cosine 0.81 (vs 0.52 for
-   `mxbai-large-v1` which is en-centric).
-3. **75 emb/s** on M3 Max — 92k corpus rebuild in ~20 min on
-   `pnpm cli:embed-rebuild`.
-
-Alternatives if Granite isn't installed locally:
-
-- [`BAAI/bge-m3`](https://huggingface.co/BAAI/bge-m3) — 568 MB,
-  1024 dims, same multilingual property; needs Transformers.js or
-  an Infinity server.
-- [`intfloat/multilingual-e5-large`](https://huggingface.co/intfloat/multilingual-e5-large)
-  — Success@10 = 0.87, MAP = 0.75 on AMC-16K
-  ([Pikuliak et al. 2024](https://arxiv.org/html/2503.02737)).
+— 303 MB, 768 dims, Apache-2.0. Configurable via `EMBEDDING_MODEL`
+plus an OpenAI-compatible `/v1/embeddings` endpoint at
+`EMBEDDING_BASE_URL`. The selection rationale, alternatives, and
+head-to-head measurement live in
+[`../adr/model-choices.md`](../adr/model-choices.md).
 
 ## Storage
 

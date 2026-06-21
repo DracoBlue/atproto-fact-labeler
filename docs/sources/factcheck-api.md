@@ -131,7 +131,7 @@ Same allowlist, same rerank, same NLI, same `cleanup:claims` semantics.
 ## See also
 
 - [`docs/sources/licensing.md § Path 3`](./licensing.md#path-3--google-fact-check-tools-api-claimssearch) — the Terms of Service governing API responses, caching posture, and the operator-responsibility model.
-- [`docs/sources/feed-quality.md`](./feed-quality.md) — the publisher allowlist and the upstream feed's quality problems.
+- [`docs/sources/allowlist.md`](./allowlist.md) — the publisher allowlist and the upstream feed's quality problems.
 - [`docs/pipeline/language-detection.md`](../pipeline/language-detection.md) — the same-language filter that runs alongside the cross-feed merge.
 - [`docs/pipeline/README.md`](../pipeline/README.md) — stages 1–4.
 - [Google Fact Check Tools API reference](https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search).

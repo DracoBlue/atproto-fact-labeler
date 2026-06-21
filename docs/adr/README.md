@@ -21,6 +21,9 @@ crisp — "what is" lives in those docs, "why this shape" lives here.
 - [`model-choices.md`](./model-choices.md) — embedding / extraction
   / rerank / NLI model selection. Hybrid-vs-pure-local trade-off and
   the head-to-head benchmark that picked the deployed models.
+- [`nli-judge-llm-not-mdeberta.md`](./nli-judge-llm-not-mdeberta.md)
+  — empirical probe that rejected mDeBERTa as the Stage 4 backend;
+  why LLM-as-judge stays the only supported path.
 
 ## Adding an ADR
 

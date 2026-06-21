@@ -19,7 +19,7 @@ pnpm test:matching --json > report.json  # machine-readable
 ```
 
 Each case asserts `expected_verdict` and an optional `min_confidence`.
-Exit code is non-zero on any failure. Wall-clock is ~13 cases × ~1 min on
+Exit code is non-zero on any failure. Wall-clock is ~14 cases × ~1 min on
 M3 Max with qwen3.6-27b as NLI judge — **not** part of the default
 `pnpm test` suite. Re-run before any change to retrieval thresholds, NLI
 prompts, or the flip table. Treat a regression here as a release blocker.

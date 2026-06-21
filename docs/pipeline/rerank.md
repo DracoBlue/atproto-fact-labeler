@@ -29,14 +29,11 @@ failure the stage degrades to a no-op (passes the top `keep` Stage 1
 results through with `rerankScore = cosine`), so a transient LLM
 hiccup never loses the pipeline.
 
-## Why LLM-as-judge instead of `bge-reranker-v2-m3`
-
-Same ONNX ergonomics concern documented in
-[`nli-judge.md`](./nli-judge.md). The reranker LLM call is currently
-not the bottleneck (NLI dominates), and using the same OpenAI-compatible
-endpoint as extract / NLI keeps the deployment to "one LM Studio
-instance, no Python." Worth revisiting if Stage 2 itself becomes the
-bottleneck.
+Reranking shares the same `OPENAI_MODEL` as extract and NLI. Why
+LLM-as-judge rather than a dedicated cross-encoder like
+`bge-reranker-v2-m3`:
+[`../adr/nli-judge-llm-not-mdeberta.md`](../adr/nli-judge-llm-not-mdeberta.md)
+(same ONNX-ergonomics decision, same trade-off).
 
 ## Measured impact
 
@@ -46,7 +43,7 @@ bottleneck.
 |---|---|---|---|
 | the earth is round | 45 s | 33 s | −27 % |
 | My dog is brown (uncovered) | 34 s | 11 s | **−66 %** — Stage 2 drops all candidates, Stage 3 never runs |
-| (full 13-case fixture) | 826 s | see [`README.md` § Test gate](./README.md#test-gate) | — |
+| (full 14-case fixture) | 826 s | see [`README.md` § Test gate](./README.md#test-gate) | — |
 
 The big uncovered-case wins come from Stage 3 zeroing out every
 candidate — Stage 3 sees an empty list and `uncovered` is returned

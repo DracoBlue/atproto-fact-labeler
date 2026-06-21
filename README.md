@@ -33,7 +33,7 @@ Three intake paths, mix and match:
    [public dump](https://datacommons.org/factcheck/). Strong on
    non-English fact-checks (dpa, AFP, Univision, factly.in, …);
    thin on Lead Stories, USA Today, Snopes, AAP. Filtered through a
-   [curated publisher allowlist](./docs/sources/feed-quality.md) to drop
+   [curated publisher allowlist](./docs/sources/allowlist.md) to drop
    the SEO spam and injection attempts the open feed ships alongside
    real fact-checkers.
 3. **Google Fact Check Tools API (live)** — query
@@ -180,7 +180,7 @@ as inline comments next to live defaults; `src/config/index.ts` is
 the runtime validation layer (zod schema).
 
 Model and deployment-shape benchmark (all-local, hybrid,
-pure-Vercel): [docs/ADR_model_choices.md](./docs/ADR_model_choices.md).
+pure-Vercel): [docs/adr/model-choices.md](./docs/adr/model-choices.md).
 
 ### One-shot operator commands
 
@@ -203,7 +203,7 @@ docker compose run --rm fact-labeler pnpm cli:label at://...    # label a single
 Welcome. Areas where help is especially valuable:
 
 - **Adding a publisher to the allowlist** —
-  [`docs/sources/feed-quality.md`](./docs/sources/feed-quality.md) explains the
+  [`docs/sources/allowlist.md`](./docs/sources/allowlist.md) explains the
   editorial bar; use the [Publisher addition Issue
   template](./.github/ISSUE_TEMPLATE/publisher-add.yml) so reviewers
   can verify without back-and-forth.
@@ -250,7 +250,7 @@ Cross-cutting:
   fixtures, smoke test, commit conventions.
 - [`docs/ATPROTO_LABEL_LANDSCAPE.md`](./docs/ATPROTO_LABEL_LANDSCAPE.md)
   — atproto label surfaces and what already exists in the space.
-- [`docs/ADR_model_choices.md`](./docs/ADR_model_choices.md) —
+- [`docs/adr/model-choices.md`](./docs/adr/model-choices.md) —
   LLM / embedding choices and the hybrid-vs-pure-local trade-off.
 - [`docs/RESEARCH-MATCHING.md`](./docs/RESEARCH-MATCHING.md) —
   peer-reviewed evidence for the retrieve → rerank → NLI shape.

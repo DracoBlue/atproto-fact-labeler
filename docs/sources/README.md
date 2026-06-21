@@ -5,13 +5,17 @@ Per-path operational reference:
 - [`own-claimreviews.md`](./own-claimreviews.md) — host your own
   fact-checks as `ClaimReview` JSON-LD on your domain; `pnpm ingest`
   pulls them in.
-- [`data-commons.md`](./data-commons.md) — daily Google Data
-  Commons Fact Check feed; ingest, refresh, cleanup.
+- [`data-commons.md`](./data-commons.md) — Google Data Commons
+  Fact Check feed: ingest, refresh, cleanup, upstream reporting.
 - [`factcheck-api.md`](./factcheck-api.md) — Google Fact Check
   Tools API for per-claim live lookups (closes the English
   publisher gap).
-- [`feed-quality.md`](./feed-quality.md) — the publisher allowlist
-  as editorial chokepoint; reporting upstream to Google.
+
+Cross-cutting:
+
+- [`allowlist.md`](./allowlist.md) — the publisher allowlist that
+  every intake path routes through; the single editorial chokepoint
+  of the labeler.
 - [`licensing.md`](./licensing.md) — per-path licensing.
 
 **Why these three paths and not others** (Fact-Check Insights,

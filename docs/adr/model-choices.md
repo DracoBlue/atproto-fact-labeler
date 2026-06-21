@@ -16,7 +16,7 @@ The pipeline has three OpenAI-compatible model slots:
    + Vercel for the LLM).
 
 [`test/fixtures/matching-cases.json`](../../test/fixtures/matching-cases.json)
-is the binding correctness gate: the 13-case fixture must remain green
+is the binding correctness gate: the 14-case fixture must remain green
 on whichever model the operator picks. Each model swap we evaluate is
 benchmarked against it.
 
@@ -28,8 +28,8 @@ This ADR records the picks and the alternatives we evaluated.
 | --- | --- | --- | --- |
 | **Embedding (S1) — recommended** | `text-embedding-granite-embedding-278m-multilingual` | local LM Studio | EN↔DE crosslingual cosine 0.81, 768 dim, ships with LM Studio, ~13 ms / query, no external dep |
 | **Embedding (S1) — pure-Vercel alternative** | `google/text-multilingual-embedding-002` | Vercel AI Gateway | EN↔DE crosslingual cosine 0.75, 768 dim, $0.025/M tokens. Trades −7 % retrieval quality for an LM-Studio-free deploy. |
-| **LLM — local default** | `qwen3.6-27b` | local LM Studio | 13/13 fixture pass, fully offline, reliable strict json_schema, ~62s/case |
-| **LLM — Vercel default** | `google/gemini-2.5-flash` | Vercel AI Gateway | 13/13 fixture pass, 2.6× faster than local qwen3, cheap, fixture-exact |
+| **LLM — local default** | `qwen3.6-27b` | local LM Studio | 14/14 fixture pass, fully offline, reliable strict json_schema, ~62s/case |
+| **LLM — Vercel default** | `google/gemini-2.5-flash` | Vercel AI Gateway | 14/14 fixture pass, 2.6× faster than local qwen3, cheap, fixture-exact |
 
 Two valid deployment shapes:
 
@@ -51,13 +51,13 @@ be permissive.
 
 **Evidence**
 
-Full 13-case fixture (`pnpm test:matching`) on M3 Max, 2026-06-17/18.
+Full 14-case fixture (`pnpm test:matching`) on M3 Max, 2026-06-17/18.
 LM Studio + qwen3.6-27b is the reference run.
 
 | Model | Endpoint | Score | Wall-clock | Median/case | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `qwen3.6-27b` | LM Studio (local) | **13/13** | 826 s | ~62 s | Reference. Cost: electricity only. |
-| `google/gemini-2.5-flash` | Vercel | **13/13** | 321 s | ~25 s | 2.6× faster than local. 3 rerank parse-fails tolerated by fallback. Est. ~$0.05/full-suite. |
+| `qwen3.6-27b` | LM Studio (local) | **14/14** | 826 s | ~62 s | Reference. Cost: electricity only. |
+| `google/gemini-2.5-flash` | Vercel | **14/14** | 321 s | ~25 s | 2.6× faster than local. 3 rerank parse-fails tolerated by fallback. Est. ~$0.05/full-suite. |
 | `anthropic/claude-haiku-4-5` | Vercel | 11/13 | 143 s | ~11 s | Polarity-matrix 4/4 ✓. Two edge-case fails: Bill Gates → `false` (fixture says `unknown`), Trump 2020 → `disputed` (NLI over-classified contradictions). |
 | `openai/gpt-4o-mini` | Vercel | 2/4 polarity | (partial) | ~10 s | Polarity matrix only; too small for adversarial NLI. Negation cases mis-flipped. |
 | `alibaba/qwen3.6-27b` | Vercel | 0/4 polarity | ~575 s | ~144 s | Strict json_schema not honoured through gateway; even tolerant-parser cannot recover all cases. Markedly slower than local qwen3. |
@@ -149,7 +149,7 @@ Won head-to-head against four alternatives on the same fixture:
   EMBEDDING_MODEL=text-embedding-granite-embedding-278m-multilingual
   ```
 
-- **Reviewing this ADR**: a model swap must (a) hit 13/13 on
+- **Reviewing this ADR**: a model swap must (a) hit 14/14 on
   `pnpm test:matching`, (b) be cost-justified vs. the incumbent,
   (c) update or supersede this ADR with the new evidence table.
 
@@ -184,9 +184,9 @@ Won head-to-head against four alternatives on the same fixture:
 
 **Future revisit triggers**
 
-- Local: a smaller / faster local model passes 13/13 within
+- Local: a smaller / faster local model passes 14/14 within
   current LM Studio capability — e.g. a future qwen3.7-12b or similar.
-- Vercel: a materially cheaper or faster model passes 13/13, OR
+- Vercel: a materially cheaper or faster model passes 14/14, OR
   Gemini-2.5-flash's pricing or rate-limits change such that the
   cost-quality ratio against haiku flips.
 - A pricing shift on the Vercel Gateway pushes any model into a

@@ -73,7 +73,7 @@ useful for downstream rendering.
 | `claimReviewed` | ✓ | The atomic claim text. This is what gets embedded for cosine retrieval. Keep it concise (~1500 chars max). |
 | `reviewRating.alternateName` (or `.name`) | ✓ | Free-text verdict. Mapped to an internal verdict via `src/pipeline/normalise-rating.ts` (False/Fake/Falso → `false`, True/Correct → `true`, etc.). |
 | `author.name` | recommended | Publisher display name shown in the detail page. |
-| `author.url` | recommended | Publisher host. Used by the [publisher allowlist](./feed-quality.md). If the host doesn't match an allowlist line the entry is dropped at ingest. |
+| `author.url` | recommended | Publisher host. Used by the [publisher allowlist](./allowlist.md). If the host doesn't match an allowlist line the entry is dropped at ingest. |
 | `datePublished` | recommended | Used downstream for "current as of" rendering and supersedes-by-newer logic. |
 | `inLanguage` | recommended | BCP-47 lang. When absent, `detectLang()` infers from the text. See [LANGUAGE_DETECTION.md](../pipeline/language-detection.md). |
 
@@ -179,7 +179,7 @@ and [`kiesel-app/facts:claimReview.json`](https://github.com/kiesel-app/facts/bl
 
 - [`kiesel-app/facts:docs/DESIGN.md`](https://github.com/kiesel-app/facts/blob/main/docs/DESIGN.md) — atproto-native record types (one for publishers, one for labelers).
 - [`docs/sources/licensing.md § Path 1`](./licensing.md#path-1--your-own-claimreview-articles) — when you host your own ClaimReviews you own the licensing posture end-to-end; the labeler doesn't layer extra terms.
-- [`docs/sources/feed-quality.md`](./feed-quality.md) — the allowlist that
+- [`docs/sources/allowlist.md`](./allowlist.md) — the allowlist that
   filters every ingest, including yours.
 - [`docs/sources/factcheck-api.md`](./factcheck-api.md) — using the Google live
   API alongside or instead of your own bulk file.

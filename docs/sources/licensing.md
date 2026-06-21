@@ -107,7 +107,7 @@ least one entry whose publisher name field carried an active XSS
 payload. The labeler filters at ingest with a curated publisher
 allowlist that applies to **both** Path 2 (bulk) and Path 3 (live
 API), so the same editorial bar gates every entry regardless of
-intake path. See [`FEED_QUALITY.md`](./feed-quality.md) for the
+intake path. See [`FEED_QUALITY.md`](./allowlist.md) for the
 allowlist criteria, how to add a publisher, and how to report bad
 upstream entries back to Google.
 

@@ -52,7 +52,7 @@ so the editorial bar stays identical regardless of intake.
 Per-path setup, caching, and ToS implications:
 
 - **Path 1** — [`sources/own-claimreviews.md`](../sources/own-claimreviews.md)
-- **Path 2** — [`sources/feed-quality.md`](../sources/feed-quality.md) + [`sources/licensing.md § Path 2`](../sources/licensing.md#path-2--google-data-commons-bulk-feed)
+- **Path 2** — [`sources/allowlist.md`](../sources/allowlist.md) + [`sources/licensing.md § Path 2`](../sources/licensing.md#path-2--google-data-commons-bulk-feed)
 - **Path 3** — [`sources/factcheck-api.md`](../sources/factcheck-api.md) + [`sources/licensing.md § Path 3`](../sources/licensing.md#path-3--google-fact-check-tools-api-claimssearch)
 
 The default deployment runs Path 2 + Path 3 — they're independent

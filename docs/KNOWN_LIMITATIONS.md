@@ -150,7 +150,7 @@ in the shipping system. Documented so operators tracking against an
 older mental model can stop worrying about them:
 
 - **Wrong labels emitted from junk publishers.** Closed by the
-  publisher allowlist (see [`FEED_QUALITY.md`](./sources/feed-quality.md)).
+  publisher allowlist (see [`FEED_QUALITY.md`](./sources/allowlist.md)).
   Every path — bulk feed, live API, own ingest — flows through the
   same allowlist gate.
 - **Stored XSS / `javascript:` URLs from feed content.** Closed by

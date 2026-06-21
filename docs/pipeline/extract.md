@@ -84,26 +84,22 @@ match.
 The aggregation stage is the only stage that takes a position on
 truth. Extraction stays neutral by construction.
 
-## Model choice
+## Strict structured output
 
-Same `OPENAI_MODEL` env as Stages 2 and 3 — qwen3.6-27b on the
-all-local deployment, gemini-2.5-flash on the Vercel-hosted shape.
-See [`../ADR_model_choices.md`](../adr/model-choices.md) for the
-head-to-head and the reasons. Both produced 14/14 on
-`pnpm test:matching` and agreed on every extracted-claim text on the
-fixture posts.
+The prompt asks for JSON matching the `ExtractedClaim` schema; the
+OpenAI-compatible client passes that schema as
+`response_format: { type: 'json_schema', json_schema: ... }`. Models
+that support strict structured output (OpenAI, qwen3 via LM Studio,
+gemini-2.5-flash) honour it directly. Models with reasoning channels
+(qwen3, gemini) need `OPENAI_MAX_TOKENS ≥ 4096` so the reasoning
+trace doesn't truncate the JSON as `finish_reason=length`. The
+extract client retries once with a larger budget on truncation, but
+configuring it right is cheaper than the retry.
 
-Strict structured-output is required. The prompt asks for JSON
-matching a specific schema; the OpenAI-compatible client passes that
-schema as `response_format: { type: 'json_schema', json_schema: ... }`
-where the provider supports it (OpenAI, qwen3 via LM Studio,
-gemini-2.5-flash all do).
-
-For models with reasoning channels (qwen3, gemini): set
-`OPENAI_MAX_TOKENS ≥ 4096`. The reasoning trace can otherwise
-truncate the JSON output as `finish_reason=length`. The extract
-client tolerates this and retries once with a larger budget, but
-configuring the budget right is cheaper than the retry.
+Model selection (`OPENAI_MODEL`) is shared across Stages 3, 4 and
+this stage. The head-to-head benchmark and deployment-shape
+trade-off live in
+[`../adr/model-choices.md`](../adr/model-choices.md).
 
 ## Research backing
 

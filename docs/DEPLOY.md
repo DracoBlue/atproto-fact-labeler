@@ -13,7 +13,7 @@ register the labeler with Bluesky, and the labeler registration can be
 done from any operator workstation, not necessarily the server.
 
 For the **model choices** (LLM, embedding) and the rationale per
-deployment shape, see [`ADR_model_choices.md`](./adr/model-choices.md).
+deployment shape, see [`adr/model-choices.md`](./adr/model-choices.md).
 Summary: hybrid (Vercel LLM + local granite) is the recommended shape
 for best retrieval quality, pure-Vercel works too at a ~7% crosslingual
 quality cost.
@@ -92,7 +92,7 @@ See § "Periodic re-ingest" below.
 alongside real fact-checkers. The ingester only inserts rows whose
 publisher is on a curated allowlist
 (`config/claimreview-publishers-allowlist.txt`). Read
-[`docs/sources/feed-quality.md`](./sources/feed-quality.md) before going live — that
+[`docs/sources/allowlist.md`](./sources/allowlist.md) before going live — that
 file decides which fact-checkers' verdicts your service propagates
 onto Bluesky, and tells you how to report the spam back to Google.
 
@@ -270,11 +270,11 @@ pnpm ingest
 pnpm cli:embed-rebuild
 # (~12 min for 92 k rows on M3 Max via local granite; 80-120 min via Vercel.)
 
-# 3. Optionally test the pipeline against the 13-case fixture
+# 3. Optionally test the pipeline against the 14-case fixture
 pnpm test:matching
 ```
 
-Step 3 is the gate — if `test:matching` is not 13/13 against your
+Step 3 is the gate — if `test:matching` is not 14/14 against your
 chosen LLM, fix that *before* exposing the labeler to live traffic.
 Once it's green, proceed to LIFECYCLE.md § Phase 1 to register the
 service.
@@ -321,7 +321,7 @@ last refresh — for example to drop a previously-trusted publisher —
 also run `pnpm cleanup:claims` to delete the now-disallowed rows from
 the existing index. New ingests honour the allowlist, but already-
 ingested rows linger until removed. See
-[`FEED_QUALITY.md`](./sources/feed-quality.md).
+[`FEED_QUALITY.md`](./sources/allowlist.md).
 
 The `cli:embed-rebuild` is model-aware: only newly-ingested rows or
 rows tagged with an outdated `EMBEDDING_MODEL` get re-embedded. Refresh
@@ -375,7 +375,7 @@ Phase 1 to register with Bluesky:
       DID (or the equivalent `_atproto.` TXT record is live)
 - [ ] `pnpm ingest` and `pnpm cli:embed-rebuild` have run inside the
       container
-- [ ] `pnpm test:matching` is **13/13 green** against your configured
+- [ ] `pnpm test:matching` is **14/14 green** against your configured
       LLM
 - [ ] `LABELER_SIGNING_KEY` is persisted somewhere outside the container
 - [ ] `LABELER_DID`, `LABELER_HANDLE`, `LABELER_HOSTNAME`,
@@ -410,7 +410,7 @@ Together, Groq, Mistral, …
 | --- | --- | --- |
 | `OPENAI_API_KEY` | — *(required)* | API key for the chat endpoint. Any non-empty value if the server doesn't check. |
 | `OPENAI_BASE_URL` | `https://ai-gateway.vercel.sh/v1` | Chat-completions base URL. |
-| `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [docs/adr/model-choices.md](adr/model-choices.md). |
+| `OPENAI_MODEL` | `google/gemini-2.5-flash` | Model name. All-local example: `qwen3.6-27b`. See [`adr/model-choices.md`](./adr/model-choices.md). |
 | `OPENAI_MAX_TOKENS` | `8192` | Per-request `max_tokens`. Reasoning models burn tokens on internal thinking — too small a budget truncates the JSON. `0` lets the server pick. |
 
 ### Embedding endpoint (Stage 2)
@@ -499,7 +499,7 @@ is `true`. Same creds, two surfaces.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CLAIMREVIEW_FEED_PATH` | `data.json` | Path to a Google Data Commons (or own single-item) `DataFeed` JSON. See [OWN_FACT_CHECKS.md](./sources/own-claimreviews.md). |
-| `CLAIMREVIEW_PUBLISHER_ALLOWLIST` | `config/claimreview-publishers-allowlist.txt` | Allowlist filtering both bulk ingest and live API responses. See [FEED_QUALITY.md](./sources/feed-quality.md). |
+| `CLAIMREVIEW_PUBLISHER_ALLOWLIST` | `config/claimreview-publishers-allowlist.txt` | Allowlist filtering both bulk ingest and live API responses. See [FEED_QUALITY.md](./sources/allowlist.md). |
 | `FACTCHECK_API_KEY` | *(empty)* | Google Fact Check Tools API key. When set, every `matchClaim()` also queries `claims:search` live and merges hits into the candidate pool. Setup: [FACTCHECK_API.md](./sources/factcheck-api.md). |
 | `FACTCHECK_API_PAGE_SIZE` | `10` | Results per `claims:search` call. |
 | `FACTCHECK_API_TIMEOUT_MS` | `5000` | Per-call timeout for the live API. On timeout, the pipeline falls back to the local pool. |

@@ -39,7 +39,7 @@ be named) before the details become public.
   their verdicts; their editorial mistakes are upstream.
 - Spam or low-quality entries in the Google Data Commons Fact Check
   feed itself. Those are documented in
-  [`docs/sources/feed-quality.md`](docs/sources/feed-quality.md), filtered with the
+  [`docs/sources/allowlist.md`](docs/sources/allowlist.md), filtered with the
   publisher allowlist, and reported upstream via
   `factcheck-support@datacommons.org`. They're not vulnerabilities in
   this codebase.
