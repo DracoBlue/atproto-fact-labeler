@@ -35,6 +35,6 @@ operator + contributor reference, organised by what the labeler
   system measurably doesn't do yet, with evidence. Operator-facing.
 - [`DEVELOPMENT.md`](./DEVELOPMENT.md) — offline dev, fixtures,
   smoke test, commit conventions.
-- [`feedback.md`](./feedback.md) — the feedback channel that
+- [`triggers/feedback.md`](./triggers/feedback.md) — the feedback channel that
   receives label appeals and reports against the labeler's own
   posts; review CLIs, Telegram surfacing, resolved workflow.

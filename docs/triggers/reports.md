@@ -208,7 +208,7 @@ Two report classes don't go through the fact-check pipeline:
   pipeline on the same input would produce the same verdict.
 
 Both land in the `feedback` table for operator review and never
-reach the dispatcher. See [`../feedback.md`](../feedback.md) for the
+reach the dispatcher. See [`./feedback.md`](./feedback.md) for the
 review CLIs, Telegram surfacing on appeals, the resolved-workflow,
 and the dedup behaviour.
 

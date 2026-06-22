@@ -24,3 +24,11 @@ thread reply, reports get a quote-post on the labeler's own feed.
 The behaviour is documented once in [`replies.md`](./replies.md):
 when it fires, what the post looks like, where the `Details:` link
 points, the i18n picker, and the retry queue.
+
+## Feedback channel
+
+Two report classes don't go through the pipeline at all — reports
+against the labeler's own posts, and label appeals (`reasonAppeal`).
+Both land in the `feedback` table for operator review. Review CLIs,
+Telegram surfacing on appeals, the resolved-workflow:
+[`feedback.md`](./feedback.md).

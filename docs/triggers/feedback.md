@@ -17,8 +17,8 @@ NLI on the labeler's own post would be both pointless and a recursion
 risk; running it on an appeal would produce the same verdict as
 before (input unchanged) and waste an LLM call.
 
-Code: [`src/feedback/store.ts`](../src/feedback/store.ts) +
-[`src/index.ts`](../src/index.ts) (route handler).
+Code: [`src/feedback/store.ts`](../../src/feedback/store.ts) +
+[`src/index.ts`](../../src/index.ts) (route handler).
 
 ## Reports against the labeler's own posts
 
@@ -36,7 +36,7 @@ of:
 - `tools.ozone.report.defs#reasonAppeal` (Ozone)
 
 Both are recognised by `isAppealReason()` in
-[`src/feedback/store.ts`](../src/feedback/store.ts). The dispatcher
+[`src/feedback/store.ts`](../../src/feedback/store.ts). The dispatcher
 **short-circuits**: no pipeline re-run; the appeal goes straight to
 `feedback` with the reporting DID, the reason string the user typed,
 and the subject URI of the contested label.
