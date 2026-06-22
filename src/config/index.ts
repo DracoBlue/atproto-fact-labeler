@@ -27,7 +27,7 @@ const Schema = z.object({
   /**
    * Embedding model name. Default = granite-278m-multilingual: ships with
    * LM Studio, 768 dims, genuine multilingual (EN↔DE crosslingual cosine 0.81
-   * measured on our test set). See docs/PIPELINE.md.
+   * measured on our test set). See docs/pipeline/README.md.
    */
   EMBEDDING_MODEL: z.string().default('openai/text-embedding-3-small'),
 
@@ -42,7 +42,7 @@ const Schema = z.object({
 
   // --- NLI (Stage 4: polarity gate) -------------------------------------
   // `llm-judge` reuses the LLM (OPENAI_*) with a 3-class entailment prompt.
-  // `dedicated` is reserved but throws — see docs/ADR_nli_llm_judge_over_mdeberta.md.
+  // `dedicated` is reserved but throws — see docs/adr/nli-judge-llm-not-mdeberta.md.
   NLI_MODE: z.enum(['llm-judge', 'dedicated']).default('llm-judge'),
 
   // Labeler identity
@@ -206,7 +206,7 @@ const Schema = z.object({
   // matching pipeline issues a live query per claim and merges the hits
   // into the candidate pool — closes the coverage gap where Lead Stories,
   // USA Today, AAP etc. publish ClaimReview on their own pages but don't
-  // show up in the bulk Data Commons feed. See docs/FACTCHECK_API.md.
+  // show up in the bulk Data Commons feed. See docs/sources/factcheck-api.md.
   FACTCHECK_API_KEY: z.string().optional(),
   FACTCHECK_API_PAGE_SIZE: z.coerce.number().int().min(1).max(50).default(10),
   FACTCHECK_API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),

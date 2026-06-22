@@ -5,7 +5,7 @@
  * embedding_model matches the current model, return top-K candidates sorted
  * by cosine descending.
  *
- * Threshold deliberately LOW (~0.55) — see docs/PIPELINE.md § "Why a single
+ * Threshold deliberately LOW (~0.55) — see docs/pipeline/README.md § "Why a single
  * threshold doesn't work." The quality gate lives in Stage 4 (NLI), not here.
  * Stage 2's job is to recall as many topically related candidates as possible
  * without flooding Stage 4.

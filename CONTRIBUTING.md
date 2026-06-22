@@ -86,8 +86,8 @@ then a paragraph or two on *why* the change was made. The existing
   conservative. If your region's IFCN-signatory fact-checker isn't on
   the list, please open a Publisher addition issue with the evidence.
 - **NLI / rerank prompt tuning** — `pnpm test:matching` is the
-  regression harness. A PR that lifts the 13-case fixture from
-  9/13 → 12/13 on a specific model is very welcome.
+  regression harness. A PR that lifts the 14-case fixture from
+  e.g. 10/14 → 13/14 on a specific model is very welcome.
 - **PDS compatibility** — the labeler is tested against `bsky.social`.
   Reports of running it against Eurosky, a self-hosted PDS or other
   major providers are valuable (open a Bug report with the symptoms).

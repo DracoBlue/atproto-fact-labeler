@@ -5,7 +5,7 @@
  * `retiredAt` timestamp (`tombstone`).
  *
  * Selection is operator-controlled via `ATPROTO_RETIRE_MODE` — see
- * docs/PROPOSAL_lexicons/LEXICON_DESIGN.md.
+ * kiesel-app/facts:docs/DESIGN.md.
  */
 import { CLAIM_VERDICT_NSID } from './atproto-verdict.ts';
 import type { BskyClient } from '../replier/bsky.ts';

@@ -148,7 +148,7 @@ async function main(): Promise<void> {
     // Publish the canonical app.kiesel.facts.claimVerdict record to the
     // labeler's PDS. The detail server reads this back via getRecord; other
     // consumers discover it through Constellation. See
-    // docs/PROPOSAL_lexicons/LEXICON_DESIGN.md for the architecture.
+    // kiesel-app/facts:docs/DESIGN.md for the architecture.
     await maybePublishClaimVerdict(proposalId);
 
     // Optional: reply to the mention post on Bluesky with the verdict.

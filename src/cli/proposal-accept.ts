@@ -242,7 +242,7 @@ async function main(): Promise<void> {
       }
       process.stderr.write(
         `\n  To accept one: pnpm proposal:accept --id=<N>\n` +
-          `  (Stop the live labeler first; see docs/LIFECYCLE.md.)\n`,
+          `  (Stop the live labeler first; see docs/HOSTING.md.)\n`,
       );
       return;
     }

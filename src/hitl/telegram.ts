@@ -98,7 +98,7 @@ export class TelegramHitl implements HitlSurface {
     lines.push('Pipeline was NOT re-run (same input → same verdict).');
     lines.push('Review:  pnpm feedback:list --only-unresolved');
     lines.push(`Retire:  pnpm retire --uri=${input.subjectUri}`);
-    lines.push('(see docs/TRIGGER_REPORTS.md § Label appeals)');
+    lines.push('(see docs/triggers/reports.md § Label appeals)');
     try {
       await this.bot.api.sendMessage(this.chatId, lines.join('\n'), {
         link_preview_options: { is_disabled: true },

@@ -1,6 +1,6 @@
 /**
  * Minimal authenticated Bluesky client. Used only for posting replies to
- * mention-triggered fact-checks; see docs/TRIGGER_MENTIONS.md § Reply-to-mention.
+ * mention-triggered fact-checks; see docs/triggers/mentions.md § Reply-to-mention.
  *
  * Auth flow:
  *   1. com.atproto.server.createSession with identifier + app password.

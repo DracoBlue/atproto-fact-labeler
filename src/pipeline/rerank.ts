@@ -14,7 +14,7 @@
  *
  * Why not a dedicated cross-encoder like bge-reranker-v2-m3 in
  * Transformers.js: same ONNX-ergonomics concern documented in
- * [`docs/ADR_nli_llm_judge_over_mdeberta.md`](../../docs/ADR_nli_llm_judge_over_mdeberta.md).
+ * [`docs/adr/nli-judge-llm-not-mdeberta.md`](../../docs/adr/nli-judge-llm-not-mdeberta.md).
  * The LLM-as-reranker path uses the LLM endpoint we already have wired
  * and proven.
  */

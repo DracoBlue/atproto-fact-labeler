@@ -9,7 +9,7 @@
  *   S5 propose   → write a proposal to the HITL queue
  *
  * The retrieve→entail→match chain is implemented in matching.ts.
- * See docs/PIPELINE.md for the architecture rationale.
+ * See docs/pipeline/README.md for the architecture rationale.
  */
 import { getDb } from '../store/db.ts';
 import type { DbLike } from '../store/runtime-sqlite.ts';
@@ -143,7 +143,7 @@ function hostOf(url: string | null): string | undefined {
 /**
  * Infer how this candidate entered the pool. Based on the `attribution`
  * string the ingest paths embed (see src/ingest/{claimreview-feed,
- * factcheck-live}.ts and docs/OWN_FACT_CHECKS.md).
+ * factcheck-live}.ts and docs/sources/own-claimreviews.md).
  */
 function inferIntakePath(attribution: string): EvidenceSnapshot['evidence'][number]['intakePath'] {
   if (/Google Fact Check Tools API/i.test(attribution)) return 'factcheck-api';
@@ -193,7 +193,7 @@ export async function processPost(
     falsifiableClaims++;
 
     // S2..S5 — retrieve + rerank + NLI polarity gate + aggregate. See
-    // docs/PIPELINE.md for the three-stage architecture.
+    // docs/pipeline/README.md for the three-stage architecture.
     const match = await matchClaim(
       c.decontextualized_text || c.atomic_text,
       { topK: 10, lang: c.lang ?? post.lang },
@@ -252,7 +252,7 @@ export async function processPost(
     // claimVerdict.evidence[] array on accept. Shape mirrors the lexicon
     // (lexicons/app/kiesel/facts/claimVerdict.json#evidenceItem). Persisted
     // on the proposal row so it survives crashes between pipeline-run and
-    // HITL decision (see docs/PROPOSAL_lexicons/LEXICON_DESIGN.md § Option C).
+    // HITL decision (see kiesel-app/facts:docs/DESIGN.md § Option C).
     const snapshot: EvidenceSnapshot = {
       evidence: survivingCandidates.map((cand) => ({
         polarity:

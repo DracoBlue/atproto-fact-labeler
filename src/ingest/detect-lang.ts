@@ -8,7 +8,7 @@
  * encode the language in their URL.
  *
  * Picked `eld` (medium dataset) after the side-by-side run in
- * `experiment/language/`. See `docs/LANGUAGE_DETECTION.md` for the why.
+ * `experiment/language/`. See `docs/pipeline/language-detection.md` for the why.
  */
 import { eld } from 'eld/medium';
 

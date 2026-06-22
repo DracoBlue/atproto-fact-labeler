@@ -3,7 +3,7 @@
  *
  * Determines whether the input claim entails, contradicts, or is neutral
  * w.r.t. each retrieved fact-check's claim_reviewed text. This is the
- * principled fix for the FTS aggregator's polarity bug — see docs/PIPELINE.md
+ * principled fix for the FTS aggregator's polarity bug — see docs/pipeline/README.md
  * § "Stage 4 — NLI polarity gate".
  *
  * Modes:

@@ -62,7 +62,7 @@ interface DataFeedItem {
  *   3. NULL if the text is too short / detector isn't confident.
  *
  * The URL/TLD heuristic this replaced was buggy on multiple fronts —
- * see `docs/LANGUAGE_DETECTION.md` for the history.
+ * see `docs/pipeline/language-detection.md` for the history.
  */
 function guessLanguage(entry: ClaimReview): string | undefined {
   if (entry.inLanguage) return entry.inLanguage.toLowerCase().slice(0, 2);

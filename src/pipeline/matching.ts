@@ -107,7 +107,7 @@ export async function matchClaim(
   // unique lang, filter through the publisher allowlist, persist new hits
   // into claim_review, and inline-embed them — so Stage 2 retrieval below
   // picks them up via the normal cosine path. Cached on subsequent runs;
-  // no-op when the key is unset. See docs/FACTCHECK_API.md.
+  // no-op when the key is unset. See docs/sources/factcheck-api.md.
   if (cfg.FACTCHECK_API_KEY) {
     try {
       const live = await populateLiveCandidates(claim, langs, db ?? getDb());

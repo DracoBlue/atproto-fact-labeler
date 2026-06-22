@@ -2,7 +2,7 @@
  * Google Fact Check Tools API client — claims:search endpoint.
  *
  * Auth: API key only. Bearer tokens (user OAuth, service-account JWT) are
- * actively rejected by the endpoint — see docs/FACTCHECK_API.md for the
+ * actively rejected by the endpoint — see docs/sources/factcheck-api.md for the
  * test that confirmed this.
  *
  * Returns a normalised shape that matches what the ingest pipeline writes

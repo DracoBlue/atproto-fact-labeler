@@ -6,7 +6,7 @@
  * the configured LLM endpoint. Prints a pass/fail report and exits non-zero
  * on regression.
  *
- * This is the "polarity matrix" gate referenced in docs/PIPELINE.md §
+ * This is the "polarity matrix" gate referenced in docs/pipeline/README.md §
  * "Test-set / CI gate". Not part of `pnpm test` — it needs LM Studio
  * running, a populated index with embeddings, and ~15 min wall clock for
  * the full set on M3 Max.

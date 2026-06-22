@@ -12,32 +12,35 @@ services:
     environment:
       # --- LLM (any OpenAI-compatible endpoint: OpenAI, LM Studio, Ollama, vLLM, ...) ---
       - OPENAI_API_KEY=${OPENAI_API_KEY:?set OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
-      # Default: all-local qwen3.6-27b. For Vercel use OPENAI_MODEL=google/gemini-2.5-flash.
-      # See docs/ADR_model_choices.md.
-      - OPENAI_MODEL=${OPENAI_MODEL:-qwen3.6-27b}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://ai-gateway.vercel.sh/v1}
+      # Default: hybrid shape (Vercel gemini for chat, local granite for embeddings).
+      # All-local example: OPENAI_MODEL=qwen3.6-27b with LM Studio.
+      # See docs/adr/model-choices.md.
+      - OPENAI_MODEL=${OPENAI_MODEL:-google/gemini-2.5-flash}
       # Reasoning models (qwen3, deepseek-r1) need headroom or finish_reason=length
       # swallows the answer. Set 0 to let the server pick its default.
-      - OPENAI_MAX_TOKENS=${OPENAI_MAX_TOKENS:-4096}
+      - OPENAI_MAX_TOKENS=${OPENAI_MAX_TOKENS:-8192}
 
-      # --- Embedding (Stage 1: dense retrieval) ---
-      # Falls back to the OPENAI_* slot when unset, so a single LM Studio
-      # instance can serve both. Override when embeddings live on a different server.
+      # --- Embedding (Stage 2: dense retrieval) ---
+      # Falls back to the OPENAI_* slot when unset, so a single endpoint
+      # can serve both. Override when embeddings live on a different server
+      # (e.g. local LM Studio for embeddings + Vercel for chat).
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-granite-embedding-278m-multilingual}
 
-      # --- Reranker (Stage 2: relevance gate before NLI) ---
+      # --- Reranker (Stage 3: relevance gate before NLI) ---
       # llm: single batched LLM call rates top-K candidates for relevance.
       #      Keeps top RERANK_KEEP above RERANK_THRESHOLD.
-      # off: skip Stage 2 — Stage 3 NLI runs on every retrieved candidate.
+      # off: skip Stage 3 — Stage 4 NLI runs on every retrieved candidate.
       - RERANK_MODE=${RERANK_MODE:-llm}
       - RERANK_KEEP=${RERANK_KEEP:-5}
       - RERANK_THRESHOLD=${RERANK_THRESHOLD:-0.5}
 
-      # --- NLI (Stage 3: polarity gate) ---
+      # --- NLI (Stage 4: polarity gate) ---
       # llm-judge: prompt OPENAI_MODEL as a 3-class entailment judge (default).
-      # dedicated: reserved for a separate NLI server (not yet implemented).
+      # dedicated: reserved for a separate NLI server (not implemented —
+      #            see docs/adr/nli-judge-llm-not-mdeberta.md).
       - NLI_MODE=${NLI_MODE:-llm-judge}
 
       # --- Labeler identity ---
@@ -46,6 +49,13 @@ services:
       - LABELER_SIGNING_KEY=${LABELER_SIGNING_KEY:-}
       - LABELER_HOSTNAME=${LABELER_HOSTNAME:-http://localhost:14831}
       - LABELER_PORT=14831
+      # GET / 302-redirect target. Unset → derived from LABELER_DID
+      # (https://bsky.app/profile/<DID>). Set to empty string to disable.
+      - LABELER_ROOT_REDIRECT=${LABELER_ROOT_REDIRECT:-}
+      # Retire mode for the atproto claimVerdict record on `pnpm retire`.
+      # delete: drop the record (matches retract intent, default).
+      # tombstone: putRecord with retiredAt timestamp (keeps audit trail).
+      - ATPROTO_RETIRE_MODE=${ATPROTO_RETIRE_MODE:-delete}
 
       # --- Ingest ---
       - JETSTREAM_URL=${JETSTREAM_URL:-wss://jetstream2.us-east.bsky.network/subscribe}
@@ -66,22 +76,34 @@ services:
       - REQUIRE_REPORT_AUTH=${REQUIRE_REPORT_AUTH:-true}
       - PLC_DIRECTORY_URL=${PLC_DIRECTORY_URL:-https://plc.directory}
 
-      # --- Mention replies (opt-in; needs a Bluesky service account) ---
+      # --- Replies + quote-posts (opt-in; needs a Bluesky service account) ---
+      # REPLY_TO_MENTIONS: threaded reply under the mention post.
+      # REPLY_TO_REPORTS:  quote-post the reported post on the labeler's feed.
       - REPLY_TO_MENTIONS=${REPLY_TO_MENTIONS:-false}
+      - REPLY_TO_REPORTS=${REPLY_TO_REPORTS:-false}
       - LABELER_BSKY_SERVICE=${LABELER_BSKY_SERVICE:-https://bsky.social}
       - LABELER_BSKY_IDENTIFIER=${LABELER_BSKY_IDENTIFIER:-}
       - LABELER_BSKY_APP_PASSWORD=${LABELER_BSKY_APP_PASSWORD:-}
       - LABELER_DETAIL_BASE_URL=${LABELER_DETAIL_BASE_URL:-}
       - LABELER_REPLY_DEFAULT_LANG=${LABELER_REPLY_DEFAULT_LANG:-en}
 
-      # --- HITL ---
-      - HITL_MODE=${HITL_MODE:-auto}
+      # --- HITL (decision review) ---
+      # stdin (default) · telegram · auto · auto-telegram
+      - HITL_MODE=${HITL_MODE:-stdin}
+      - HITL_AUTO_MIN_CONFIDENCE=${HITL_AUTO_MIN_CONFIDENCE:-0.6}
+      - HITL_AUTO_MIN_VOTES=${HITL_AUTO_MIN_VOTES:-2}
       - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
       - TG_REVIEWER_CHAT_ID=${TG_REVIEWER_CHAT_ID:-}
 
+      # --- Live Fact Check Tools API (optional; closes the English-publisher gap) ---
+      # Setup: docs/sources/factcheck-api.md
+      - FACTCHECK_API_KEY=${FACTCHECK_API_KEY:-}
+      - FACTCHECK_API_PAGE_SIZE=${FACTCHECK_API_PAGE_SIZE:-10}
+      - FACTCHECK_API_TIMEOUT_MS=${FACTCHECK_API_TIMEOUT_MS:-5000}
+
       # --- Storage ---
       - SQLITE_PATH=/data/labeler.sqlite
-      - CLAIMREVIEW_FEED_PATH=/data/data.json
+      - CLAIMREVIEW_FEED_PATH=${CLAIMREVIEW_FEED_PATH:-/data/data.json}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
     extra_hosts:

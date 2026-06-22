@@ -58,14 +58,12 @@ curl -L https://storage.googleapis.com/datacommons-feeds/factcheck/latest/data.j
 # 3. Build the local index
 pnpm ingest                   # import allow-listed rows into SQLite
 pnpm cli:lang-rebuild         # populate language column
-pnpm cli:embed-rebuild        # compute embeddings (~15 min cold)
+pnpm cli:embed-rebuild        # compute embeddings — see note below
 
 # 4. Turn the Bluesky account into a labeler
 #    Step a — update the DID document to declare the labeler endpoint
 #    and signing key. Skyware asks for the account creds and a PLC
 #    token mailed to the address.
-#    PERSIST THE SIGNING KEY — losing it invalidates every emitted
-#    label.
 pnpm dlx @skyware/labeler setup
 
 #    Step b — declare the six fact-* label values in the account's
@@ -76,6 +74,23 @@ pnpm labeler:declare
 # 5. Start the service
 pnpm start                    # or: docker compose up -d
 ```
+
+> ⚠️ **`pnpm dlx @skyware/labeler setup` prints a signing key to
+> stdout. Save it now — there is no second chance.** Losing it
+> invalidates every label you emit and the only way to recover is
+> to re-run `setup` (which generates a new key and re-publishes the
+> DID document, leaving any cached labels signed by the old key
+> permanently unverifiable). Either let skyware write it to `.env`
+> as `LABELER_SIGNING_KEY`, or copy it into a password manager
+> *before* you continue.
+
+> ⏱ **`cli:embed-rebuild` time depends on the embedding endpoint.**
+> Against local LM Studio + granite-278m on M3 Max it takes
+> ~15 min for the ~88k allow-listed rows (~130 emb/s). Against the
+> Vercel AI Gateway it takes **80–120 min** — the network round-trip
+> dominates. Use a local embedding endpoint for the initial build
+> if you can; subsequent re-runs are incremental (only newly-ingested
+> rows or rows tagged with an outdated `EMBEDDING_MODEL` get touched).
 
 Skyware's [getting-started guide](https://skyware.js.org/guides/labeler/introduction/getting-started/)
 has the DID / PLC-token detail for step 4a. Step 4b is idempotent —
@@ -135,8 +150,11 @@ The 14-case fixture is the calibrated correctness gate:
 pnpm test:matching            # 14/14 is the going-live bar
 ```
 
-Anything below that, fix before exposing the labeler to real
-traffic.
+Wall-clock ~15 min on M3 Max with qwen3.6-27b as the LLM judge.
+The fixture spins up extract + retrieve + rerank + NLI for every
+case, so the run cost scales with your LLM endpoint's latency —
+budget ~1 min per case. Not part of `pnpm test`. Anything below
+14/14, fix before exposing the labeler to real traffic.
 
 ## Configuration reference
 
