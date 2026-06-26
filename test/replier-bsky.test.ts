@@ -209,3 +209,116 @@ describe('BskyClient.quotesAllowed', () => {
     expect(await c.quotesAllowed('not-an-at-uri')).toBe(true);
   });
 });
+
+describe('BskyClient — JWT-expiry handling', () => {
+  function fakeFetch(
+    handlers: Array<(req: Request) => Response | Promise<Response>>,
+  ): typeof fetch {
+    const queue = [...handlers];
+    return (async (input: string | URL | Request, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const handler = queue.shift();
+      if (!handler) throw new Error('unexpected extra fetch call: ' + req.url);
+      return handler(req);
+    }) as unknown as typeof fetch;
+  }
+
+  /** Build a JWT-shaped string whose payload encodes `{ exp }`. No signature. */
+  function makeJwt(claims: { exp: number }): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+    return `${header}.${payload}.signature`;
+  }
+
+  it('refreshes proactively when the access JWT exp is in the past', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expiredJwt = makeJwt({ exp: nowSec - 10 });
+    const freshJwt = makeJwt({ exp: nowSec + 3600 });
+    let createRecordBearer: string | undefined;
+
+    const fetchImpl = fakeFetch([
+      // 1: createSession returns an already-expired access token
+      async () =>
+        new Response(
+          JSON.stringify({ did: 'did:plc:labeler', accessJwt: expiredJwt, refreshJwt: 'r1' }),
+          { status: 200 },
+        ),
+      // 2: refreshSession fires BEFORE the createRecord because the token
+      //    is already expired by the proactive check
+      async () =>
+        new Response(
+          JSON.stringify({ did: 'did:plc:labeler', accessJwt: freshJwt, refreshJwt: 'r2' }),
+          { status: 200 },
+        ),
+      // 3: createRecord uses the fresh token, succeeds
+      async (req) => {
+        createRecordBearer = req.headers.get('authorization') ?? undefined;
+        return new Response(JSON.stringify({ uri: 'at://r', cid: 'bafy-r' }), { status: 200 });
+      },
+    ]);
+
+    const client = new BskyClient({
+      serviceUrl: 'https://bsky.social',
+      identifier: 'x',
+      password: 'y',
+      fetchImpl,
+    });
+    const result = await client.postReply({
+      text: 't',
+      parent: { uri: 'at://a', cid: 'c' },
+      root: { uri: 'at://a', cid: 'c' },
+    });
+    expect(result.uri).toBe('at://r');
+    expect(createRecordBearer).toBe(`Bearer ${freshJwt}`);
+  });
+
+  it('retries on 400 + ExpiredToken (not just 401)', async () => {
+    // Simulate the bsky.social shape: well-formed JWT but the server rejects
+    // it as expired with a 400/ExpiredToken response. Proactive check might
+    // miss this if the clock skewed or the JWT can't be parsed.
+    const unparseableJwt = 'opaque-token-from-mock-server';
+    let attempt = 0;
+
+    const fetchImpl = fakeFetch([
+      // 1: createSession with an unparseable accessJwt — proactive check
+      //    bails to "not expired" so we DO try the call once
+      async () =>
+        new Response(
+          JSON.stringify({ did: 'did:plc:labeler', accessJwt: unparseableJwt, refreshJwt: 'r1' }),
+          { status: 200 },
+        ),
+      // 2: createRecord → 400 ExpiredToken
+      async () => {
+        attempt++;
+        return new Response(JSON.stringify({ error: 'ExpiredToken', message: 'Token has expired' }), {
+          status: 400,
+        });
+      },
+      // 3: refreshSession → new tokens
+      async () =>
+        new Response(
+          JSON.stringify({ did: 'did:plc:labeler', accessJwt: 'fresh', refreshJwt: 'r2' }),
+          { status: 200 },
+        ),
+      // 4: createRecord retry succeeds
+      async () => {
+        attempt++;
+        return new Response(JSON.stringify({ uri: 'at://r', cid: 'bafy-r' }), { status: 200 });
+      },
+    ]);
+
+    const client = new BskyClient({
+      serviceUrl: 'https://bsky.social',
+      identifier: 'x',
+      password: 'y',
+      fetchImpl,
+    });
+    const result = await client.postReply({
+      text: 't',
+      parent: { uri: 'at://a', cid: 'c' },
+      root: { uri: 'at://a', cid: 'c' },
+    });
+    expect(result.uri).toBe('at://r');
+    expect(attempt).toBe(2);
+  });
+});

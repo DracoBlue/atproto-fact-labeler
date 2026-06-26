@@ -17,6 +17,26 @@ interface Session {
   refreshJwt: string;
 }
 
+/**
+ * Decode the `exp` claim from a JWT *without* verifying the signature.
+ * The token came from bsky.social on a successful login; we trust it
+ * to know its own expiry. Returns the Unix timestamp in seconds or
+ * null when the JWT can't be parsed.
+ */
+function jwtExp(jwt: string): number | null {
+  try {
+    const payload = jwt.split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = Buffer.from(padded, 'base64').toString('utf-8');
+    const claims = JSON.parse(json) as { exp?: unknown };
+    return typeof claims.exp === 'number' ? claims.exp : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface BskyClientOptions {
   serviceUrl: string;
   identifier: string;
@@ -229,12 +249,37 @@ export class BskyClient {
     await this.callRepoMethod('deleteRecord', { collection, rkey });
   }
 
+  /**
+   * Is the cached access JWT about to expire? Bsky.social access tokens
+   * have a ~2h lifetime; we refresh ~60 s before expiry so a long-running
+   * downstream call doesn't trip over the boundary.
+   *
+   * Returns `true` (= treat as expired) when the JWT can't be decoded —
+   * conservative because the alternative is a 400/ExpiredToken downstream
+   * that the post-hoc retry has to clean up anyway.
+   */
+  private accessJwtExpired(safetySeconds = 60): boolean {
+    if (!this.session) return true;
+    const exp = jwtExp(this.session.accessJwt);
+    if (exp === null) return false; // unparseable but present — let the call try, fall back to retry
+    return exp <= Math.floor(Date.now() / 1000) + safetySeconds;
+  }
+
   private async callRepoMethod(
     method: 'createRecord' | 'putRecord' | 'deleteRecord',
     extraBody: Record<string, unknown>,
   ): Promise<PostReplyResult> {
     if (!this.session) await this.login();
     if (!this.session) throw new Error('bsky session unavailable');
+
+    // Proactive refresh: bsky.social returns 400 + ExpiredToken (not 401)
+    // when the access JWT has aged out. Catching that post-hoc is possible
+    // but burns a doomed round-trip. Cheaper to check the exp claim and
+    // refresh before sending.
+    if (this.accessJwtExpired()) {
+      await this.refresh();
+      if (!this.session) throw new Error('bsky re-auth failed');
+    }
 
     const body = { repo: this.session.did, ...extraBody };
     const url = `${this.serviceUrl}/xrpc/com.atproto.repo.${method}`;
@@ -250,13 +295,24 @@ export class BskyClient {
       });
 
     let res = await post();
-    if (res.status === 401) {
+    // Safety net: clock skew, a refresh that raced, or an edge case in the
+    // exp check. 401 is the standard "token rejected"; bsky.social uses
+    // 400 + ExpiredToken specifically when the JWT is well-formed but past
+    // its expiry. Both warrant one retry after a refresh.
+    let bodyText = '';
+    if (!res.ok) bodyText = await res.text().catch(() => '');
+    const expiredToken =
+      res.status === 401 ||
+      (res.status === 400 && bodyText.includes('ExpiredToken'));
+    if (expiredToken) {
       await this.refresh();
       if (!this.session) throw new Error('bsky re-auth failed');
       res = await post();
+      bodyText = '';
     }
     if (!res.ok) {
-      throw new Error(`${method} ${res.status}: ${await res.text().catch(() => '')}`);
+      if (!bodyText) bodyText = await res.text().catch(() => '');
+      throw new Error(`${method} ${res.status}: ${bodyText}`);
     }
     // deleteRecord returns an empty body; parse-failure tolerated.
     return (await res
