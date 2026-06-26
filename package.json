@@ -1,6 +1,6 @@
 {
   "name": "atproto-fact-labeler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An atproto labeler that routes existing fact-check verdicts (CORRECTIV, dpa, AFP, Snopes, ...) onto Bluesky posts — it does not decide what is true; it surfaces who already verified what.",
   "type": "module",
   "license": "MIT",
