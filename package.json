@@ -42,7 +42,7 @@
     "dotenv": "^17.4.2",
     "eld": "^2.0.3",
     "grammy": "^1.32.0",
-    "openai": "^6.44.0",
+    "openai": "^6.45.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.0.0",
     "stream-chain": "^4.2.5",
